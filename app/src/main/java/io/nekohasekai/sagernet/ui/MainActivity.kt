@@ -387,14 +387,27 @@ class MainActivity : ThemedActivity(),
         syncMainControls(fragment, showWhenConnected = false, animate = true)
     }
 
+    fun requestDashboardConnection() {
+        connect.launch(null)
+    }
+
+    fun runDashboardConnectionTest() {
+        if (DataStore.serviceState.connected) {
+            binding.stats.testConnection()
+        } else {
+            snackbar("请先连接 VPN").show()
+        }
+    }
+
     private fun syncMainControls(
         fragment: Any? = currentMainFragment
             ?: supportFragmentManager.findFragmentById(R.id.fragment_holder),
         showWhenConnected: Boolean,
         animate: Boolean,
     ) {
-        val showControls = fragment is ConfigurationFragment || DataStore.showBottomBar
-        binding.stats.useExternalScrollDriver = fragment is ConfigurationFragment
+        val dashboardHome = fragment is ConfigurationFragment
+        val showControls = !dashboardHome && DataStore.showBottomBar
+        binding.stats.useExternalScrollDriver = false
         binding.stats.syncMainControls(
             showControls,
             DataStore.serviceState,

@@ -26,6 +26,7 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
+import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
 import androidx.core.graphics.ColorUtils
 import androidx.core.net.toUri
@@ -192,6 +193,10 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     @Volatile
     private var serviceStartedSnapshot = DataStore.serviceState.started
+    private lateinit var dashboardSwitch: SwitchCompat
+    private lateinit var dashboardState: TextView
+    private lateinit var dashboardAction: TextView
+    private lateinit var dashboardProfileName: TextView
 
     private data class ProfileStateSnapshot(
         val selectedProxy: Long,
@@ -205,9 +210,37 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     fun refreshProfileState() {
         lifecycleScope.launch(Dispatchers.Main.immediate) {
+            updateDashboardState()
             val generation = profileStateGeneration.incrementAndGet()
             profileStateRequests.trySend(generation)
         }
+    }
+
+    private fun updateDashboardState() {
+        if (!::dashboardSwitch.isInitialized) return
+        val state = DataStore.serviceState
+        dashboardSwitch.setOnCheckedChangeListener(null)
+        dashboardSwitch.isChecked = state.started
+        dashboardSwitch.setOnCheckedChangeListener { _, checked ->
+            if (checked && !DataStore.serviceState.started) {
+                (activity as? MainActivity)?.requestDashboardConnection()
+            } else if (!checked && DataStore.serviceState.canStop) {
+                SagerNet.stopService()
+            }
+        }
+        dashboardState.text = when (state) {
+            BaseService.State.Connecting -> "正在连接…"
+            BaseService.State.Connected -> "已连接"
+            BaseService.State.Stopping -> "正在断开…"
+            else -> "等待连接"
+        }
+        dashboardAction.text = when (state) {
+            BaseService.State.Connecting -> "正在建立 VPN"
+            BaseService.State.Connected -> "点击断开 VPN"
+            BaseService.State.Stopping -> "正在关闭 VPN"
+            else -> "点击连接 VPN"
+        }
+        dashboardProfileName.text = if (DataStore.selectedProxy > 0) "当前节点" else "未选择节点"
     }
 
     private fun updateSelectedProxySnapshot(profileId: Long) {
@@ -377,6 +410,22 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
             }
         }
+
+        dashboardSwitch = view.findViewById(R.id.dashboard_connection_switch)
+        dashboardState = view.findViewById(R.id.dashboard_connection_state)
+        dashboardAction = view.findViewById(R.id.dashboard_connection_action)
+        dashboardProfileName = view.findViewById(R.id.dashboard_profile_name)
+        dashboardSwitch.setOnCheckedChangeListener { _, checked ->
+            if (checked && !DataStore.serviceState.started) {
+                (activity as? MainActivity)?.requestDashboardConnection()
+            } else if (!checked && DataStore.serviceState.canStop) {
+                SagerNet.stopService()
+            }
+        }
+        view.findViewById<View>(R.id.dashboard_test_card).setOnClickListener {
+            (activity as? MainActivity)?.runDashboardConnectionTest()
+        }
+        updateDashboardState()
 
         groupPager = view.findViewById(R.id.group_pager)
         tabLayout = view.findViewById(R.id.group_tab)
