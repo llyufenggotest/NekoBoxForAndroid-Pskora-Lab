@@ -149,7 +149,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
             return s
         }
 
-    var mixedUsername by configurationStore.string(Key.MIXED_USERNAME_PREF) { Key.MIXED_USERNAME }
+    var mixedUsername by configurationStore.string(Key.MIXED_USERNAME_PREF) { "" }
+    var shareAuthEnabled by configurationStore.boolean(Key.SHARE_AUTH_ENABLED)
 
     var mixedPort: Int
         get() = getLocalPort(Key.MIXED_PORT, 2080)
@@ -160,8 +161,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
             !(appendHttpProxy && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
 
     val mixedInboundHasAuth: Boolean
-        get() = mixedInboundNeedsAuth &&
-            (mixedUsername.isNotEmpty() || mixedSecret.isNotEmpty())
+        get() = mixedInboundNeedsAuth && shareAuthEnabled &&
+            mixedUsername.isNotEmpty() && mixedSecret.isNotEmpty()
 
     val mixedInboundUser: String get() = if (mixedInboundAuthed) mixedUsername else ""
     val mixedInboundPass: String get() = if (mixedInboundAuthed) mixedSecret else ""

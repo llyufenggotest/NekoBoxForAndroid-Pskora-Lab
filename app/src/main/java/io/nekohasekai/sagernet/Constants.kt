@@ -44,6 +44,7 @@ object Key {
     const val MIXED_SECRET = "mixedSecret" // storage key for the generated inbound secret
     const val MIXED_USERNAME = "neko" // default username presented to the authed mixed inbound
     const val MIXED_USERNAME_PREF = "mixedUsername" // storage key for the inbound username
+    const val SHARE_AUTH_ENABLED = "shareAuthEnabled"
     const val ALLOW_ACCESS = "allowAccess"
     const val SPEED_INTERVAL = "speedInterval"
     const val SHOW_DIRECT_SPEED = "showDirectSpeed"
