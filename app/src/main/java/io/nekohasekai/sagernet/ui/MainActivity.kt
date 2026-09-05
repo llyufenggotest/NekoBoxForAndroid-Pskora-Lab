@@ -82,6 +82,15 @@ class MainActivity : ThemedActivity(),
             binding.drawerLayout.removeView(binding.navView)
         }
         navigation.setNavigationItemSelectedListener(this)
+        binding.bottomNavigation.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.bottom_home -> displayFragmentWithId(R.id.nav_configuration)
+                R.id.bottom_route -> displayFragmentWithId(R.id.nav_route)
+                R.id.bottom_share -> displayFragmentWithId(R.id.nav_share)
+                R.id.bottom_settings -> displayFragmentWithId(R.id.nav_settings)
+                else -> false
+            }
+        }
 
         if (savedInstanceState == null) {
             displayFragmentWithId(R.id.nav_configuration)

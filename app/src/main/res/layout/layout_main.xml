@@ -17,7 +17,8 @@
         <androidx.coordinatorlayout.widget.CoordinatorLayout
             android:id="@+id/fragment_holder"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent"
+            android:layout_marginBottom="80dp" />
 
         <!-- We double trackThickness as half of it will be invisible -->
         <com.google.android.material.progressindicator.CircularProgressIndicator
@@ -97,6 +98,16 @@
             </LinearLayout>
 
         </io.nekohasekai.sagernet.widget.StatsBar>
+
+        <com.google.android.material.bottomnavigation.BottomNavigationView
+            android:id="@+id/bottom_navigation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:elevation="8dp"
+            app:itemIconTint="@color/navigation_icon"
+            app:itemTextColor="@color/navigation_icon"
+            app:menu="@menu/main_bottom_menu" />
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
