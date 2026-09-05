@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="20dp">
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent"
+            android:layout_height="wrap_content" app:cardCornerRadius="24dp" app:cardElevation="0dp"
+            app:strokeWidth="1dp" app:strokeColor="@color/material_blue_100">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="20dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                        android:text="局域网共享" android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6" />
+                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/share_switch"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content" />
+                </LinearLayout>
+                <TextView android:id="@+id/share_status" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" android:text="共享代理端口给局域网设备使用" android:textColor="?android:textColorSecondary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp"
+            android:text="接入地址" android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6" />
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" app:cardCornerRadius="20dp" app:cardElevation="0dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="18dp">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Wi-Fi" android:textStyle="bold" />
+                <TextView android:id="@+id/wifi_address" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="未检测到" android:textSize="16sp" />
+                <Button android:id="@+id/copy_wifi" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="复制" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="热点" android:textStyle="bold" />
+                <TextView android:id="@+id/hotspot_address" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="未检测到" android:textSize="16sp" />
+                <Button android:id="@+id/copy_hotspot" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="复制" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp"
+            android:text="共享端口使用当前混合入站端口，并遵循已有认证设置。关闭共享后将不再监听局域网地址。"
+            android:textColor="?android:textColorSecondary" />
+    </LinearLayout>
+</ScrollView>
