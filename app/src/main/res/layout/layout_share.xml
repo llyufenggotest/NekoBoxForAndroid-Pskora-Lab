@@ -4,7 +4,13 @@
     android:layout_width="match_parent" android:layout_height="match_parent"
     android:fillViewport="true">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:padding="20dp">
+        android:orientation="vertical">
+        <include
+            layout="@layout/layout_appbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:padding="20dp">
         <com.google.android.material.card.MaterialCardView android:layout_width="match_parent"
             android:layout_height="wrap_content" app:cardCornerRadius="24dp" app:cardElevation="0dp"
             app:strokeWidth="1dp" app:strokeColor="@color/material_blue_100">
@@ -36,5 +42,6 @@
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp"
             android:text="共享端口使用当前混合入站端口，并遵循已有认证设置。关闭共享后将不再监听局域网地址。"
             android:textColor="?android:textColorSecondary" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>
