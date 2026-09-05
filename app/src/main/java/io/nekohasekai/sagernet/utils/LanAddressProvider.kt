@@ -6,38 +6,54 @@ import android.net.NetworkCapabilities
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
-/** Finds Wi-Fi and hotspot IPv4 addresses without exposing loopback/VPN addresses. */
+/** Selects distinct active Wi-Fi and tethering IPv4 addresses. */
 object LanAddressProvider {
     fun current(context: Context): LanAddresses {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-        val wifi = mutableSetOf<String>()
+        val activeWifi = linkedSetOf<String>()
         cm?.allNetworks?.forEach { network ->
             val caps = cm.getNetworkCapabilities(network) ?: return@forEach
-            if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return@forEach
+            if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+            ) return@forEach
             cm.getLinkProperties(network)?.linkAddresses?.forEach { link ->
-                (link.address as? Inet4Address)?.hostAddress?.let(wifi::add)
+                val address = link.address as? Inet4Address ?: return@forEach
+                if (!address.isLoopbackAddress && !address.isLinkLocalAddress) {
+                    address.hostAddress?.let(activeWifi::add)
+                }
             }
         }
-        var hotspot: String? = null
+
+        val hotspotCandidates = mutableListOf<Pair<Int, String>>()
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces()
             while (interfaces.hasMoreElements()) {
-                val nif = interfaces.nextElement()
-                val name = nif.name?.lowercase() ?: continue
-                val isHotspot = name.startsWith("ap") || name.startsWith("wlan") || name.startsWith("swlan") || name.contains("softap")
-                if (!isHotspot) continue
-                val addresses = nif.inetAddresses
+                val networkInterface = interfaces.nextElement()
+                if (!networkInterface.isUp || networkInterface.isLoopback) continue
+                val name = networkInterface.name?.lowercase() ?: continue
+                val rank = hotspotRank(name)
+                if (rank == Int.MAX_VALUE) continue
+                val addresses = networkInterface.inetAddresses
                 while (addresses.hasMoreElements()) {
                     val address = addresses.nextElement() as? Inet4Address ?: continue
-                    if (!address.isLoopbackAddress && !address.isLinkLocalAddress) {
-                        hotspot = address.hostAddress
-                        break
-                    }
+                    val host = address.hostAddress ?: continue
+                    if (address.isLoopbackAddress || address.isLinkLocalAddress || host in activeWifi) continue
+                    hotspotCandidates += rank to host
                 }
             }
         } catch (_: Exception) {
-            // Address discovery is best effort; the UI reports unavailable.
+            // Best effort: unavailable is safer than advertising a wrong address.
         }
-        return LanAddresses(wifi.firstOrNull(), hotspot)
+
+        return LanAddresses(
+            wifiIpv4 = activeWifi.firstOrNull(),
+            hotspotRouterIpv4 = hotspotCandidates.minByOrNull { it.first }?.second,
+        )
+    }
+
+    private fun hotspotRank(name: String): Int = when {
+        name.startsWith("ap") || name.startsWith("swlan") || name.contains("softap") -> 0
+        name.startsWith("wlan") -> 1
+        else -> Int.MAX_VALUE
     }
 }

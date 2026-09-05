@@ -10,34 +10,43 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.widget.SwitchCompat
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
-import io.nekohasekai.sagernet.ktx.needReload
 import io.nekohasekai.sagernet.utils.LanAddressProvider
 
-/** LAN sharing screen, implemented against the existing mixed inbound. */
+/** LAN sharing screen backed by the existing sing-box mixed inbound. */
 class ShareFragment : ToolbarFragment(R.layout.layout_share) {
     private var wifiAddress: String? = null
     private var hotspotAddress: String? = null
+    private var applying = false
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         toolbar.title = "共享"
-        val toggle = view.findViewById<SwitchCompat>(R.id.share_switch)
-        toggle.setOnCheckedChangeListener { _, checked ->
-            if (DataStore.allowAccess != checked) {
-                DataStore.allowAccess = checked
-                refresh()
-                needReload()
-            }
-        }
         view.findViewById<Button>(R.id.copy_wifi).setOnClickListener { copyValue(wifiAddress) }
         view.findViewById<Button>(R.id.copy_hotspot).setOnClickListener { copyValue(hotspotAddress) }
+        bindSwitch()
         refresh()
     }
 
     override fun onResume() {
         super.onResume()
         refresh()
+    }
+
+    private fun bindSwitch() {
+        view?.findViewById<SwitchCompat>(R.id.share_switch)?.setOnCheckedChangeListener { _, checked ->
+            if (applying || DataStore.allowAccess == checked) return@setOnCheckedChangeListener
+            applying = true
+            DataStore.allowAccess = checked
+            refresh()
+            if (DataStore.serviceState.started) {
+                Toast.makeText(requireContext(), "正在应用共享设置…", Toast.LENGTH_SHORT).show()
+                SagerNet.reloadService()
+            } else {
+                applying = false
+            }
+        }
     }
 
     private fun copyValue(value: String?) {
@@ -52,22 +61,28 @@ class ShareFragment : ToolbarFragment(R.layout.layout_share) {
         val port = DataStore.mixedPort
         wifiAddress = addresses.wifiIpv4?.let { "$it:$port" }
         hotspotAddress = addresses.hotspotRouterIpv4?.let { "$it:$port" }
-        val active = DataStore.allowAccess
+        val configured = DataStore.allowAccess
+        val running = configured && DataStore.serviceState.connected
+        if (!DataStore.serviceState.started) applying = false
+
         view?.findViewById<SwitchCompat>(R.id.share_switch)?.apply {
             setOnCheckedChangeListener(null)
-            isChecked = active
-            setOnCheckedChangeListener { _, checked ->
-                if (DataStore.allowAccess != checked) {
-                    DataStore.allowAccess = checked
-                    refresh()
-                    needReload()
-                }
-            }
+            isChecked = configured
+            isEnabled = !applying
         }
-        view?.findViewById<TextView>(R.id.share_status)?.text = if (active) {
-            "已开启，局域网设备可使用当前代理端口 $port"
-        } else {
-            "已关闭，开启后允许局域网设备访问代理端口"
+        bindSwitch()
+
+        view?.findViewById<TextView>(R.id.share_status)?.text = when {
+            applying -> "正在重载代理服务并应用监听地址…"
+            running -> "共享运行中，HTTP / SOCKS 混合代理端口 $port"
+            configured -> "共享已开启；连接代理后服务将监听局域网地址"
+            else -> "共享已关闭，服务不监听局域网地址"
+        }
+        view?.findViewById<TextView>(R.id.share_running_state)?.text = when {
+            applying -> "正在应用"
+            running -> "运行中"
+            configured -> "等待连接"
+            else -> "已停止"
         }
         view?.findViewById<TextView>(R.id.wifi_address)?.text = wifiAddress ?: "未检测到"
         view?.findViewById<TextView>(R.id.hotspot_address)?.text = hotspotAddress ?: "未检测到"
