@@ -4,10 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F3F4FC"
+    android:background="#F1F1FF"
     android:orientation="vertical"
-    android:paddingStart="18dp"
-    android:paddingEnd="18dp"
     tools:context=".ui.ConfigurationFragment">
 
     <include
@@ -19,19 +17,23 @@
         android:id="@+id/dashboard_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="0dp"
+        android:layout_marginBottom="12dp"
         android:text="我的订阅"
         android:textColor="#202633"
-        android:textSize="30sp"
-        android:textStyle="bold" />
+        android:textSize="26sp"
+        android:textStyle="normal" />
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/dashboard_connection_card"
         android:layout_width="match_parent"
-        android:layout_height="132dp"
-        app:cardBackgroundColor="#FAFAFE"
-        app:cardCornerRadius="24dp"
+        android:layout_height="120dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        app:cardBackgroundColor="#F8F8FC"
+        app:cardCornerRadius="16dp"
         app:cardElevation="1dp"
         app:strokeWidth="0dp">
 
@@ -40,8 +42,8 @@
             android:layout_height="match_parent"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="24dp"
-            android:paddingEnd="24dp">
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -55,16 +57,16 @@
                     android:layout_height="wrap_content"
                     android:text="等待连接"
                     android:textColor="#626875"
-                    android:textSize="16sp" />
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/dashboard_connection_action"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="6dp"
                     android:text="点击连接 VPN"
                     android:textColor="#202633"
-                    android:textSize="21sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
@@ -72,9 +74,9 @@
                 android:id="@+id/dashboard_connection_switch"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="72dp"
-                android:scaleX="1.25"
-                android:scaleY="1.25"
+                android:minWidth="64dp"
+                android:scaleX="1.1"
+                android:scaleY="1.1"
                 android:showText="false" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
@@ -82,13 +84,15 @@
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/dashboard_test_card"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="60dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
         android:layout_marginTop="10dp"
         android:clickable="true"
         android:focusable="true"
         android:foreground="?attr/selectableItemBackground"
-        app:cardBackgroundColor="#FAFAFE"
-        app:cardCornerRadius="20dp"
+        app:cardBackgroundColor="#F8F8FC"
+        app:cardCornerRadius="16dp"
         app:cardElevation="1dp">
 
         <LinearLayout
@@ -141,10 +145,12 @@
 
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
-        android:layout_height="70dp"
+        android:layout_height="63dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
         android:layout_marginTop="10dp"
-        app:cardBackgroundColor="#FAFAFE"
-        app:cardCornerRadius="20dp"
+        app:cardBackgroundColor="#F8F8FC"
+        app:cardCornerRadius="16dp"
         app:cardElevation="1dp">
 
         <LinearLayout
@@ -160,27 +166,29 @@
                 android:gravity="center"
                 android:orientation="vertical">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="实时延迟" android:textColor="#6B717D" android:textSize="13sp" />
-                <TextView android:id="@+id/dashboard_latency" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="-- ms" android:textColor="#202633" android:textSize="18sp" android:textStyle="bold" />
+                <TextView android:id="@+id/dashboard_latency" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="-- ms" android:textColor="#202633" android:textSize="16sp" android:textStyle="bold" />
             </LinearLayout>
             <View android:layout_width="1dp" android:layout_height="38dp" android:background="#D9DBE4" />
             <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="上传" android:textColor="#6B717D" android:textSize="13sp" />
-                <TextView android:id="@+id/dashboard_upload" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0 B/s" android:textColor="#202633" android:textSize="18sp" android:textStyle="bold" />
+                <TextView android:id="@+id/dashboard_upload" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0 B/s" android:textColor="#202633" android:textSize="16sp" android:textStyle="bold" />
             </LinearLayout>
             <View android:layout_width="1dp" android:layout_height="38dp" android:background="#D9DBE4" />
             <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="下载" android:textColor="#6B717D" android:textSize="13sp" />
-                <TextView android:id="@+id/dashboard_download" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0 B/s" android:textColor="#202633" android:textSize="18sp" android:textStyle="bold" />
+                <TextView android:id="@+id/dashboard_download" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0 B/s" android:textColor="#202633" android:textSize="16sp" android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
-        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="节点分组" android:textColor="#202633" android:textSize="18sp" android:textStyle="bold" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="节点分组" android:textColor="#202633" android:textSize="16sp" android:textStyle="bold" />
         <TextView android:id="@+id/dashboard_group_count" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="" android:textColor="#6B717D" android:textSize="14sp" />
     </LinearLayout>
 

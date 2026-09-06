@@ -100,12 +100,10 @@
         </io.nekohasekai.sagernet.widget.StatsBar>
 
         <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
+            android:layout_width="274dp"
             android:layout_height="64dp"
-            android:layout_gravity="bottom"
-            android:layout_marginStart="18dp"
-            android:layout_marginEnd="18dp"
-            android:layout_marginBottom="14dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="24dp"
             android:elevation="10dp"
             app:cardBackgroundColor="?android:attr/colorBackground"
             app:cardCornerRadius="32dp">
