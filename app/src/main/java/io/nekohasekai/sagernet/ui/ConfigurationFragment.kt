@@ -193,7 +193,9 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     @Volatile
     private var serviceStartedSnapshot = DataStore.serviceState.started
-    private lateinit var dashboardSwitch: SwitchCompat
+    private lateinit var dashboardConnectionButton: MaterialCardView
+    private lateinit var dashboardConnectionIcon: ImageView
+    private var dashboardPulse: android.animation.ObjectAnimator? = null
     private lateinit var dashboardState: TextView
     private lateinit var dashboardAction: TextView
     private lateinit var dashboardProfileName: TextView
@@ -220,17 +222,26 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     private fun updateDashboardState() {
-        if (!::dashboardSwitch.isInitialized) return
+        if (!::dashboardConnectionButton.isInitialized) return
         val state = DataStore.serviceState
-        dashboardSwitch.setOnCheckedChangeListener(null)
-        dashboardSwitch.isChecked = state.started
-        dashboardSwitch.setOnCheckedChangeListener { _, checked ->
-            if (checked && !DataStore.serviceState.started) {
-                (activity as? MainActivity)?.requestDashboardConnection()
-            } else if (!checked && DataStore.serviceState.canStop) {
-                SagerNet.stopService()
+        val connected = state == BaseService.State.Connected
+        val busy = state == BaseService.State.Connecting || state == BaseService.State.Stopping
+        dashboardConnectionButton.isEnabled = !busy
+        dashboardConnectionButton.setCardBackgroundColor(
+            Color.parseColor(if (connected) "#DFF6EC" else "#EEF0F6")
+        )
+        dashboardConnectionIcon.setImageResource(
+            when (state) {
+                BaseService.State.Connecting -> R.drawable.ic_service_connecting
+                BaseService.State.Connected -> R.drawable.ic_service_connected
+                BaseService.State.Stopping -> R.drawable.ic_service_stopping
+                else -> R.drawable.ic_service_idle
             }
-        }
+        )
+        dashboardConnectionIcon.imageTintList = android.content.res.ColorStateList.valueOf(
+            Color.parseColor(if (connected) "#2E9E78" else "#626A7B")
+        )
+        if (connected) startDashboardPulse() else stopDashboardPulse()
         dashboardState.text = when (state) {
             BaseService.State.Connecting -> "正在连接…"
             BaseService.State.Connected -> "已连接"
@@ -244,6 +255,24 @@ class ConfigurationFragment @JvmOverloads constructor(
             else -> "点击连接 VPN"
         }
         dashboardProfileName.text = if (DataStore.selectedProxy > 0) "当前节点" else "未选择节点"
+    }
+
+    private fun startDashboardPulse() {
+        if (dashboardPulse?.isRunning == true) return
+        dashboardPulse = android.animation.ObjectAnimator.ofFloat(
+            dashboardConnectionButton, View.ALPHA, 1f, 0.78f, 1f
+        ).apply {
+            duration = 2200L
+            repeatCount = android.animation.ValueAnimator.INFINITE
+            repeatMode = android.animation.ValueAnimator.RESTART
+            start()
+        }
+    }
+
+    private fun stopDashboardPulse() {
+        dashboardPulse?.cancel()
+        dashboardPulse = null
+        if (::dashboardConnectionButton.isInitialized) dashboardConnectionButton.alpha = 1f
     }
 
     fun updateDashboardSpeed(txRate: Long, rxRate: Long) {
@@ -424,18 +453,18 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
 
-        dashboardSwitch = view.findViewById(R.id.dashboard_connection_switch)
+        dashboardConnectionButton = view.findViewById(R.id.dashboard_connection_button)
+        dashboardConnectionIcon = view.findViewById(R.id.dashboard_connection_icon)
         dashboardState = view.findViewById(R.id.dashboard_connection_state)
         dashboardAction = view.findViewById(R.id.dashboard_connection_action)
         dashboardProfileName = view.findViewById(R.id.dashboard_profile_name)
         dashboardLatency = view.findViewById(R.id.dashboard_latency)
         dashboardUpload = view.findViewById(R.id.dashboard_upload)
         dashboardDownload = view.findViewById(R.id.dashboard_download)
-        dashboardSwitch.setOnCheckedChangeListener { _, checked ->
-            if (checked && !DataStore.serviceState.started) {
-                (activity as? MainActivity)?.requestDashboardConnection()
-            } else if (!checked && DataStore.serviceState.canStop) {
-                SagerNet.stopService()
+        dashboardConnectionButton.setOnClickListener {
+            when {
+                DataStore.serviceState.canStop -> SagerNet.stopService()
+                !DataStore.serviceState.started -> (activity as? MainActivity)?.requestDashboardConnection()
             }
         }
         view.findViewById<View>(R.id.dashboard_test_card).setOnClickListener {
@@ -514,6 +543,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
             }
         }
+    }
+
+    override fun onDestroyView() {
+        stopDashboardPulse()
+        super.onDestroyView()
     }
 
     override fun onDestroy() {
@@ -2573,13 +2607,17 @@ class ConfigurationFragment @JvmOverloads constructor(
                 } else {
                     val primary = ctx.getColorAttr(R.attr.selectedColorPrimary)
                     selectedIndicator.isVisible = selected
-                    card.strokeWidth = 0
-                    card.cardElevation =
-                        ctx.resources.getDimension(R.dimen.profile_card_elevation_classic)
+                    card.strokeWidth = ctx.resources.getDimensionPixelSize(R.dimen.card_stroke_width)
+                    card.strokeColor = if (selected) {
+                        ColorUtils.setAlphaComponent(primary, 90)
+                    } else {
+                        ctx.getColour(R.color.card_stroke)
+                    }
+                    card.cardElevation = 0f
                     card.setCardBackgroundColor(
                         if (selected) {
                             ColorUtils.compositeColors(
-                                ColorUtils.setAlphaComponent(primary, 20), surface
+                                ColorUtils.setAlphaComponent(primary, 14), surface
                             )
                         } else {
                             surface

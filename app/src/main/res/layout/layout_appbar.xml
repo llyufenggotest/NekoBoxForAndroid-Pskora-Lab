@@ -13,8 +13,10 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@android:color/white"
-        android:theme="?actionBarTheme"
+        android:theme="@style/ThemeOverlay.MaterialComponents.Light"
         android:touchscreenBlocksFocus="false"
-        app:popupTheme="@style/ThemeOverlay.AppCompat.DayNight"
+        app:navigationIconTint="#202633"
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+        app:titleTextColor="#202633"
         app:title="@string/app_name" />
 </com.google.android.material.appbar.AppBarLayout>
