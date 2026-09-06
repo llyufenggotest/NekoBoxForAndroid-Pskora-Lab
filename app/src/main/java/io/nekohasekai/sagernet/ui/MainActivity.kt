@@ -392,10 +392,22 @@ class MainActivity : ThemedActivity(),
     }
 
     fun runDashboardConnectionTest() {
-        if (DataStore.serviceState.connected) {
-            binding.stats.testConnection()
-        } else {
+        if (!DataStore.serviceState.connected) {
             snackbar("请先连接 VPN").show()
+            return
+        }
+        val fragment = currentMainFragment as? ConfigurationFragment ?: return
+        fragment.updateDashboardLatency(null)
+        runOnDefaultDispatcher {
+            try {
+                val elapsed = urlTest()
+                onMainDispatcher { fragment.updateDashboardLatency(elapsed) }
+            } catch (e: Exception) {
+                onMainDispatcher {
+                    fragment.updateDashboardLatency(null)
+                    snackbar(getString(R.string.connection_test_error, e.readableMessage)).show()
+                }
+            }
         }
     }
 
@@ -519,6 +531,10 @@ class MainActivity : ThemedActivity(),
     // ONLY do UI update here, write DB in bg process
     override fun cbSpeedUpdate(stats: SpeedDisplayData) {
         binding.stats.updateSpeed(stats.txRateProxy, stats.rxRateProxy)
+        (currentMainFragment as? ConfigurationFragment)?.updateDashboardSpeed(
+            stats.txRateProxy,
+            stats.rxRateProxy,
+        )
     }
 
     override suspend fun cbTrafficUpdate(data: TrafficDataBatch) {

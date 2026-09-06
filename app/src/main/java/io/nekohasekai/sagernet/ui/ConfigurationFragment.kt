@@ -197,6 +197,9 @@ class ConfigurationFragment @JvmOverloads constructor(
     private lateinit var dashboardState: TextView
     private lateinit var dashboardAction: TextView
     private lateinit var dashboardProfileName: TextView
+    private lateinit var dashboardLatency: TextView
+    private lateinit var dashboardUpload: TextView
+    private lateinit var dashboardDownload: TextView
 
     private data class ProfileStateSnapshot(
         val selectedProxy: Long,
@@ -241,6 +244,16 @@ class ConfigurationFragment @JvmOverloads constructor(
             else -> "点击连接 VPN"
         }
         dashboardProfileName.text = if (DataStore.selectedProxy > 0) "当前节点" else "未选择节点"
+    }
+
+    fun updateDashboardSpeed(txRate: Long, rxRate: Long) {
+        if (!::dashboardUpload.isInitialized) return
+        dashboardUpload.text = android.text.format.Formatter.formatFileSize(requireContext(), txRate) + "/s"
+        dashboardDownload.text = android.text.format.Formatter.formatFileSize(requireContext(), rxRate) + "/s"
+    }
+
+    fun updateDashboardLatency(elapsed: Int?) {
+        if (::dashboardLatency.isInitialized) dashboardLatency.text = elapsed?.let { "$it ms" } ?: "-- ms"
     }
 
     private fun updateSelectedProxySnapshot(profileId: Long) {
@@ -415,6 +428,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         dashboardState = view.findViewById(R.id.dashboard_connection_state)
         dashboardAction = view.findViewById(R.id.dashboard_connection_action)
         dashboardProfileName = view.findViewById(R.id.dashboard_profile_name)
+        dashboardLatency = view.findViewById(R.id.dashboard_latency)
+        dashboardUpload = view.findViewById(R.id.dashboard_upload)
+        dashboardDownload = view.findViewById(R.id.dashboard_download)
         dashboardSwitch.setOnCheckedChangeListener { _, checked ->
             if (checked && !DataStore.serviceState.started) {
                 (activity as? MainActivity)?.requestDashboardConnection()
