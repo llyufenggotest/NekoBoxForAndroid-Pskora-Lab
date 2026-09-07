@@ -1,0 +1,7 @@
+<resources>
+<style name="LabToolbarTitle" parent="TextAppearance.AppCompat.Title">
+<item name="android:textSize">18sp</item><item name="android:textStyle">normal</item>
+</style>
+<dimen name="lab_content_inset">20dp</dimen>
+<style name="LabCompactLabel" parent="TextAppearance.AppCompat.Small"><item name="android:textSize">12sp</item></style>
+</resources>

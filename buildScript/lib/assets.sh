@@ -46,10 +46,12 @@ VERSION_GEOIP="$(get_latest_release "SagerNet/sing-geoip")"
 echo "VERSION_GEOIP=$VERSION_GEOIP"
 printf '%s' "$VERSION_GEOIP" > geoip.version.txt
 download_asset "SagerNet/sing-geoip" "$VERSION_GEOIP" geoip.db
+gzip -n -9 -c geoip.db > geoip.db.bundle
 xz -9 geoip.db
 
 VERSION_GEOSITE="$(get_latest_release "SagerNet/sing-geosite")"
 echo "VERSION_GEOSITE=$VERSION_GEOSITE"
 printf '%s' "$VERSION_GEOSITE" > geosite.version.txt
 download_asset "SagerNet/sing-geosite" "$VERSION_GEOSITE" geosite.db
+gzip -n -9 -c geosite.db > geosite.db.bundle
 xz -9 geosite.db

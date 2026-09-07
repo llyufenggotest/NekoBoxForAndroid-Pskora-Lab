@@ -4,11 +4,9 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.text.format.Formatter
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.activity.result.component1
 import androidx.activity.result.component2
 import androidx.activity.result.contract.ActivityResultContracts
@@ -255,7 +253,6 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
 
         val profileName = binding.profileName
         val profileType = binding.profileType
-        val trafficText: TextView = binding.trafficText
         val editButton = binding.edit
         val shareLayout = binding.share
 
@@ -264,19 +261,6 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
             profileName.text = proxyEntity.displayName()
             profileType.text = proxyEntity.displayType()
             profileType.setTextColor(getProtocolColor(proxyEntity.type))
-
-            val rx = proxyEntity.rx
-            val tx = proxyEntity.tx
-
-            val showTraffic = rx + tx != 0L
-            trafficText.isVisible = showTraffic
-            if (showTraffic) {
-                trafficText.text = itemView.context.getString(
-                    R.string.traffic,
-                    Formatter.formatFileSize(itemView.context, tx),
-                    Formatter.formatFileSize(itemView.context, rx)
-                )
-            }
 
             editButton.setOnClickListener {
                 replacing = bindingAdapterPosition

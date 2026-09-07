@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/appbar"
     android:layout_width="match_parent"
-    android:layout_height="?attr/actionBarSize"
+    android:layout_height="wrap_content"
     android:background="@android:color/white"
     app:elevation="0dp"
     app:liftOnScroll="false">
@@ -11,12 +11,15 @@
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="56dp"
         android:background="@android:color/white"
         android:theme="@style/ThemeOverlay.MaterialComponents.Light"
         android:touchscreenBlocksFocus="false"
         app:navigationIconTint="#202633"
         app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
         app:titleTextColor="#202633"
+        app:titleTextAppearance="@style/LabToolbarTitle"
+        app:titleMarginTop="0dp"
+        app:titleMarginBottom="0dp"
         app:title="@string/app_name" />
 </com.google.android.material.appbar.AppBarLayout>

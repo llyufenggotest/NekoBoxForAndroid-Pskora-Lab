@@ -47,6 +47,15 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     }
 
     override fun launch() {
+        // Publish only controller options from the exact config being launched across :bg/UI.
+        // Do not infer the API port/secret from yacdURL or the proxy authentication password.
+        if (notTmp) {
+            val options = com.google.gson.JsonParser.parseString(config.config).asJsonObject
+                .getAsJsonObject("experimental")?.get("clash_api")
+            io.nekohasekai.sagernet.database.DataStore.configurationStore.putString(
+                "activeClashApiOptions", options?.toString().orEmpty()
+            )
+        }
         box.setAsMain()
         super.launch() // start box
         runOnDefaultDispatcher {

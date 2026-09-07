@@ -78,6 +78,11 @@ class ServiceButton @JvmOverloads constructor(
     private val iconStopping by lazy { AnimatedState(R.drawable.ic_service_stopping) }
     private val animationQueue = ArrayDeque<AnimatedState>()
 
+    private var connectionRing: ConnectionRing? = null
+    override fun onVisibilityChanged(changedView: View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        connectionRing?.sync()
+    }
     private var checked = false
     private var delayedAnimation: Job? = null
     private lateinit var progress: BaseProgressIndicator<*>
@@ -117,6 +122,11 @@ class ServiceButton @JvmOverloads constructor(
             else -> changeState(iconStopped, animate)
         }
         checked = state == BaseService.State.Connected
+        if (connectionRing == null) connectionRing = ConnectionRing(this, context as LifecycleOwner)
+        connectionRing?.setConnected(checked)
+        backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (checked) "#DFF6EC" else "#EEF0F6"))
+        imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (checked) "#209C69" else "#626A7B"))
+
         refreshDrawableState()
         val description = context.getText(if (state.canStop) R.string.stop else R.string.connect)
         contentDescription = description

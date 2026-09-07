@@ -58,6 +58,7 @@ class SagerNet : Application(),
 
         if (isMainProcess || isBgProcess) {
             externalAssets.mkdirs()
+            BundledGeoAssets.ensure(this, externalAssets)
             Seq.setContext(this)
             Libcore.initCore(
                 process,

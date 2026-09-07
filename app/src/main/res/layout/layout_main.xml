@@ -18,7 +18,7 @@
             android:id="@+id/fragment_holder"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginBottom="80dp" />
+            android:layout_marginBottom="0dp" />
 
         <!-- We double trackThickness as half of it will be invisible -->
         <com.google.android.material.progressindicator.CircularProgressIndicator
@@ -34,6 +34,25 @@
             app:trackCornerRadius="@dimen/mtrl_progress_track_thickness"
             app:trackThickness="8dp" />
 
+        <LinearLayout
+            android:orientation="vertical"
+            android:id="@+id/vpn_control_strip"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_gravity="bottom"
+            android:layout_marginBottom="96dp"
+            android:paddingStart="@dimen/lab_content_inset"
+            android:paddingEnd="88dp"
+            android:gravity="center_vertical"
+            android:background="#EEF1F5FA">
+            <TextView android:id="@+id/vpn_node_name" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end"
+                android:text="未选择节点" android:textColor="#303746" android:textSize="14sp" />
+            <TextView android:id="@+id/vpn_metrics" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end"
+                android:text="未连接 · 待测 ↑ — ↓ —" android:textColor="#626A7B" android:textSize="12sp" />
+        </LinearLayout>
+
         <io.nekohasekai.sagernet.widget.ServiceButton
             android:id="@+id/fab"
             android:layout_width="wrap_content"
@@ -41,12 +60,17 @@
             android:elevation="6dp"
             android:nextFocusDown="@+id/stats"
             app:backgroundTint="?colorPrimary"
-            app:layout_anchor="@id/stats"
+            android:layout_gravity="bottom|end"
+                        android:layout_marginBottom="100dp"
+            android:layout_marginEnd="20dp"
+            app:fabCustomSize="48dp"
             app:pressedTranslationZ="6dp"
             app:srcCompat="@drawable/ic_service_idle" />
 
         <io.nekohasekai.sagernet.widget.StatsBar
             android:id="@+id/stats"
+            android:visibility="gone"
+            android:background="@android:color/transparent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
@@ -58,7 +82,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="?android:attr/selectableItemBackground"
+                android:background="@android:color/transparent"
                 android:orientation="vertical"
                 android:padding="16dp">
 
@@ -100,12 +124,16 @@
         </io.nekohasekai.sagernet.widget.StatsBar>
 
         <androidx.cardview.widget.CardView
-            android:layout_width="274dp"
+                    android:id="@+id/navigation_capsule"
+                    android:clipToOutline="true"
+                    app:cardUseCompatPadding="false"
+                    app:cardPreventCornerOverlap="false"
+                    android:layout_width="274dp"
             android:layout_height="64dp"
             android:layout_gravity="bottom|center_horizontal"
             android:layout_marginBottom="24dp"
             android:elevation="10dp"
-            app:cardBackgroundColor="?android:attr/colorBackground"
+            app:cardBackgroundColor="#DDF5F7FC"
             app:cardCornerRadius="32dp">
             <com.google.android.material.bottomnavigation.BottomNavigationView
                 android:id="@+id/bottom_navigation"

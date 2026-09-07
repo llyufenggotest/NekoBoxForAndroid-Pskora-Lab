@@ -129,8 +129,8 @@
         <item name="android:background">#F7F8FB</item>
         <item name="android:gravity">center</item>
         <item name="android:lineSpacingExtra">2dp</item>
-        <item name="android:textColor">#566074</item>
-        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">#171B23</item>
+                <item name="android:textSize">15sp</item>
         <item name="android:textStyle">normal</item>
     </style>
 

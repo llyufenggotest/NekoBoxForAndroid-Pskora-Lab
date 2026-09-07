@@ -36,6 +36,16 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         super.onViewCreated(view, savedInstanceState)
 
         listView.layoutManager = FixedLinearLayoutManager(listView)
+        val inset = resources.getDimensionPixelSize(R.dimen.lab_content_inset)
+        listView.setPadding(inset, listView.paddingTop, inset, listView.paddingBottom)
+        listView.clipToPadding = false
+        listView.addOnChildAttachStateChangeListener(object : androidx.recyclerview.widget.RecyclerView.OnChildAttachStateChangeListener {
+            override fun onChildViewAttachedToWindow(child: View) {
+                child.findViewById<android.widget.TextView>(android.R.id.title)?.textSize = 14f
+                child.findViewById<android.widget.TextView>(android.R.id.summary)?.textSize = 12f
+            }
+            override fun onChildViewDetachedFromWindow(child: View) {}
+        })
     }
 
     private val reloadListener = Preference.OnPreferenceChangeListener { _, _ ->
@@ -271,6 +281,7 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
 
     override fun onResume() {
         super.onResume()
+        findPreference<SwitchPreference>(Key.ENABLE_CLASH_API)?.isChecked = DataStore.enableClashAPI
 
         if (::isProxyApps.isInitialized) {
             isProxyApps.isChecked = DataStore.proxyApps
@@ -309,13 +320,19 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
                     return@setPositiveButton
                 }
                 DataStore.mixedPort = port
-                DataStore.allowAccess = allowAccessSwitch.isChecked
+                val sharingChanged = io.nekohasekai.sagernet.utils.ShareToggle.apply(
+                    DataStore.allowAccess, allowAccessSwitch.isChecked, false,
+                    DataStore::writeSharingPreferences, {},
+                )
+                findPreference<SwitchPreference>(Key.ENABLE_CLASH_API)?.isChecked = DataStore.enableClashAPI
+                (activity as? MainActivity)?.refreshNavMenu(DataStore.enableClashAPI)
                 DataStore.mixedUsername = usernameField.text.toString().trim()
                 DataStore.configurationStore.putString(
                     Key.MIXED_SECRET, passwordField.text.toString()
                 )
                 preference.summary = localProxySummary()
-                needReload()
+                if (sharingChanged && DataStore.serviceState.started) SagerNet.reloadService()
+                else needReload()
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()

@@ -4,6 +4,16 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.os.Bundle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import io.nekohasekai.sagernet.ktx.getColorAttr
+import java.net.HttpURLConnection
+import java.net.URL
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
@@ -22,10 +32,47 @@ class ShareFragment : ToolbarFragment(R.layout.layout_share) {
     private var wifiAddress: String? = null
     private var hotspotAddress: String? = null
     private var applying = false
+    private var polling: Job? = null
+    fun refreshServiceState() { applying = false; if (view != null) refresh() }
+
+    override fun onPause() {
+        polling?.cancel()
+        polling = null
+        super.onPause()
+    }
+
+    private suspend fun connectedClients(): String = withContext(Dispatchers.IO) {
+        if (!DataStore.allowAccess || !DataStore.serviceState.connected) return@withContext "共享未运行"
+        var connection: HttpURLConnection? = null
+        try {
+            val endpoint = io.nekohasekai.sagernet.utils.ClashConnections.endpoint(
+                DataStore.configurationStore.getString("activeClashApiOptions").orEmpty()
+            )
+            connection = URL(endpoint.url).openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection
+            connection.connectTimeout = 1500
+            connection.readTimeout = 1500
+            connection.instanceFollowRedirects = false
+            endpoint.authorization?.let { connection.setRequestProperty("Authorization", it) }
+            val code = connection.responseCode
+            if (code != 200) return@withContext when (code) {
+                401, 403 -> "连接监测鉴权失败（HTTP $code）；请重新连接 VPN 同步控制器 secret，不代表没有设备"
+                else -> "连接监测失败（HTTP $code），不代表没有设备"
+            }
+            val local = java.net.NetworkInterface.getNetworkInterfaces().toList()
+                .flatMap { it.inetAddresses.toList() }.mapNotNull { it.hostAddress }.toSet()
+            io.nekohasekai.sagernet.utils.ClashConnections.parse(
+                connection.inputStream.bufferedReader().use { it.readText() }, local
+            ).describe()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            "连接监测不可用（${e.javaClass.simpleName}），不代表没有设备；请确认 Clash API 已启用并重新连接 VPN"
+        } finally { connection?.disconnect() }
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        toolbar.title = "共享"
+        toolbar.title = "局域网共享"
         view.findViewById<Button>(R.id.copy_wifi).setOnClickListener { copyValue(wifiAddress) }
         view.findViewById<Button>(R.id.copy_hotspot).setOnClickListener { copyValue(hotspotAddress) }
         view.findViewById<View>(R.id.share_auth_row).setOnClickListener { showAuthenticationDialog() }
@@ -36,18 +83,28 @@ class ShareFragment : ToolbarFragment(R.layout.layout_share) {
     override fun onResume() {
         super.onResume()
         refresh()
+        polling?.cancel()
+        polling = viewLifecycleOwner.lifecycleScope.launch {
+            while (true) {
+                refresh()
+                val clients = connectedClients()
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                view?.findViewById<TextView>(R.id.share_clients)?.text = if (DataStore.allowAccess && DataStore.serviceState.connected) clients else "共享未运行"
+                delay(2500)
+            }
+        }
     }
 
     private fun bindSwitch() {
         view?.findViewById<SwitchCompat>(R.id.share_switch)?.setOnCheckedChangeListener { _, checked ->
             if (applying || DataStore.allowAccess == checked) return@setOnCheckedChangeListener
-            applying = false
-            DataStore.allowAccess = checked
+            applying = DataStore.serviceState.started
+            io.nekohasekai.sagernet.utils.ShareToggle.apply(
+                DataStore.allowAccess, checked, DataStore.serviceState.started,
+                DataStore::writeSharingPreferences, SagerNet::reloadService,
+            )
+            (activity as? MainActivity)?.refreshNavMenu(DataStore.enableClashAPI)
             refresh()
-            if (DataStore.serviceState.started) {
-                SagerNet.reloadService()
-                Toast.makeText(requireContext(), "共享设置已提交", Toast.LENGTH_SHORT).show()
-            }
         }
     }
 
@@ -103,7 +160,13 @@ class ShareFragment : ToolbarFragment(R.layout.layout_share) {
         wifiAddress = addresses.wifiIpv4?.let { "$it:$port" }
         hotspotAddress = addresses.hotspotRouterIpv4?.let { "$it:$port" }
         val configured = DataStore.allowAccess
-        val running = configured && DataStore.serviceState.connected
+        val running = configured && DataStore.serviceState.connected && !applying
+        val color = if (running) android.graphics.Color.parseColor("#209C69") else android.graphics.Color.parseColor("#858B96")
+        view?.findViewById<com.google.android.material.card.MaterialCardView>(R.id.share_ring)?.strokeColor = color
+        view?.findViewById<android.widget.ImageView>(R.id.share_state_icon)?.apply {
+            imageTintList = android.content.res.ColorStateList.valueOf(color)
+            setImageResource(R.drawable.ic_share_network)
+        }
         if (!DataStore.serviceState.started) applying = false
 
         view?.findViewById<SwitchCompat>(R.id.share_switch)?.apply {

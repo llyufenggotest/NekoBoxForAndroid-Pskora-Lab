@@ -1,60 +1,16 @@
-<?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:fillViewport="true">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical">
-        <include
-            layout="@layout/layout_appbar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:orientation="vertical" android:padding="20dp">
-        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent"
-            android:layout_height="wrap_content" app:cardCornerRadius="24dp" app:cardElevation="0dp"
-            app:strokeWidth="1dp" app:strokeColor="@color/material_blue_100">
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:orientation="vertical" android:padding="20dp">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
-                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                        android:text="局域网共享" android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6" />
-                    <androidx.appcompat.widget.SwitchCompat android:id="@+id/share_switch"
-                        android:layout_width="wrap_content" android:layout_height="wrap_content" />
-                </LinearLayout>
-                <TextView android:id="@+id/share_status" android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp" android:text="共享代理端口给局域网设备使用" android:textColor="?android:textColorSecondary" />
-                <TextView android:id="@+id/share_running_state" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp" android:layout_marginTop="8dp" android:text="已停止" android:textColor="?colorPrimary" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp"
-            android:text="接入地址" android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6" />
-        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" app:cardCornerRadius="20dp" app:cardElevation="0dp">
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="18dp">
-                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Wi-Fi" android:textStyle="bold" />
-                <TextView android:id="@+id/wifi_address" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="未检测到" android:textSize="16sp" />
-                <Button android:id="@+id/copy_wifi" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="复制" />
-                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="热点" android:textStyle="bold" />
-                <TextView android:id="@+id/hotspot_address" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="未检测到" android:textSize="16sp" />
-                <Button android:id="@+id/copy_hotspot" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="复制" />
-                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="10dp" android:background="#22000000" />
-                <LinearLayout android:id="@+id/share_auth_row" android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:gravity="center_vertical" android:orientation="horizontal" android:paddingTop="14dp" android:paddingBottom="8dp">
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="访问认证" android:textStyle="bold" />
-                        <TextView android:id="@+id/share_auth_summary" android:layout_width="match_parent" android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp" android:text="无账号与密码" android:textColor="?android:textColorSecondary" />
-                    </LinearLayout>
-                    <TextView android:id="@+id/share_auth_state" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="关闭" android:textColor="?colorPrimary" android:textStyle="bold" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp"
-            android:text="共享端口使用当前混合入站端口，并遵循已有认证设置。关闭共享后将不再监听局域网地址。"
-            android:textColor="?android:textColorSecondary" />
-        </LinearLayout>
-    </LinearLayout>
-</ScrollView>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#F1F4FA">
+<include layout="@layout/layout_appbar"/>
+<ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:clipToPadding="false" android:paddingBottom="16dp"><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="@dimen/lab_content_inset">
+<com.google.android.material.card.MaterialCardView android:id="@+id/share_ring" android:layout_width="88dp" android:layout_height="88dp" android:layout_gravity="center_horizontal" android:layout_marginTop="12dp" app:cardCornerRadius="44dp" app:cardElevation="0dp" app:cardBackgroundColor="@android:color/transparent" app:strokeWidth="2dp" app:strokeColor="#858B96"><ImageView android:id="@+id/share_state_icon" android:layout_width="38dp" android:layout_height="38dp" android:layout_gravity="center" android:src="@drawable/ic_share_network" android:contentDescription="共享状态"/></com.google.android.material.card.MaterialCardView>
+<TextView android:id="@+id/share_running_state" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:layout_marginTop="14dp" android:text="共享已关闭" android:textSize="18sp" android:textColor="#202633"/>
+<TextView android:id="@+id/share_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:layout_marginTop="6dp" android:textSize="12sp" android:textColor="#687082"/>
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:layout_marginBottom="10dp" android:text="共享服务" android:textSize="14sp" android:textColor="#202633"/>
+<com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" app:cardBackgroundColor="#FAFFFFFF" app:cardCornerRadius="20dp" app:cardElevation="0dp"><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp" android:orientation="vertical">
+<LinearLayout android:layout_width="match_parent" android:layout_height="64dp" android:gravity="center_vertical"><TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="局域网共享
+HTTP / SOCKS 混合代理" android:textColor="#202633"/><androidx.appcompat.widget.SwitchCompat android:id="@+id/share_switch" android:layout_width="wrap_content" android:layout_height="48dp" android:contentDescription="局域网共享开关"/></LinearLayout>
+<LinearLayout android:layout_width="match_parent" android:layout_height="68dp" android:gravity="center_vertical"><LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical"><TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Wi-Fi IPv4 地址" android:textColor="#202633" android:textSize="14sp"/><TextView android:id="@+id/wifi_address" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="未检测到" android:textColor="#687082" android:textSize="13sp"/></LinearLayout><Button android:id="@+id/copy_wifi" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="64dp" android:layout_height="48dp" android:text="复制"/></LinearLayout><LinearLayout android:layout_width="match_parent" android:layout_height="68dp" android:gravity="center_vertical"><LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical"><TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="热点路由器 IPv4 地址" android:textColor="#202633" android:textSize="14sp"/><TextView android:id="@+id/hotspot_address" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="未检测到" android:textColor="#687082" android:textSize="13sp"/></LinearLayout><Button android:id="@+id/copy_hotspot" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="64dp" android:layout_height="48dp" android:text="复制"/></LinearLayout>
+<LinearLayout android:id="@+id/share_auth_row" android:layout_width="match_parent" android:layout_height="64dp" android:gravity="center_vertical" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true"><LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical"><TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="访问认证" android:textColor="#202633"/><TextView android:id="@+id/share_auth_summary" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#687082"/></LinearLayout><TextView android:id="@+id/share_auth_state" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="?colorPrimary"/></LinearLayout>
+</LinearLayout></com.google.android.material.card.MaterialCardView>
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:layout_marginBottom="10dp" android:text="正在使用代理" android:textSize="14sp" android:textColor="#202633"/>
+<com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" app:cardBackgroundColor="#FAFFFFFF" app:cardCornerRadius="20dp" app:cardElevation="0dp"><TextView android:id="@+id/share_clients" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="100dp" android:gravity="center" android:padding="@dimen/lab_content_inset" android:text="等待连接数据" android:textColor="#687082" android:textSize="13sp"/></com.google.android.material.card.MaterialCardView>
+</LinearLayout></ScrollView></LinearLayout>

@@ -5,14 +5,19 @@
     android:id="@+id/content"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="4dp"
+    android:layout_marginHorizontal="@dimen/lab_content_inset"
+    android:layout_marginVertical="4dp"
     android:clickable="true"
     android:focusable="true"
-    app:cardCornerRadius="12dp">
+    app:cardCornerRadius="0dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp">
 
     <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_gravity="top" android:background="#1F8290A3" />
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_gravity="bottom" android:background="#1F8290A3" />
 
         <LinearLayout
             android:id="@+id/content_lin"
@@ -134,18 +139,10 @@
                     android:textAppearance="?android:attr/textAppearanceSmall"
                     android:textColor="?android:attr/textColorSecondary" />
 
-                <LinearLayout
+                <View
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="0dp"
                     android:layout_weight="1" />
-
-                <TextView
-                    android:id="@+id/traffic_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/traffic"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
-                    android:textColor="?android:attr/textColorSecondary" />
 
             </LinearLayout>
 

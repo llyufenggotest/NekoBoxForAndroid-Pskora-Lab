@@ -9,6 +9,18 @@ plugins {
 
 setupApp()
 
+val verifyBundledGeoAssets by tasks.registering {
+    doLast {
+        for (name in listOf("geoip", "geosite")) {
+            for (suffix in listOf("db.xz", "db.bundle", "version.txt")) {
+                val asset = file("src/main/assets/sing-box/$name.$suffix")
+                check(asset.isFile && asset.length() > 0) { "Missing bundled rules: $asset. Run buildScript/lib/assets.sh" }
+            }
+        }
+    }
+}
+tasks.named("preBuild").configure { dependsOn(verifyBundledGeoAssets) }
+
 android {
     compileOptions {
         isCoreLibraryDesugaringEnabled = true

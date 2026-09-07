@@ -1,5 +1,9 @@
 package io.nekohasekai.sagernet.ui
 
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import android.Manifest.permission.POST_NOTIFICATIONS
 import android.annotation.SuppressLint
 import android.app.ActivityManager
@@ -63,6 +67,51 @@ class MainActivity : ThemedActivity(),
     lateinit var binding: LayoutMainBinding
     lateinit var navigation: NavigationView
     private var currentMainFragment: ToolbarFragment? = null
+    private var lastUiState = BaseService.State.Idle
+    private var metricsTarget = 0L
+    private var metricsGeneration = 0L
+    private var latency: Int? = null
+    private var connectionTestResult: DashboardConnectionTestResult? = null
+    private var upload: Long? = null
+    private var download: Long? = null
+    private fun targetProfile(): Long = if (DataStore.serviceState.started && DataStore.currentProfile > 0)
+        DataStore.currentProfile else DataStore.selectedProxy
+
+    private fun refreshVpnStrip() {
+        val target = targetProfile()
+        if (metricsTarget != target) {
+            metricsTarget = target
+            metricsGeneration++
+            latency = null; connectionTestResult = null; upload = null; download = null
+        }
+        val generation = metricsGeneration
+        binding.vpnNodeName.text = "加载节点…"
+        lifecycleScope.launch {
+            val name = withContext(Dispatchers.IO) {
+                ProfileManager.getProfile(target)?.displayName() ?: "未选择节点"
+            }
+            if (generation == metricsGeneration && target == targetProfile()) binding.vpnNodeName.text = name
+        }
+        renderVpnMetrics()
+    }
+
+    private fun renderVpnMetrics() {
+        val state = when (DataStore.serviceState) {
+            BaseService.State.Connected -> "已连接"
+            BaseService.State.Connecting -> "连接中"
+            BaseService.State.Stopping -> "断开中"
+            else -> "未连接"
+        }
+        fun rate(value: Long?) = value?.let { android.text.format.Formatter.formatFileSize(this, it) + "/s" } ?: "—"
+        val testStatus = when (val result = connectionTestResult) {
+            DashboardConnectionTestResult.Testing -> "测试中…"
+            is DashboardConnectionTestResult.Success -> "${result.elapsedMs}ms"
+            DashboardConnectionTestResult.Timeout -> "连接超时 · 点击重试"
+            is DashboardConnectionTestResult.Failure -> "${result.reason} · 点击重试"
+            null -> latency?.let { "${it}ms" } ?: "待测"
+        }
+        binding.vpnMetrics.text = "$state · $testStatus ↑ ${rate(upload)} ↓ ${rate(download)}"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,6 +120,30 @@ class MainActivity : ThemedActivity(),
 
         binding = LayoutMainBinding.inflate(layoutInflater)
         binding.fab.initProgress(binding.fabProgress)
+        // The Activity owns system insets; the navigation widget must not add an opaque inset scrim.
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.bottomNavigation) { v, _ ->
+            v.setPadding(0, 0, 0, 0)
+            androidx.core.view.WindowInsetsCompat.CONSUMED
+        }
+        binding.bottomNavigation.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
+        binding.bottomNavigation.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        binding.bottomNavigation.isItemActiveIndicatorEnabled = false
+        (binding.bottomNavigation.getChildAt(0) as? android.view.ViewGroup)?.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        // Keep the capsule and VPN strip above both gesture and three-button navigation.
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.coordinator) { _, insets ->
+            val bottom = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars()).bottom
+            fun bottomMargin(view: View, dp: Int) {
+                val params = view.layoutParams as androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
+                params.bottomMargin = bottom + (dp * resources.displayMetrics.density).toInt()
+                view.layoutParams = params
+            }
+            bottomMargin(binding.navigationCapsule, 12)
+            bottomMargin(binding.vpnControlStrip, 84)
+            bottomMargin(binding.fab, 88)
+            val fragment = currentMainFragment ?: supportFragmentManager.findFragmentById(R.id.fragment_holder)
+            if (fragment !is ConfigurationFragment) bottomMargin(binding.fragmentHolder, 144)
+            insets
+        }
         if (themeResId !in intArrayOf(
                 R.style.Theme_SagerNet_Black
             )
@@ -112,6 +185,7 @@ class MainActivity : ThemedActivity(),
             )
         }
         binding.stats.setOnClickListener { if (DataStore.serviceState.connected) binding.stats.testConnection() }
+        binding.vpnControlStrip.setOnClickListener { runDashboardConnectionTest() }
 
         setContentView(binding.root)
         currentMainFragment =
@@ -396,18 +470,28 @@ class MainActivity : ThemedActivity(),
             snackbar("请先连接 VPN").show()
             return
         }
-        val fragment = currentMainFragment as? ConfigurationFragment ?: return
-        fragment.updateDashboardLatency(null)
-        runOnDefaultDispatcher {
-            try {
-                val elapsed = urlTest()
-                onMainDispatcher { fragment.updateDashboardLatency(elapsed) }
+        val target = targetProfile()
+        val generation = metricsGeneration
+        latency = null
+        connectionTestResult = DashboardConnectionTestResult.Testing
+        renderVpnMetrics()
+        (currentMainFragment as? ConfigurationFragment)?.updateDashboardConnectionTest(
+            target,
+            DashboardConnectionTestResult.Testing
+        )
+        lifecycleScope.launch {
+            val result = try {
+                val elapsed = withContext(Dispatchers.IO) { urlTest() }
+                if (elapsed >= 0) DashboardConnectionTestResult.Success(elapsed)
+                else DashboardConnectionTestResult.Failure("测试未返回有效延迟")
             } catch (e: Exception) {
-                onMainDispatcher {
-                    fragment.updateDashboardLatency(null)
-                    snackbar(getString(R.string.connection_test_error, e.readableMessage)).show()
-                }
+                dashboardConnectionTestFailure(e)
             }
+            if (!DataStore.serviceState.connected || generation != metricsGeneration || target != targetProfile()) return@launch
+            latency = (result as? DashboardConnectionTestResult.Success)?.elapsedMs
+            connectionTestResult = result
+            renderVpnMetrics()
+            (currentMainFragment as? ConfigurationFragment)?.updateDashboardConnectionTest(target, result)
         }
     }
 
@@ -418,10 +502,24 @@ class MainActivity : ThemedActivity(),
         animate: Boolean,
     ) {
         val dashboardHome = fragment is ConfigurationFragment
-        val showControls = !dashboardHome && DataStore.showBottomBar
+        val showControls = !dashboardHome
+        val holder = binding.fragmentHolder
+        // Bottom controls occupy their own compact strip; never push the toolbar down.
+                holder.setPadding(0, 0, 0, 0)
+                (holder.layoutParams as androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams).apply {
+            bottomMargin = if (dashboardHome) 0 else
+                (144 * resources.displayMetrics.density).toInt() +
+                    (androidx.core.view.ViewCompat.getRootWindowInsets(holder)
+                        ?.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0)
+                    holder.layoutParams = this
+                }
+                binding.vpnControlStrip.visibility = if (showControls) View.VISIBLE else View.GONE
+                refreshVpnStrip()
+                // A translated BottomAppBar still draws an opaque rectangle under the capsule.
+                binding.stats.visibility = View.GONE
         binding.stats.useExternalScrollDriver = false
         binding.stats.syncMainControls(
-            showControls,
+            false,
             DataStore.serviceState,
             showWhenConnected,
             animate,
@@ -483,10 +581,24 @@ class MainActivity : ThemedActivity(),
         animate: Boolean = false,
         animateControls: Boolean = animate,
     ) {
+        val previousState = lastUiState
+        lastUiState = state
         DataStore.serviceState = state
+        if (previousState != state) {
+            metricsGeneration++
+            latency = null; connectionTestResult = null; upload = null; download = null
+        }
         refreshConfigurationProfileState()
+        (currentMainFragment as? ShareFragment)?.refreshServiceState()
+        if (state == BaseService.State.Connected && previousState != state) {
+            binding.root.post { runDashboardConnectionTest() }
+        }
+        if (!state.connected) (currentMainFragment as? ConfigurationFragment)?.updateDashboardConnectionTest(
+            targetProfile(),
+            DashboardConnectionTestResult.Failure("未连接")
+        )
 
-        binding.fab.changeState(state, DataStore.serviceState, animate)
+        binding.fab.changeState(state, previousState, animate)
         binding.stats.changeState(state)
         syncMainControls(
             showWhenConnected = state == BaseService.State.Connected,
@@ -530,10 +642,18 @@ class MainActivity : ThemedActivity(),
     // may NOT called when app is in background
     // ONLY do UI update here, write DB in bg process
     override fun cbSpeedUpdate(stats: SpeedDisplayData) {
+        if (metricsTarget != targetProfile()) refreshVpnStrip()
+        if (DataStore.serviceState.connected) {
+            upload = stats.txRateProxy; download = stats.rxRateProxy
+            renderVpnMetrics()
+        }
         binding.stats.updateSpeed(stats.txRateProxy, stats.rxRateProxy)
         (currentMainFragment as? ConfigurationFragment)?.updateDashboardSpeed(
+            targetProfile(),
             stats.txRateProxy,
             stats.rxRateProxy,
+            stats.txTotal,
+            stats.rxTotal,
         )
     }
 
@@ -545,6 +665,8 @@ class MainActivity : ThemedActivity(),
         val old = DataStore.selectedProxy
         DataStore.selectedProxy = id
         DataStore.currentProfile = id
+        refreshVpnStrip()
+        if (DataStore.serviceState.connected) runDashboardConnectionTest()
         refreshConfigurationProfileState()
         runOnDefaultDispatcher {
             ProfileManager.postUpdate(old, true)
@@ -554,6 +676,8 @@ class MainActivity : ThemedActivity(),
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
         when (key) {
+            Key.PROFILE_ID, Key.PROFILE_CURRENT -> lifecycleScope.launch { refreshVpnStrip() }
+            Key.ENABLE_CLASH_API -> lifecycleScope.launch { refreshNavMenu(DataStore.enableClashAPI) }
             Key.SERVICE_MODE -> onBinderDied()
             Key.SHOW_BOTTOM_BAR -> syncMainControls(
                 showWhenConnected = DataStore.showBottomBar,
