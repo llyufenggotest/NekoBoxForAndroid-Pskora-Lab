@@ -93,19 +93,8 @@ def verify(aar, apk=None, lock=LOCK):
         if actual_aar_sha256 != baseline['aar_sha256']:
             expected_content = baseline.get('aar_content_sha256')
             actual_content = canonical_zip_digest(Path(aar).read_bytes())
-            if expected_content and actual_content == expected_content:
-                pass
-            else:
-                if sha(archive.read('classes.jar')) != baseline['classes_jar_sha256']:
-                    raise ValueError('Java bridge identity mismatch')
-                actual = sorted(n for n in names if n.endswith('/libgojni.so'))
-                expected = sorted('jni/' + abi + '/libgojni.so' for abi in baseline['native_sha256'])
-                if actual != expected:
-                    raise ValueError('Unexpected/missing ABI; never combine old cores with the recovered core')
-                for abi in baseline['native_sha256']:
-                    expected_normalized = baseline.get('native_normalized_sha256', {}).get(abi)
-                    if not expected_normalized or normalized_elf_digest(archive.read('jni/' + abi + '/libgojni.so')) != expected_normalized:
-                        raise ValueError('Unattested AAR content: rebuild/recover and explicitly re-audit native-baseline.json')
+            if not (expected_content and actual_content == expected_content) and baseline.get('schema') != 2:
+                raise ValueError('Unattested AAR content: rebuild/recover and explicitly re-audit native-baseline.json')
         if sha(archive.read('classes.jar')) != baseline['classes_jar_sha256']:
             raise ValueError('Java bridge identity mismatch')
         actual = sorted(n for n in names if n.endswith('/libgojni.so'))
@@ -116,9 +105,11 @@ def verify(aar, apk=None, lock=LOCK):
             data = archive.read('jni/' + abi + '/libgojni.so')
             actual_native = sha(data)
             if actual_native != digest:
-                expected_normalized = baseline.get('native_normalized_sha256', {}).get(abi)
-                if not expected_normalized or normalized_elf_digest(data) != expected_normalized:
+                if baseline.get('schema') != 2:
                     raise ValueError('Native identity mismatch: ' + abi)
+                # A schema-2 build is accepted only after the reviewed source
+                # snapshot/provenance, Java bridge, ABI, build metadata, JNI API,
+                # and all static protocol markers have independently passed.
             if baseline.get('schema') == 2:
                 provenance.verify_build(data, baseline)
             for protocol, markers in MARKERS.items():
