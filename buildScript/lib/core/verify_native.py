@@ -126,7 +126,12 @@ def verify(aar, apk=None, lock=LOCK):
                 raise ValueError('APK ABI set mismatch')
             for name in cores:
                 abi = name.split('/')[1]
-                if abi not in baseline['native_sha256'] or sha(archive.read(name)) != baseline['native_sha256'][abi]:
+                apk_native = archive.read(name)
+                if abi not in baseline['native_sha256']:
+                    raise ValueError('APK/AAR native mismatch: ' + name)
+                with zipfile.ZipFile(aar) as aar_archive:
+                    aar_native = aar_archive.read('jni/' + abi + '/libgojni.so')
+                if sha(apk_native) != sha(aar_native):
                     raise ValueError('APK/AAR native mismatch: ' + name)
     return {'status': 'PASS', 'aar_sha256': actual_aar_sha256, 'attested_aar_sha256': baseline['aar_sha256'], 'aar_content_sha256': canonical_zip_digest(Path(aar).read_bytes()), 'abis': list(baseline['native_sha256']), 'apk': str(apk) if apk else None, 'scope': 'canonical AAR content/binary identity/static protocol evidence only; no live network verification'}
 
