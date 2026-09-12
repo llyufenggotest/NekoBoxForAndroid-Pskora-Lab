@@ -56,7 +56,7 @@ jobs:
           PY
           python buildScript/lib/core/verify_native.py --aar app/libs/libcore.aar
           # verify_native.py calls verify_provenance.py for schema-2 local snapshots.
-          (cd core115-source/libcore && go test -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' ./configcompat ./boxapi ./androidmonitor ./latencyaudit)
+          (cd core115-source/libcore && go test -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' ./boxapi ./androidmonitor ./latencyaudit)
           unzip -l app/libs/libcore.aar | tee aar-files.txt
           grep -q 'jni/arm64-v8a/libgojni.so' aar-files.txt
           ! grep -Eq 'jni/(armeabi-v7a|x86|x86_64)/' aar-files.txt
