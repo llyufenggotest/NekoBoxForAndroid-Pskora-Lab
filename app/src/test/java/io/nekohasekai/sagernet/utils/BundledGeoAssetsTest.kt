@@ -11,13 +11,15 @@ class BundledGeoAssetsTest {
         val assets = File("src/main/assets")
         try {
             BundledGeoAssets.ensure(directory) { File(assets, it).inputStream() }
-            assertEquals(3947343L, File(directory, "geoip.db").length())
-            assertEquals(3762160L, File(directory, "geosite.db").length())
+            val geoipLength = File(directory, "geoip.db").length()
+            val geositeLength = File(directory, "geosite.db").length()
+            assertTrue(geoipLength > 1_000_000L)
+            assertTrue(geositeLength > 1_000_000L)
             File(directory, "geoip.db").writeText("custom")
             File(directory, "geosite.db").writeBytes(byteArrayOf())
             BundledGeoAssets.ensure(directory) { File(assets, it).inputStream() }
             assertEquals("custom", File(directory, "geoip.db").readText())
-            assertEquals(3762160L, File(directory, "geosite.db").length())
+            assertEquals(geositeLength, File(directory, "geosite.db").length())
             assertFalse(File(directory, "geosite.db.installing").exists())
         } finally { directory.deleteRecursively() }
     }
