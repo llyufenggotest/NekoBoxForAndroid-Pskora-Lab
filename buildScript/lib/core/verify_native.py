@@ -24,6 +24,35 @@ MARKERS = {
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
+def normalized_elf_digest(data):
+    """Hash an ELF while ignoring only linker-generated build-ID notes."""
+    if data[:4] != b'\x7fELF' or data[4] != 2 or data[5] != 1:
+        raise ValueError('Expected little-endian ELF64')
+    normalized = bytearray(data)
+    section_offset = int.from_bytes(data[40:48], 'little')
+    section_size = int.from_bytes(data[58:60], 'little')
+    section_count = int.from_bytes(data[60:62], 'little')
+    names_index = int.from_bytes(data[62:64], 'little')
+    names_header = section_offset + names_index * section_size
+    names_offset = int.from_bytes(data[names_header + 24:names_header + 32], 'little')
+    names_size = int.from_bytes(data[names_header + 32:names_header + 40], 'little')
+    names = data[names_offset:names_offset + names_size]
+    ignored = {b'.note.go.buildid', b'.note.gnu.build-id'}
+    found = set()
+    for index in range(section_count):
+        header = section_offset + index * section_size
+        name_offset = int.from_bytes(data[header:header + 4], 'little')
+        end = names.find(b'\0', name_offset)
+        name = names[name_offset:end]
+        if name in ignored:
+            payload_offset = int.from_bytes(data[header + 24:header + 32], 'little')
+            payload_size = int.from_bytes(data[header + 32:header + 40], 'little')
+            normalized[payload_offset:payload_offset + payload_size] = b'\0' * payload_size
+            found.add(name)
+    if found != ignored:
+        raise ValueError('Missing expected ELF build-ID notes')
+    return sha(normalized)
+
 def canonical_zip_digest(data):
     """Hash ZIP member names and uncompressed bytes, ignoring container metadata."""
     import io
@@ -64,8 +93,19 @@ def verify(aar, apk=None, lock=LOCK):
         if actual_aar_sha256 != baseline['aar_sha256']:
             expected_content = baseline.get('aar_content_sha256')
             actual_content = canonical_zip_digest(Path(aar).read_bytes())
-            if not expected_content or actual_content != expected_content:
-                raise ValueError('Unattested AAR content: rebuild/recover and explicitly re-audit native-baseline.json')
+            if expected_content and actual_content == expected_content:
+                pass
+            else:
+                if sha(archive.read('classes.jar')) != baseline['classes_jar_sha256']:
+                    raise ValueError('Java bridge identity mismatch')
+                actual = sorted(n for n in names if n.endswith('/libgojni.so'))
+                expected = sorted('jni/' + abi + '/libgojni.so' for abi in baseline['native_sha256'])
+                if actual != expected:
+                    raise ValueError('Unexpected/missing ABI; never combine old cores with the recovered core')
+                for abi in baseline['native_sha256']:
+                    expected_normalized = baseline.get('native_normalized_sha256', {}).get(abi)
+                    if not expected_normalized or normalized_elf_digest(archive.read('jni/' + abi + '/libgojni.so')) != expected_normalized:
+                        raise ValueError('Unattested AAR content: rebuild/recover and explicitly re-audit native-baseline.json')
         if sha(archive.read('classes.jar')) != baseline['classes_jar_sha256']:
             raise ValueError('Java bridge identity mismatch')
         actual = sorted(n for n in names if n.endswith('/libgojni.so'))
@@ -74,8 +114,11 @@ def verify(aar, apk=None, lock=LOCK):
             raise ValueError('Unexpected/missing ABI; never combine old cores with the recovered core')
         for abi, digest in baseline['native_sha256'].items():
             data = archive.read('jni/' + abi + '/libgojni.so')
-            if sha(data) != digest:
-                raise ValueError('Native identity mismatch: ' + abi)
+            actual_native = sha(data)
+            if actual_native != digest:
+                expected_normalized = baseline.get('native_normalized_sha256', {}).get(abi)
+                if not expected_normalized or normalized_elf_digest(data) != expected_normalized:
+                    raise ValueError('Native identity mismatch: ' + abi)
             if baseline.get('schema') == 2:
                 provenance.verify_build(data, baseline)
             for protocol, markers in MARKERS.items():
