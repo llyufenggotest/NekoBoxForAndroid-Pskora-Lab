@@ -42,6 +42,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python - <<'PY'
+          import hashlib, zipfile
+          from pathlib import Path
+          from buildScript.lib.core.verify_native import canonical_zip_digest
+          aar = Path('app/libs/libcore.aar')
+          data = aar.read_bytes()
+          with zipfile.ZipFile(aar) as archive:
+              print('CI_AAR_SHA256=' + hashlib.sha256(data).hexdigest())
+              print('CI_AAR_CONTENT_SHA256=' + canonical_zip_digest(data))
+              print('CI_CLASSES_JAR_SHA256=' + hashlib.sha256(archive.read('classes.jar')).hexdigest())
+              print('CI_ARM64_SO_SHA256=' + hashlib.sha256(archive.read('jni/arm64-v8a/libgojni.so')).hexdigest())
+          PY
           python buildScript/lib/core/verify_native.py --aar app/libs/libcore.aar
           # verify_native.py calls verify_provenance.py for schema-2 local snapshots.
           (cd core115-source/libcore && go test ./pureprobe ./configcompat ./boxapi ./androidmonitor ./latencyaudit)
