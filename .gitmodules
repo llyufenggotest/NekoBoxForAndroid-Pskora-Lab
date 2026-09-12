@@ -1,3 +1,2 @@
-[submodule "hev-socks5-tunnel"]
-	path = hev-socks5-tunnel
-	url = https://github.com/heiher/hev-socks5-tunnel
+# The build pins HEV_VERSION in buildScript/compile-hevtun.sh; leaving the
+# source untracked lets that script clone the exact release when needed.

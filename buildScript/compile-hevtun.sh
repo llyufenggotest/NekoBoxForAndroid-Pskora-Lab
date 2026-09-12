@@ -34,15 +34,11 @@ OUT_DIR="$REPO_DIR/app/src/main/jniLibs"
 BUILD_DIR="$REPO_DIR/.hev-build"
 
 if [ ! -f "$HEV_SRC/Android.mk" ]; then
-    if [ -e "$REPO_DIR/.git" ] || [ -d "$REPO_DIR/.git" ]; then
-        echo ">> initializing hev-socks5-tunnel submodule"
-        git -C "$REPO_DIR" submodule update --init --recursive hev-socks5-tunnel
-    else
-        echo ">> cloning hev-socks5-tunnel $HEV_VERSION into $HEV_SRC"
-        mkdir -p "$(dirname "$HEV_SRC")"
-        git clone --branch "$HEV_VERSION" --depth 1 --recursive \
-            https://github.com/heiher/hev-socks5-tunnel "$HEV_SRC"
-    fi
+    echo ">> cloning hev-socks5-tunnel $HEV_VERSION into $HEV_SRC"
+    rm -rf "$HEV_SRC"
+    mkdir -p "$(dirname "$HEV_SRC")"
+    git clone --branch "$HEV_VERSION" --depth 1 --recursive \
+        https://github.com/heiher/hev-socks5-tunnel "$HEV_SRC"
 fi
 
 # Persistent obj/libs dirs so ndk-build stays incremental between runs.
