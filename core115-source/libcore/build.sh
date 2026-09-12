@@ -11,7 +11,7 @@ export GOBIND="${GOBIND:-$GOPATH/bin/gobind-matsuri}"
 "$GO_BIN" test ./protocol/oppa
 "$GO_BIN" test ./tunnetcontrol
 "$GO_BIN" test github.com/sagernet/sing-box/protocol/trojan
-"$GOPATH/bin/gomobile-matsuri" bind -v -target=android/arm64 -androidapi 21 -cache "$(realpath "$BUILD")" -trimpath -ldflags='-s -w' -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' .
+"$GOPATH/bin/gomobile-matsuri" bind -v -target=android/arm64 -androidapi 21 -cache "$(realpath "$BUILD")" -trimpath -ldflags='-s -w -X github.com/sagernet/sing-box/constant.Version=1.15.0-alpha.2-private-lab' -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' .
 rm -f libcore-sources.jar
 mkdir -p ../../app/libs
 cp -f libcore.aar ../../app/libs/libcore.aar
