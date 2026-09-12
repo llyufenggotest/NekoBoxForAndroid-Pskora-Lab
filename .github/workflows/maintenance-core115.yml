@@ -91,9 +91,14 @@ jobs:
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
           echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
           chmod +x ./run ./gradlew buildScript/init/action/gradle.sh
+          export GRADLE_OPTS="${GRADLE_OPTS:-} -Dhttps.protocols=TLSv1.2 -Djava.net.preferIPv4Stack=true"
           ./run init action gradle
-          ./gradlew app:testOssDebugUnitTest app:testOssReleaseUnitTest
-          ./gradlew app:assembleOssRelease
+          for attempt in 1 2 3; do
+            ./gradlew --no-daemon --refresh-dependencies app:testOssDebugUnitTest app:testOssReleaseUnitTest && break
+            test "$attempt" -lt 3
+            sleep 15
+          done
+          ./gradlew --no-daemon app:assembleOssRelease
       - name: Verify target APK
         shell: bash
         run: |
