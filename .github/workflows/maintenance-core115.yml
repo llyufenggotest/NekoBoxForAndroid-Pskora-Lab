@@ -90,6 +90,7 @@ jobs:
           set -euo pipefail
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
           echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
+          chmod +x ./run ./gradlew
           ./run init action gradle
           ./gradlew app:testOssDebugUnitTest app:testOssReleaseUnitTest
           ./gradlew app:assembleOssRelease
