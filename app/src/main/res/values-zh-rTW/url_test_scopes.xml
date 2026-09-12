@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="url_test_scopes">
+        <item>測速全部節點</item>
+        <item>只測未測節點</item>
+        <item>僅複測失敗節點</item>
+    </string-array>
+</resources>

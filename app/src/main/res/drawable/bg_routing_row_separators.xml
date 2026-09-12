@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Transparent center, horizontal hairlines only; invariant across states. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:gravity="top" android:height="0.5dp">
+        <shape android:shape="rectangle"><solid android:color="#26000000" /></shape>
+    </item>
+    <item android:gravity="bottom" android:height="0.5dp">
+        <shape android:shape="rectangle"><solid android:color="#26000000" /></shape>
+    </item>
+</layer-list>

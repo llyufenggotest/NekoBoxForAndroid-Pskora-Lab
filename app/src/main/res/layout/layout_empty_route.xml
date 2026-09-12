@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="应用策略"
+        android:textAppearance="?attr/textAppearanceHeadline6" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="为常用服务指定出口。预设默认关闭，配置并保存后可开启。下方全部规则从上到下匹配，长按拖动调整优先级。" />
+    <io.nekohasekai.sagernet.ui.StrategyPanel
+        android:id="@+id/strategy_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" />
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/smart_route_custom"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="自定义域名 / IP → 选择节点" />
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/smart_route_advanced"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="新增高级规则（原有全部选项）" />
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/smart_route_help"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="分流说明" />
+</LinearLayout>

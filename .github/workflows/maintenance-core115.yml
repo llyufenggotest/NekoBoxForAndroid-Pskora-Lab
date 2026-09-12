@@ -1,0 +1,113 @@
+name: Core115 Validated 250 Maintenance
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - maintenance/core115-validated250-stable
+    tags:
+      - core115-validated250-maintenance-candidate-*
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Native AAR and protocol gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - name: Pin and build native source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f core115-source/libcore/go.mod
+          git clone --filter=blob:none https://github.com/MatsuriDayo/gomobile.git core115-source/gomobile
+          git -C core115-source/gomobile checkout --detach 17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f
+          test "$(git -C core115-source/gomobile rev-parse HEAD)" = 17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f
+          chmod +x core115-source/libcore/init.sh core115-source/libcore/build.sh
+          (cd core115-source/libcore && ./init.sh && ./build.sh)
+          test -s app/libs/libcore.aar
+      - name: Native provenance Pure and geo gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python buildScript/lib/core/verify_native.py --aar app/libs/libcore.aar
+          # verify_native.py calls verify_provenance.py for schema-2 local snapshots.
+          (cd core115-source/libcore && go test ./pureprobe ./configcompat ./boxapi ./androidmonitor ./latencyaudit)
+          unzip -l app/libs/libcore.aar | tee aar-files.txt
+          grep -q 'jni/arm64-v8a/libgojni.so' aar-files.txt
+          ! grep -Eq 'jni/(armeabi-v7a|x86|x86_64)/' aar-files.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: libcore-aar
+          path: app/libs/libcore.aar
+          retention-days: 3
+
+  android:
+    name: Android tests and unsigned arm64 release
+    needs: native
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/download-artifact@v5
+        with:
+          name: libcore-aar
+          path: app/libs
+      - name: Gradle tests and release build
+        shell: bash
+        env:
+          BUILD_PLUGIN: none
+        run: |
+          set -euo pipefail
+          echo "sdk.dir=${ANDROID_HOME}" > local.properties
+          echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
+          ./run init action gradle
+          ./gradlew app:testOssDebugUnitTest app:testOssReleaseUnitTest
+          ./gradlew app:assembleOssRelease
+      - name: Verify target APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t apks < <(find app/build/outputs/apk/oss/release -type f -name '*arm64-v8a*.apk')
+          test "${#apks[@]}" -eq 1
+          APK="${apks[0]}"
+          unzip -l "$APK" | tee apk-files.txt
+          grep -q 'lib/arm64-v8a/libgojni.so' apk-files.txt
+          ! grep -Eq 'lib/(armeabi-v7a|x86|x86_64)/' apk-files.txt
+          unzip -p "$APK" lib/arm64-v8a/libgojni.so > apk-libgojni.so
+          unzip -p app/libs/libcore.aar jni/arm64-v8a/libgojni.so > aar-libgojni.so
+          cmp apk-libgojni.so aar-libgojni.so
+          for asset in geoip.db geosite.db; do unzip -l "$APK" | grep -q "$asset"; done
+          if "${ANDROID_HOME}/build-tools/35.0.0/apksigner" verify "$APK"; then
+            echo 'APK unexpectedly signed' >&2
+            exit 1
+          fi
+          mkdir -p out
+          cp "$APK" out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk
+          (cd out && sha256sum NekoBoxYF-core115-validated250-arm64-release-unsigned.apk > NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256)
+          python tools/verify_maintenance_ci.py .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: NekoBoxYF-core115-validated250-arm64-unsigned
+          path: |
+            out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk
+            out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256
+          if-no-files-found: error
+          retention-days: 30

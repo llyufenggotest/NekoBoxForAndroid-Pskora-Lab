@@ -1,0 +1,322 @@
+{
+  "dns": {
+    "fakeip": {
+      "enabled": true,
+      "inet4_range": "198.18.0.0/15",
+      "inet6_range": "fc00::/18"
+    },
+    "final": "dns-remote",
+    "independent_cache": true,
+    "rules": [
+      {
+        "domain": [
+          "fixture-0.invalid",
+          "fixture-1.invalid",
+          "fixture-2.invalid",
+          "fixture-3.invalid"
+        ],
+        "server": "dns-direct"
+      },
+      {
+        "outbound": [
+          "any"
+        ],
+        "server": "dns-direct"
+      },
+      {
+        "rule_set": [
+          "geosite:cn"
+        ],
+        "server": "dns-direct",
+        "user_id": [
+          12700,
+          11918
+        ]
+      },
+      {
+        "disable_cache": true,
+        "rule_set": [
+          "geosite:category-ads-all"
+        ],
+        "server": "dns-block"
+      },
+      {
+        "domain_suffix": [
+          "fixture-4.invalid",
+          "fixture-5.invalid",
+          "fixture-6.invalid"
+        ],
+        "inbound": [
+          "tun-in"
+        ],
+        "query_type": [
+          "A",
+          "AAAA"
+        ],
+        "server": "dns-fake"
+      },
+      {
+        "disable_cache": true,
+        "inbound": [
+          "tun-in"
+        ],
+        "query_type": [
+          "A",
+          "AAAA"
+        ],
+        "server": "dns-fake"
+      }
+    ],
+    "servers": [
+      {
+        "address": "rcode://success",
+        "tag": "dns-block"
+      },
+      {
+        "address": "local",
+        "detour": "direct",
+        "tag": "dns-local"
+      },
+      {
+        "address": "udp://127.0.0.1:15355",
+        "address_resolver": "dns-local",
+        "detour": "direct",
+        "strategy": "ipv4_only",
+        "tag": "dns-direct"
+      },
+      {
+        "address": "udp://127.0.0.1:15356",
+        "address_resolver": "dns-direct",
+        "strategy": "ipv4_only",
+        "tag": "dns-remote"
+      },
+      {
+        "address": "fakeip",
+        "strategy": "ipv4_only",
+        "tag": "dns-fake"
+      }
+    ]
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true,
+      "path": "",
+      "store_fakeip": true
+    }
+  },
+  "inbounds": [
+    {
+      "auto_route": true,
+      "domain_strategy": "",
+      "endpoint_independent_nat": true,
+      "inet4_address": [
+        "172.19.0.1/28"
+      ],
+      "interface_name": "tun0",
+      "mtu": 1500,
+      "sniff": false,
+      "sniff_override_destination": false,
+      "stack": "system",
+      "strict_route": true,
+      "tag": "tun-in",
+      "type": "tun"
+    },
+    {
+      "domain_strategy": "",
+      "listen": "127.0.0.1",
+      "listen_port": 2080,
+      "sniff": false,
+      "sniff_override_destination": false,
+      "tag": "mixed-in",
+      "type": "mixed"
+    }
+  ],
+  "log": {
+    "level": "debug"
+  },
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "fixture-out-0"
+    },
+    {
+      "type": "direct",
+      "tag": "fixture-out-1"
+    },
+    {
+      "type": "direct",
+      "tag": "fixture-out-2"
+    },
+    {
+      "type": "direct",
+      "tag": "fixture-out-3"
+    },
+    {
+      "type": "direct",
+      "tag": "fixture-out-4"
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "direct",
+      "tag": "fixture-out-6"
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "concurrent_dial": false,
+    "final": "fixture-out-0",
+    "override_android_vpn": true,
+    "rule_set": [
+      {
+        "type": "inline",
+        "tag": "geoip:cn",
+        "rules": [
+          {
+            "domain": [
+              "cn.invalid"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "inline",
+        "tag": "geosite:category-ads-all",
+        "rules": [
+          {
+            "domain": [
+              "ads.invalid"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "inline",
+        "tag": "geosite:cn",
+        "rules": [
+          {
+            "domain": [
+              "cn.invalid"
+            ]
+          }
+        ]
+      }
+    ],
+    "rules": [
+      {
+        "action": "hijack-dns",
+        "port": [
+          53
+        ]
+      },
+      {
+        "action": "hijack-dns",
+        "protocol": [
+          "dns"
+        ]
+      },
+      {
+        "outbound": "fixture-out-6",
+        "rule_set": [
+          "geosite:cn"
+        ],
+        "user_id": [
+          12700,
+          11918
+        ]
+      },
+      {
+        "domain_suffix": [
+          "fixture-7.invalid",
+          "fixture-8.invalid",
+          "fixture-9.invalid",
+          "fixture-10.invalid",
+          "fixture-11.invalid",
+          "fixture-12.invalid",
+          "fixture-13.invalid",
+          "fixture-14.invalid",
+          "fixture-15.invalid",
+          "fixture-16.invalid",
+          "fixture-17.invalid",
+          "fixture-18.invalid"
+        ],
+        "outbound": "fixture-out-2"
+      },
+      {
+        "outbound": "fixture-out-1",
+        "user_id": [
+          12748,
+          10535
+        ]
+      },
+      {
+        "domain_suffix": [
+          "fixture-19.invalid",
+          "fixture-20.invalid"
+        ],
+        "outbound": "fixture-out-4",
+        "user_id": [
+          10361,
+          10538
+        ]
+      },
+      {
+        "ip_cidr": [
+          "39.98.78.35",
+          "106.53.212.126",
+          "39.98.71.17",
+          "47.86.42.11"
+        ],
+        "outbound": "fixture-out-6"
+      },
+      {
+        "outbound": "fixture-out-6",
+        "rule_set": [
+          "geoip:cn"
+        ],
+        "user_id": [
+          12700,
+          11918,
+          10535
+        ]
+      },
+      {
+        "outbound": "fixture-out-3",
+        "user_id": [
+          13094
+        ]
+      },
+      {
+        "action": "reject",
+        "rule_set": [
+          "geosite:category-ads-all"
+        ]
+      },
+      {
+        "domain_suffix": [
+          "fixture-4.invalid",
+          "fixture-5.invalid",
+          "fixture-6.invalid"
+        ],
+        "outbound": "fixture-out-0"
+      },
+      {
+        "ip_is_private": true,
+        "outbound": "fixture-out-6"
+      },
+      {
+        "action": "reject",
+        "ip_cidr": [
+          "224.0.0.0/3",
+          "ff00::/8"
+        ],
+        "source_ip_cidr": [
+          "224.0.0.0/3",
+          "ff00::/8"
+        ]
+      }
+    ]
+  }
+}

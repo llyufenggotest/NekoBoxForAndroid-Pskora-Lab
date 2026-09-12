@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "source_kind": "local recovery from supplied Actions APK; not original AAR",
+  "actions_run": "33967191242",
+  "reported_source_commit": "64e29a220855958134fbcbd6920b5eea2d6fe576",
+  "source_apk_sha256": "b856cb389fb9b0a98c5203e9f45d003444a114e3c7392ff6da74f575a3091758",
+  "aar_sha256": "4f263dbc8e307d3bcd09e5482dc1cd3c4053801b331848402a065b0d47f539ed",
+  "classes_jar_sha256": "45be10a453a75ea1a4364ec907666d23e06eea2b73052d2103778795fe0e4afb",
+  "native_sha256": {
+    "arm64-v8a": "6f1862c913ba969c0e80ad03d3c01941209f7abf34752fe4f0f94aaa12e80b95"
+  },
+  "jni_evidence": {
+    "matched_classes": 31,
+    "native_methods": 86,
+    "equal_jni_exports": 86,
+    "bridge_mismatches": []
+  },
+  "dependency_pins": {
+    "sing-box": "0466eadc8c483599fa5332b5cac63c467b363222",
+    "sing-vmess": "5537b1238054eb9f755082df6a0c936baf77df90"
+  },
+  "limitations": [
+    "arm64-v8a only; other stale ABIs intentionally excluded",
+    "Static JNI signatures/export comparison is not Android runtime execution",
+    "Protocol markers are presence evidence, not live traffic proof",
+    "Newly built cores require explicit provenance/JNI/protocol audit before updating lock"
+  ]
+}

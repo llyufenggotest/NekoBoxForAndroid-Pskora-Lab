@@ -1,0 +1,520 @@
+package io.nekohasekai.sagernet.bg
+
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.*
+import android.app.ActivityManager
+import android.widget.Toast
+import io.nekohasekai.sagernet.Action
+import io.nekohasekai.sagernet.BootReceiver
+import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.SagerNet
+import io.nekohasekai.sagernet.aidl.ISagerNetService
+import io.nekohasekai.sagernet.aidl.ISagerNetServiceCallback
+import io.nekohasekai.sagernet.bg.proto.ProxyInstance
+import io.nekohasekai.sagernet.bg.proto.activeTunNetBeans
+import io.nekohasekai.sagernet.bg.proto.selectorSwitchRequiresRestart
+import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.SagerDatabase
+import io.nekohasekai.sagernet.ktx.*
+import io.nekohasekai.sagernet.plugin.PluginManager
+import io.nekohasekai.sagernet.utils.DefaultNetworkListener
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import libcore.Libcore
+import moe.matsuri.nb4a.Protocols
+import moe.matsuri.nb4a.utils.Util
+import java.net.UnknownHostException
+
+class BaseService {
+
+    enum class State(
+        val canStop: Boolean = false,
+        val started: Boolean = false,
+        val connected: Boolean = false,
+    ) {
+        /**
+         * Idle state is only used by UI and will never be returned by BaseService.
+         */
+        Idle, Connecting(true, true, false), Connected(true, true, true), Stopping, Stopped,
+    }
+
+    interface ExpectedException
+
+    class Data internal constructor(private val service: Interface) {
+        var state = State.Stopped
+        var proxy: ProxyInstance? = null
+        var notification: ServiceNotification? = null
+
+        val receiver = broadcastReceiver { ctx, intent ->
+            when (intent.action) {
+                Intent.ACTION_SHUTDOWN -> service.persistStats()
+                Action.RELOAD -> service.reload()
+                // Action.SWITCH_WAKE_LOCK -> runOnDefaultDispatcher { service.switchWakeLock() }
+                PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        if (SagerNet.power.isDeviceIdleMode) {
+                            proxy?.box?.sleep()
+                        } else {
+                            proxy?.box?.wake()
+                            if (DataStore.wakeResetConnections) {
+                                Libcore.resetAllConnections(true)
+                            }
+                        }
+                    }
+                }
+
+                Action.RESET_UPSTREAM_CONNECTIONS -> runOnDefaultDispatcher {
+                    Libcore.resetAllConnections(true)
+                    runOnMainDispatcher {
+                        Util.collapseStatusBar(ctx)
+                        Toast.makeText(ctx, "Reset upstream connections done", Toast.LENGTH_SHORT)
+                            .show()
+                    }
+                }
+
+                else -> service.stopRunner()
+            }
+        }
+        var closeReceiverRegistered = false
+
+        val binder = Binder(this)
+        var connectingJob: Job? = null
+        var stoppingJob: Job? = null
+        var intentGeneration = 0L
+        var restartRequested = false
+        val logMutex = Mutex()
+
+        suspend fun reconfigureLog(level: Int): String = logMutex.withLock {
+            val generation = intentGeneration
+            val profile = DataStore.selectedProxy
+            val resume = state == State.Connected || state == State.Connecting
+            try {
+                // Silence old producers before waiting for cancellation/close.
+                Libcore.nekoLogReconfigure(false, false)
+                if (resume) service.stopRunner(preserveIntent = true)
+                stoppingJob?.join()
+                DataStore.logLevel = level
+                Libcore.nekoLogReconfigure(level != 0, true)
+                if (resume && generation == intentGeneration &&
+                    profile == DataStore.selectedProxy && state == State.Stopped) {
+                    service.onStartCommand(null, 0, 0)
+                }
+                ""
+            } catch (e: Exception) {
+                // Clear failure must not turn into an unconditional reconnect.
+                runCatching { Libcore.nekoLogReconfigure(level != 0, false) }
+                if (resume && generation == intentGeneration &&
+                    profile == DataStore.selectedProxy && state == State.Stopped) {
+                    service.onStartCommand(null, 0, 0)
+                }
+                e.readableMessage
+            }
+        }
+
+        fun changeState(s: State, msg: String? = null) {
+            if (state == s && msg == null) return
+            state = s
+            if (s != State.Connected) binder.clearPreferredSession()
+            DataStore.serviceState = s
+            binder.stateChanged(s, msg)
+        }
+    }
+
+    class Binder(private var data: Data? = null) : ISagerNetService.Stub(), CoroutineScope,
+        AutoCloseable {
+        private val callbacks = object : RemoteCallbackList<ISagerNetServiceCallback>() {
+            override fun onCallbackDied(callback: ISagerNetServiceCallback?, cookie: Any?) {
+                super.onCallbackDied(callback, cookie)
+            }
+        }
+
+        val callbackIdMap = mutableMapOf<ISagerNetServiceCallback, Int>()
+
+        override val coroutineContext = Dispatchers.Main.immediate + Job()
+
+        override fun getState(): Int = (data?.state ?: State.Idle).ordinal
+        override fun getProfileName(): String = data?.proxy?.displayProfileName ?: "Idle"
+
+        private var selectionOwner: ProxyInstance? = null
+        private var selectionSession = ""
+        fun clearPreferredSession() {
+            selectionOwner = null
+            selectionSession = ""
+        }
+
+        override fun getPreferredSelection(profileId: Long): String = runBlocking {
+            withContext(Dispatchers.Main.immediate) {
+                val current = data
+                val proxy = current?.proxy
+                if (current?.state != State.Connected || proxy == null || !proxy.isInitialized() ||
+                    DataStore.currentProfile != profileId) {
+                    selectionOwner = null
+                    selectionSession = ""
+                    return@withContext "{}"
+                }
+                if (selectionOwner !== proxy) {
+                    selectionOwner = proxy
+                    selectionSession = java.util.UUID.randomUUID().toString()
+                }
+                val tag = proxy.config.preferredRuntimeTags[profileId] ?: return@withContext "{}"
+                val members = proxy.config.preferredRuntimeMembers[tag].orEmpty()
+                val raw = org.json.JSONObject(proxy.box.runtimeSelection(tag))
+                if (raw.optString("groupTag") != tag) return@withContext "{}"
+                raw.put("profileId", profileId)
+                raw.put("session", selectionSession)
+                raw.put("tcpId", members[raw.optString("tcpTag")] ?: 0L)
+                raw.put("udpId", members[raw.optString("udpTag")] ?: 0L)
+                io.nekohasekai.sagernet.ui.mapPreferredRuntimeSamples(raw, members)
+                raw.toString()
+            }
+        }
+
+        override fun registerCallback(cb: ISagerNetServiceCallback, id: Int) {
+            if (id == SagerConnection.CONNECTION_ID_RESTART_BG) {
+                Runtime.getRuntime().exit(0)
+                return
+            }
+            if (!callbackIdMap.contains(cb)) {
+                callbacks.register(cb)
+            }
+            callbackIdMap[cb] = id
+        }
+
+        private val broadcastMutex = Mutex()
+
+        suspend fun broadcast(work: (ISagerNetServiceCallback) -> Unit) {
+            broadcastMutex.withLock {
+                val count = callbacks.beginBroadcast()
+                try {
+                    repeat(count) {
+                        try {
+                            work(callbacks.getBroadcastItem(it))
+                        } catch (_: RemoteException) {
+                        } catch (_: Exception) {
+                        }
+                    }
+                } finally {
+                    callbacks.finishBroadcast()
+                }
+            }
+        }
+
+        override fun unregisterCallback(cb: ISagerNetServiceCallback) {
+            callbackIdMap.remove(cb)
+            callbacks.unregister(cb)
+        }
+
+        override fun resetTraffic(profileIds: LongArray) {
+            launch(Dispatchers.Default) {
+                data?.proxy?.looper?.resetTraffic(profileIds)
+            }
+        }
+
+        override fun reconfigureLog(level: Int): String = runBlocking {
+            withContext(Dispatchers.Main.immediate) {
+                data?.reconfigureLog(level) ?: "Service disconnected"
+            }
+        }
+
+        override fun urlTest(): Int {
+            if (data?.proxy?.box == null) {
+                error("core not started")
+            }
+            try {
+                return Libcore.urlTest(
+                    data!!.proxy!!.box, DataStore.connectionTestURL, DataStore.connectionTestTimeout
+                )
+            } catch (e: Exception) {
+                error(Protocols.genFriendlyMsg(e.readableMessage))
+            }
+        }
+
+        fun stateChanged(s: State, msg: String?) = launch {
+            val profileName = profileName
+            broadcast { it.stateChanged(s.ordinal, profileName, msg) }
+        }
+
+        fun missingPlugin(pluginName: String) = launch {
+            val profileName = profileName
+            broadcast { it.missingPlugin(profileName, pluginName) }
+        }
+
+        override fun close() {
+            callbacks.kill()
+            cancel()
+            data = null
+        }
+    }
+
+    interface Interface {
+        val data: Data
+        val tag: String
+        fun createNotification(profileName: String): ServiceNotification
+
+        fun onBind(intent: Intent): IBinder? =
+            if (intent.action == Action.SERVICE) data.binder else null
+
+        fun reload() {
+            data.intentGeneration++ // a profile/user reload supersedes log-only resume intent
+            if (DataStore.selectedProxy == 0L) {
+                stopRunner(false, (this as Context).getString(R.string.profile_empty))
+            }
+            if (canReloadSelector()) {
+                val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
+                val tag = data.proxy!!.config.profileTagMap[ent?.id] ?: ""
+                if (tag.isNotBlank() && ent != null) {
+                    // select from GUI
+                    data.proxy!!.box.selectOutbound(tag)
+                    // or select from webui
+                    // => selector_OnProxySelected
+                }
+                return
+            }
+            val s = data.state
+            when {
+                s == State.Stopped -> startRunner()
+                s.canStop -> stopRunner(true)
+                else -> Logs.w("Illegal state $s when invoking use")
+            }
+        }
+
+        fun canReloadSelector(): Boolean {
+            if ((data.proxy?.config?.selectorGroupId ?: -1L) < 0) return false
+            val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy) ?: return false
+            val activeInstance = data.proxy ?: return false
+            val currentTunNet = activeTunNetBeans(
+                DataStore.currentProfile,
+                activeInstance.config.profileTagMap,
+                activeInstance.config.trafficMap,
+            ).isNotEmpty()
+            val tmpBox = ProxyInstance(ent)
+            tmpBox.buildConfigTmp()
+            val nextTunNet = activeTunNetBeans(
+                ent.id,
+                tmpBox.config.profileTagMap,
+                tmpBox.config.trafficMap,
+            ).isNotEmpty()
+            if (selectorSwitchRequiresRestart(currentTunNet, nextTunNet)) return false
+            if (tmpBox.lastSelectorGroupId == activeInstance.lastSelectorGroupId) {
+                return true
+            }
+            return false
+        }
+
+        suspend fun startProcesses() {
+            data.proxy!!.launch()
+        }
+
+        fun startRunner() {
+            this as Context
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(Intent(this, javaClass))
+            else startService(Intent(this, javaClass))
+        }
+
+        fun killProcesses() {
+            data.proxy?.close()
+            wakeLock?.apply {
+                release()
+                wakeLock = null
+            }
+            // Network listener is joined by stopRunner before any new session.
+        }
+
+        fun stopRunner(restart: Boolean = false, msg: String? = null, preserveIntent: Boolean = false) {
+            if (!preserveIntent) {
+                data.intentGeneration++
+                data.restartRequested = restart
+            }
+            DataStore.baseService = null
+            DataStore.vpnService = null
+            DataStore.mixedInboundAuthed = false
+
+            if (data.state == State.Stopping) return
+            data.notification?.destroy()
+            data.notification = null
+            this as Service
+
+            val stoppingGeneration = data.intentGeneration
+            data.changeState(State.Stopping)
+
+            data.stoppingJob = runOnMainDispatcher {
+                // Do not enter inline from the connecting coroutine's catch block.
+                yield()
+                data.connectingJob?.cancelAndJoin() // ensure stop connecting first
+                // we use a coroutineScope here to allow clean-up in parallel
+                coroutineScope {
+                    val oldProxy = data.proxy
+                    killProcesses()
+                    oldProxy?.awaitLogWriters()
+                    DefaultNetworkListener.stop(this@Interface)
+                    val data = data
+                    if (data.closeReceiverRegistered && !preserveIntent) {
+                        unregisterReceiver(data.receiver)
+                        data.closeReceiverRegistered = false
+                    }
+                    data.proxy = null
+                }
+
+                // change the state
+                data.changeState(State.Stopped, msg)
+                // stop the service if nothing has bound to it
+                if (data.restartRequested) {
+                    data.restartRequested = false
+                    // Synchronous dispatch avoids an uncancellable queued start Intent.
+                    onStartCommand(null, 0, 0)
+                } else if (!preserveIntent || data.intentGeneration != stoppingGeneration) {
+                    stopSelf()
+                }
+            }
+        }
+
+        fun persistStats() {
+            // TODO NEW save app stats?
+        }
+
+        // networks
+        var upstreamInterfaceName: String?
+
+        suspend fun preInit() {
+            DefaultNetworkListener.start(this) {
+                // Diagnostic-only: preserve the audited nullable/offline behavior.
+                VpnUnderlyingLiveDiagnostic.recordConnectivityCallback(
+                    if (it == null) 4 else 1,
+                    it,
+                )
+                if (it == null) VpnUnderlyingLiveDiagnostic.recordOfflineNoRequest()
+                SagerNet.connectivity.getLinkProperties(it)?.also { link ->
+                    SagerNet.underlyingNetwork = it
+                    DataStore.vpnService?.updateUnderlyingNetwork()
+                    //
+                    val oldName = upstreamInterfaceName
+                    if (oldName != link.interfaceName) {
+                        upstreamInterfaceName = link.interfaceName
+                    }
+                    if (oldName != null && upstreamInterfaceName != null && oldName != upstreamInterfaceName) {
+                        Logs.d("Network changed: $oldName -> $upstreamInterfaceName")
+                        if (DataStore.networkChangeResetConnections) {
+                            Libcore.resetAllConnections(true)
+                        }
+                    }
+                }
+            }
+        }
+
+        var wakeLock: PowerManager.WakeLock?
+        fun acquireWakeLock()
+
+        suspend fun lateInit() {
+            wakeLock?.apply {
+                release()
+                wakeLock = null
+            }
+
+            if (DataStore.acquireWakeLock) {
+                acquireWakeLock()
+                data.notification?.postNotificationWakeLockStatus(true)
+            } else {
+                data.notification?.postNotificationWakeLockStatus(false)
+            }
+        }
+
+        fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+            DataStore.baseService = this
+
+            val data = data
+            if (data.state != State.Stopped) return Service.START_NOT_STICKY
+            val profile = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
+            this as Context
+            if (profile == null) { // gracefully shutdown: https://stackoverflow.com/q/47337857/2245107
+                data.notification = createNotification("")
+                stopRunner(false, getString(R.string.profile_empty))
+                return Service.START_NOT_STICKY
+            }
+
+            val proxy = ProxyInstance(profile, this)
+            data.proxy = proxy
+            BootReceiver.enabled = DataStore.persistAcrossReboot
+            if (!data.closeReceiverRegistered) {
+                val filter = IntentFilter().apply {
+                    addAction(Action.RELOAD)
+                    addAction(Intent.ACTION_SHUTDOWN)
+                    addAction(Action.CLOSE)
+                    // addAction(Action.SWITCH_WAKE_LOCK)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
+                    }
+                    addAction(Action.RESET_UPSTREAM_CONNECTIONS)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    registerReceiver(
+                        data.receiver,
+                        filter,
+                        "$packageName.SERVICE",
+                        null,
+                        Context.RECEIVER_EXPORTED
+                    )
+                } else {
+                    registerReceiver(
+                        data.receiver,
+                        filter,
+                        "$packageName.SERVICE",
+                        null
+                    )
+                }
+                data.closeReceiverRegistered = true
+            }
+
+            data.intentGeneration++
+            data.changeState(State.Connecting)
+            data.connectingJob = runOnMainDispatcher {
+                try {
+                    yield() // assign ownership before synchronous failure/completion
+                    data.notification = createNotification(ServiceNotification.genTitle(profile))
+
+                    Executable.killAll()    // clean up old processes
+                    preInit()
+                    proxy.init()
+                    DataStore.currentProfile = profile.id
+
+                    proxy.processes = GuardedProcessPool {
+                        if (data.proxy === proxy && data.state != State.Stopping) {
+                            Logs.w(it)
+                            stopRunner(false, it.readableMessage)
+                        }
+                    }
+
+                    startProcesses()
+                    data.changeState(State.Connected)
+
+                    lateInit()
+                } catch (_: CancellationException) { // if the job was cancelled, it is canceller's responsibility to call stopRunner
+                } catch (_: UnknownHostException) {
+                    stopRunner(false, getString(R.string.invalid_server))
+                } catch (e: PluginManager.PluginNotFoundException) {
+                    Toast.makeText(this@Interface, e.readableMessage, Toast.LENGTH_SHORT).show()
+                    Logs.w(e)
+                    data.binder.missingPlugin(e.plugin)
+                    stopRunner(false, null)
+                } catch (exc: Throwable) {
+                    if (exc.javaClass.name.endsWith("proxyerror")) {
+                        // error from golang
+                        Logs.w(exc.readableMessage)
+                    } else {
+                        Logs.w(exc)
+                    }
+                    stopRunner(
+                        false, "${getString(R.string.service_failed)}: ${exc.readableMessage}"
+                    )
+                } finally {
+                    data.connectingJob = null
+                }
+            }
+            return Service.START_NOT_STICKY
+        }
+    }
+
+}

@@ -1,0 +1,329 @@
+{
+  "schema": 2,
+  "source_kind": "local-core115-snapshot",
+  "source_root": "core115-source",
+  "aar_sha256": "933d2030622e1d365bb7bc10fe871cde371653ccdc77892c98ec615ce15a1ae9",
+  "classes_jar_sha256": "e0450718661df37cbcf577fe0de17c28043e3c50225047c9f697746b48824e7f",
+  "native_sha256": {
+    "arm64-v8a": "70a35c2c29db6a1001afb9656ebe3055c6a49b4ce4546095764c71e559ab9d5d"
+  },
+  "dependency_pins": {
+    "sing-box": "83afb25bba3e225493c9aa3df7cd0629c7a8bd50",
+    "sing-vmess": "5537b1238054eb9f755082df6a0c936baf77df90"
+  },
+  "source_dependencies": {
+    "libcore": {
+      "commit": null,
+      "tree": null,
+      "go_mod_sha256": "9f08499ca9f3aff6ad8f92fe124f472cf63c56b4b7fd311aa60d9d029b1ec7a6"
+    },
+    "libneko": {
+      "commit": "6a85c185d62435a5293ef70ac3b638ae3ee1efa7",
+      "tree": "2431737bb12c51dc021a7b45e95b63cb7b997b71",
+      "go_mod_sha256": "c70dd05fa6ed4c2fbb2a4d554d7fed9b6293505e8343802023fa5742c3f006fa"
+    },
+    "sing-anytls115-local": {
+      "commit": null,
+      "tree": null,
+      "go_mod_sha256": "052564996ddb3a623574918b0a90646e12ba43278d86a052ce5e24ba0cf0e5ea"
+    },
+    "sing-box": {
+      "commit": "83afb25bba3e225493c9aa3df7cd0629c7a8bd50",
+      "tree": "e6cb40dc23febbea321fee8c419fbd5cfd4bdb42",
+      "go_mod_sha256": "d168691a058786669ebeb8f66c1d423b6378fcfcfe592f6e7f1109749cb0c3fa"
+    },
+    "sing-juicity": {
+      "commit": null,
+      "tree": null,
+      "go_mod_sha256": "e78e6729918eb5472308d5709e697e71ea0b1f75137290840106c80103c24391"
+    },
+    "sing-shadowsocks2": {
+      "commit": "263af01ec77a1ffed8775f12f0d0849dc724bd51",
+      "tree": "609ec7670c78a807b85b741096267d01a39fdff5",
+      "go_mod_sha256": "9bad22af406e742228013616c59478f5297ac4f498be7fc2045770b6863c7fd5"
+    },
+    "sing-snell-local": {
+      "commit": null,
+      "tree": null,
+      "go_mod_sha256": "e68b446b695e6a25f0831533bf557533745c8cd58cb79b8785ef70d251ccd1ec"
+    },
+    "sing-vmess": {
+      "commit": "5537b1238054eb9f755082df6a0c936baf77df90",
+      "tree": "544c87cb081843b9e35471e25bc9435c5b9ee626",
+      "go_mod_sha256": "77e244c26cff636829682d35c559f0b8b763c390954788a15ea7609e9d92fe26"
+    }
+  },
+  "patch_provenance": {
+    "historical_112": {
+      "historical_112": {
+        "path": "evidence/fallback/fallback-native.patch",
+        "sha256": "31db9448ac25185439960e5807420113de8df83623c31a208995a441d1898bc9",
+        "files": {
+          "option/group.go": {
+            "source_raw": "3f3a6e2168db00a3cdc7455ad4b64abacfc2c0946f1e12e59acdd953584c4cc7",
+            "target_raw": "a16d005495181a6d57306cfe661cf2e36c1e1081171a06853e3beb453589cc70",
+            "source_lf_sha256": "3f3a6e2168db00a3cdc7455ad4b64abacfc2c0946f1e12e59acdd953584c4cc7",
+            "target_lf_sha256": "3f3a6e2168db00a3cdc7455ad4b64abacfc2c0946f1e12e59acdd953584c4cc7"
+          },
+          "protocol/group/urltest.go": {
+            "source_raw": "9d4ed181ddd288d241c7de633c95ee83174e6cfe03751980841afe7816ac5b5f",
+            "target_raw": "c93c4a185767911cde20092423ad773c2df3fc9313957d54fa77a3b09ec4230a",
+            "source_lf_sha256": "9d4ed181ddd288d241c7de633c95ee83174e6cfe03751980841afe7816ac5b5f",
+            "target_lf_sha256": "9d4ed181ddd288d241c7de633c95ee83174e6cfe03751980841afe7816ac5b5f"
+          },
+          "protocol/group/urltest_fallback.go": {
+            "source_raw": "f247d896708fd031dda3c3951c155c2460343d35b0bbf3d0713ab4a9a1da3ce3",
+            "target_raw": "b2f71155456c700aa07dd6ce50445124b00292e2d3be46e9fad693b3dd37c75e",
+            "source_lf_sha256": "f247d896708fd031dda3c3951c155c2460343d35b0bbf3d0713ab4a9a1da3ce3",
+            "target_lf_sha256": "f247d896708fd031dda3c3951c155c2460343d35b0bbf3d0713ab4a9a1da3ce3"
+          },
+          "protocol/group/urltest_fallback_socket_test.go": {
+            "source_raw": "881d92e20b61af0826b91f7ecf1b44fb022e80228efa9db11af638ed55ffaef4",
+            "target_raw": "881d92e20b61af0826b91f7ecf1b44fb022e80228efa9db11af638ed55ffaef4",
+            "source_lf_sha256": "881d92e20b61af0826b91f7ecf1b44fb022e80228efa9db11af638ed55ffaef4",
+            "target_lf_sha256": "881d92e20b61af0826b91f7ecf1b44fb022e80228efa9db11af638ed55ffaef4"
+          },
+          "protocol/group/urltest_fallback_test.go": {
+            "source_raw": "c1667ea753b917bb6a43df2718c8a6aaa4d67110d40ff6dd244a9d56a0c55e3d",
+            "target_raw": "a6854b8b1f8e92d02136ed150012284dfdc23a024ff36765e63afb413d30b840",
+            "source_lf_sha256": "c1667ea753b917bb6a43df2718c8a6aaa4d67110d40ff6dd244a9d56a0c55e3d",
+            "target_lf_sha256": "c1667ea753b917bb6a43df2718c8a6aaa4d67110d40ff6dd244a9d56a0c55e3d"
+          }
+        }
+      },
+      "current": "Complete local snapshot includes private migration, legacy Android adapter, fallback and bounded nested DNS compatibility; base commits alone do not restore this tree. Legacy rcode disable_cache validated and consumed; predefined bypasses cache; fakeip/route cache flags retained. Android platform monitor uses Java ConnectivityManager, stable per-box registration IDs and Java interface enumeration. Android platform monitor uses Java ConnectivityManager, stable per-box registration IDs and Java interface enumeration."
+    },
+    "current": "Complete local snapshot includes private migration, legacy Android adapter, fallback and bounded nested DNS compatibility; base commits alone do not restore this tree."
+  },
+  "jni_evidence": {
+    "class_descriptors_equal": false,
+    "exports_equal": false,
+    "export_count": 95,
+    "previous_aar_sha256": "eeeceaf90546efe11edb42e047c977849390e948de1a223013551100d1f3d52c",
+    "missing_java": [],
+    "added_java": [
+      [
+        "libcore/BoxInstance",
+        "methods",
+        [
+          "closeIdleConnections",
+          "()V",
+          256
+        ]
+      ],
+      [
+        "libcore/BoxInstance",
+        "methods",
+        [
+          "runtimeSelection",
+          "(Ljava/lang/String;)Ljava/lang/String;",
+          256
+        ]
+      ],
+      [
+        "libcore/BoxPlatformInterface",
+        "methods",
+        [
+          "closeDefaultInterfaceMonitor",
+          "(Llibcore/InterfaceUpdateListener;)V",
+          0
+        ]
+      ],
+      [
+        "libcore/BoxPlatformInterface",
+        "methods",
+        [
+          "networkInterfacesJSON",
+          "()Ljava/lang/String;",
+          0
+        ]
+      ],
+      [
+        "libcore/BoxPlatformInterface",
+        "methods",
+        [
+          "startDefaultInterfaceMonitor",
+          "(Llibcore/InterfaceUpdateListener;)V",
+          0
+        ]
+      ],
+      [
+        "libcore/InterfaceUpdateListener",
+        "methods",
+        [
+          "networkMonitorID",
+          "()J",
+          0
+        ]
+      ],
+      [
+        "libcore/InterfaceUpdateListener",
+        "methods",
+        [
+          "updateDefaultInterface",
+          "(Ljava/lang/String;IZZ)V",
+          0
+        ]
+      ],
+      [
+        "libcore/Libcore",
+        "methods",
+        [
+          "nekoLogReconfigure",
+          "(ZZ)V",
+          264
+        ]
+      ],
+      [
+        "libcore/Libcore$proxyBoxPlatformInterface",
+        "methods",
+        [
+          "closeDefaultInterfaceMonitor",
+          "(Llibcore/InterfaceUpdateListener;)V",
+          256
+        ]
+      ],
+      [
+        "libcore/Libcore$proxyBoxPlatformInterface",
+        "methods",
+        [
+          "networkInterfacesJSON",
+          "()Ljava/lang/String;",
+          256
+        ]
+      ],
+      [
+        "libcore/Libcore$proxyBoxPlatformInterface",
+        "methods",
+        [
+          "startDefaultInterfaceMonitor",
+          "(Llibcore/InterfaceUpdateListener;)V",
+          256
+        ]
+      ],
+      [
+        "libcore/Libcore$proxyInterfaceUpdateListener",
+        "fields",
+        [
+          "refnum",
+          "I",
+          0
+        ]
+      ],
+      [
+        "libcore/Libcore$proxyInterfaceUpdateListener",
+        "methods",
+        [
+          "<init>",
+          "(I)V",
+          0
+        ]
+      ],
+      [
+        "libcore/Libcore$proxyInterfaceUpdateListener",
+        "methods",
+        [
+          "incRefnum",
+          "()I",
+          0
+        ]
+      ],
+      [
+        "libcore/Libcore$proxyInterfaceUpdateListener",
+        "methods",
+        [
+          "networkMonitorID",
+          "()J",
+          256
+        ]
+      ],
+      [
+        "libcore/Libcore$proxyInterfaceUpdateListener",
+        "methods",
+        [
+          "updateDefaultInterface",
+          "(Ljava/lang/String;IZZ)V",
+          256
+        ]
+      ]
+    ],
+    "missing_jni": [],
+    "added_jni": [
+      "JNI_OnLoad",
+      "Java_libcore_BoxInstance_closeIdleConnections",
+      "Java_libcore_BoxInstance_runtimeSelection",
+      "Java_libcore_Libcore_00024proxyBoxPlatformInterface_closeDefaultInterfaceMonitor",
+      "Java_libcore_Libcore_00024proxyBoxPlatformInterface_networkInterfacesJSON",
+      "Java_libcore_Libcore_00024proxyBoxPlatformInterface_startDefaultInterfaceMonitor",
+      "Java_libcore_Libcore_00024proxyInterfaceUpdateListener_networkMonitorID",
+      "Java_libcore_Libcore_00024proxyInterfaceUpdateListener_updateDefaultInterface",
+      "Java_libcore_Libcore_nekoLogReconfigure"
+    ]
+  },
+  "protocol_markers": {
+    "ViewTurbo": true,
+    "Blackstone": true,
+    "XHTTP": true,
+    "Juzi": true,
+    "X365": true,
+    "SL": true,
+    "Fastup": true,
+    "TunNet": true,
+    "Oppa": true,
+    "Pure": true
+  },
+  "fallback_evidence": "not-committed/device-evidence",
+  "limitations": [
+    "arm64-v8a only",
+    "JNI compatibility is static; Android device not tested",
+    "Protocol markers are presence evidence, not live traffic proof",
+    "Fallback covers DialContext failures; no lazy handshake/read/write replay; no guaranteed instant switch",
+    "Android VPN TUN/device callbacks not exercised. Real APK geo DB callbacks and rule-set route/DNS runtime verified on host.",
+    "Legacy WireGuard endpoint Start verified locally; no remote handshake claim.",
+    "Adapter preserves outbound:any, independent_cache and ip_accept_any through retained core consumers; malformed/unknown fields remain errors.",
+    "Initial asynchronous interface notification lifetime fixed; 50 delayed-DNS box starts and 30 separate cold processes passed without retry. Physical Android network switching and race detector remain unverified.",
+    "Readiness patch: host unit tests only; ADB serial A3GM6R1A27004768 unavailable; delayed physical-network recovery remains device-unverified.",
+    "Readiness patch: host unit tests only; ADB serial A3GM6R1A27004768 unavailable; delayed physical-network recovery remains device-unverified.",
+    "Readiness patch: host unit tests only; ADB serial A3GM6R1A27004768 unavailable; delayed physical-network recovery remains device-unverified.",
+    "Readiness patch: host unit tests only; ADB serial A3GM6R1A27004768 unavailable; delayed physical-network recovery remains device-unverified.",
+    "Android VPN TUN/device callbacks not exercised. Real APK geo DB callbacks and rule-set route/DNS runtime verified on host.",
+    "Legacy WireGuard endpoint Start verified locally; no remote handshake claim.",
+    "Adapter preserves outbound:any, independent_cache and ip_accept_any through retained core consumers; malformed/unknown fields remain errors.",
+    "Initial asynchronous interface notification lifetime fixed; 50 delayed-DNS box starts and 30 separate cold processes passed without retry. Physical Android network switching and race detector remain unverified.",
+    "Readiness patch: host unit tests only; ADB serial A3GM6R1A27004768 unavailable; delayed physical-network recovery remains device-unverified.",
+    "NetworkManager lifecycle binding fixed; physical multi-round recovery remains device-unverified.",
+    "Old-generation gVisor TUN TCP uses explicit Abort; system/mixed/Hev fallback Close; physical multi-round recovery remains device-unverified.",
+    "Old-generation gVisor TUN TCP uses explicit Abort; system/mixed/Hev fallback Close; physical multi-round recovery remains device-unverified.",
+    "Old-generation gVisor TUN TCP uses explicit Abort; system/mixed/Hev fallback Close; physical multi-round recovery remains device-unverified.",
+    "NetworkManager lifecycle binding fixed; physical multi-round recovery remains device-unverified.",
+    "Current-flow diagnostic: Debug/Trace only, bounded metadata; Android device network switching remains unverified.",
+    "Dynamic 500/1500 ms recovery: host and build verification only; physical multi-round device acceptance pending.",
+    "Stable recovery rollback: unvalidated route-ready 500 ms path removed; only VALIDATED uses 500 ms, all other recovery uses 1500 ms. Physical multi-round acceptance pending."
+  ],
+  "core_version": "1.15.0-alpha.2-private-lab",
+  "build_tags": "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api",
+  "build_goos": "android",
+  "build_goarch": "arm64",
+  "archived_unused_modules": [
+    "sing-anytls-local"
+  ],
+  "source_manifest_path": "evidence/telegram-call-recovery-final/source-manifest.json",
+  "source_manifest_sha256": "94a1c576915c9d64fdac10d184d0663a8feb27593b537ced935342ddf4ff26d2",
+  "source_snapshot_path": "evidence/telegram-call-recovery-final/source-snapshot.zip",
+  "source_snapshot_sha256": "1820d3030eb0493675a7f611f4507ee28360f7efeccb171f7e0cfb5649be0538",
+  "bridge_evidence_path": "evidence/stable-recovery-ui/native-rebuild.json",
+  "bridge_evidence_sha256": "cc338be8aee442dad05da1401f9d54f43cd126722b6e2962d9bc7cc258b0ff95",
+  "pure_evidence": {
+    "current_jni_equal": true,
+    "tcp_real_probes": 10,
+    "udp": "unsupported",
+    "android_runtime": "untested"
+  },
+  "experiment": {
+    "name": "validated-250-AB",
+    "fast_settle_ms": 250,
+    "fallback_ms": 1500,
+    "set_underlying_networks": false,
+    "device_runtime_tested": false
+  }
+}

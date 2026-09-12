@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="url_test_scopes">
+        <item>Test all</item>
+        <item>Test untested only</item>
+        <item>Retest failures only</item>
+    </string-array>
+</resources>

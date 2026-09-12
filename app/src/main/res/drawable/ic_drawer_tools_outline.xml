@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- NavigationView supplies the existing checked/day/night tint. -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#454B54"
+        android:strokeWidth="1.7"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M14,7A5,5 0,0 1,20.5 2.8L17,6.3L17.7,8L19.4,8.7L22,6.1A5,5 0,0 1,16,12L7,21A2.1,2.1 0,0 1,4 18L13,9Z M5,3L10,8L8,10L3,5Z M5.5,7.5L4,9 M14.5,15.5L19,20A1.4,1.4 0,0 0,21 18L16.5,13.5" />
+</vector>
