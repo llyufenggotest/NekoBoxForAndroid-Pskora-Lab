@@ -41,6 +41,27 @@ class NativeGateTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Unattested AAR'):
             gate.verify(self.aar, lock=self.lock)
 
+    def test_zip_metadata_drift_accepted_when_content_attested(self):
+        b = json.loads(self.lock.read_text())
+        b['aar_content_sha256'] = gate.canonical_zip_digest(self.aar.read_bytes())
+        self.lock.write_text(json.dumps(b))
+        with zipfile.ZipFile(self.aar) as source:
+            members = [(item.filename, source.read(item.filename)) for item in source.infolist()]
+        with zipfile.ZipFile(self.aar, 'w') as target:
+            for name, payload in reversed(members):
+                info = zipfile.ZipInfo(name, date_time=(2026, 9, 12, 0, 0, 0))
+                target.writestr(info, payload)
+        self.assertNotEqual(gate.sha(self.aar.read_bytes()), b['aar_sha256'])
+        self.assertEqual(gate.verify(self.aar, lock=self.lock)['status'], 'PASS')
+
+    def test_content_drift_rejected_with_canonical_attestation(self):
+        b = json.loads(self.lock.read_text())
+        b['aar_content_sha256'] = gate.canonical_zip_digest(self.aar.read_bytes())
+        self.lock.write_text(json.dumps(b))
+        self.write_aar(self.core + b'changed')
+        with self.assertRaisesRegex(ValueError, 'Unattested AAR content'):
+            gate.verify(self.aar, lock=self.lock)
+
     def test_marker_loss_rejected_even_when_hashes_updated(self):
         self.core = self.core.replace(b'hello_pidun', b'hello_missing')
         self.write_aar(self.core)

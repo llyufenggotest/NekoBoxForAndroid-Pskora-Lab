@@ -3,6 +3,7 @@
   "source_kind": "local-core115-snapshot",
   "source_root": "core115-source",
   "aar_sha256": "933d2030622e1d365bb7bc10fe871cde371653ccdc77892c98ec615ce15a1ae9",
+  "aar_content_sha256": "913a9f33baa0c6dd41af0c7fc67dc61ce04542ac4ac6e57f9f1890d5c4dcbdd1",
   "classes_jar_sha256": "e0450718661df37cbcf577fe0de17c28043e3c50225047c9f697746b48824e7f",
   "native_sha256": {
     "arm64-v8a": "70a35c2c29db6a1001afb9656ebe3055c6a49b4ce4546095764c71e559ab9d5d"

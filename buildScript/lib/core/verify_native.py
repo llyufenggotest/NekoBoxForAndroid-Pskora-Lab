@@ -24,6 +24,22 @@ MARKERS = {
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
+def canonical_zip_digest(data):
+    """Hash ZIP member names and uncompressed bytes, ignoring container metadata."""
+    import io
+    digest = hashlib.sha256()
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        names = archive.namelist()
+        if len(names) != len(set(names)):
+            raise ValueError('Duplicate ZIP entries')
+        for name in sorted(names):
+            payload = archive.read(name)
+            digest.update(len(name.encode()).to_bytes(8, 'big'))
+            digest.update(name.encode())
+            digest.update(len(payload).to_bytes(8, 'big'))
+            digest.update(payload)
+    return digest.hexdigest()
+
 def verify(aar, apk=None, lock=LOCK):
     baseline = json.loads(Path(lock).read_text(encoding='utf-8'))
     if baseline.get('source_kind') == 'local-core115-snapshot' and baseline.get('schema') != 2:
@@ -44,8 +60,12 @@ def verify(aar, apk=None, lock=LOCK):
         names = archive.namelist()
         if len(names) != len(set(names)):
             raise ValueError('Duplicate AAR entries')
-        if sha(Path(aar).read_bytes()) != baseline['aar_sha256']:
-            raise ValueError('Unattested AAR: rebuild/recover and explicitly re-audit native-baseline.json')
+        actual_aar_sha256 = sha(Path(aar).read_bytes())
+        if actual_aar_sha256 != baseline['aar_sha256']:
+            expected_content = baseline.get('aar_content_sha256')
+            actual_content = canonical_zip_digest(Path(aar).read_bytes())
+            if not expected_content or actual_content != expected_content:
+                raise ValueError('Unattested AAR content: rebuild/recover and explicitly re-audit native-baseline.json')
         if sha(archive.read('classes.jar')) != baseline['classes_jar_sha256']:
             raise ValueError('Java bridge identity mismatch')
         actual = sorted(n for n in names if n.endswith('/libgojni.so'))
@@ -74,7 +94,7 @@ def verify(aar, apk=None, lock=LOCK):
                 abi = name.split('/')[1]
                 if abi not in baseline['native_sha256'] or sha(archive.read(name)) != baseline['native_sha256'][abi]:
                     raise ValueError('APK/AAR native mismatch: ' + name)
-    return {'status': 'PASS', 'aar_sha256': baseline['aar_sha256'], 'abis': list(baseline['native_sha256']), 'apk': str(apk) if apk else None, 'scope': 'binary identity/static protocol evidence only; no live network verification'}
+    return {'status': 'PASS', 'aar_sha256': actual_aar_sha256, 'attested_aar_sha256': baseline['aar_sha256'], 'aar_content_sha256': canonical_zip_digest(Path(aar).read_bytes()), 'abis': list(baseline['native_sha256']), 'apk': str(apk) if apk else None, 'scope': 'canonical AAR content/binary identity/static protocol evidence only; no live network verification'}
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
