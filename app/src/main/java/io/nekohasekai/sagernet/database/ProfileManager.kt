@@ -10,12 +10,16 @@ import io.nekohasekai.sagernet.ktx.applyDefaultValues
 import java.io.IOException
 import java.sql.SQLException
 import java.util.*
+import androidx.room.withTransaction
 
 
 object ProfileManager {
 
     interface Listener {
         suspend fun onAdd(profile: ProxyEntity)
+        suspend fun onBatchAdded(profiles: List<ProxyEntity>) {
+            if (profiles.isNotEmpty()) onAdd(profiles.first())
+        }
         suspend fun onUpdated(data: List<TrafficData>)
         suspend fun onUpdated(profile: ProxyEntity, noTraffic: Boolean)
         suspend fun onRemoved(groupId: Long, profileId: Long)
@@ -83,6 +87,24 @@ object ProfileManager {
         profile.id = SagerDatabase.proxyDao.addProxy(profile)
         iterator { onAdd(profile) }
         return profile
+    }
+
+    suspend fun createProfiles(groupId: Long, beans: List<AbstractBean>): List<ProxyEntity> {
+        if (beans.isEmpty()) return emptyList()
+        val profiles = beans.map { bean ->
+            bean.applyDefaultValues()
+            ProxyEntity(groupId = groupId).apply {
+                id = 0
+                putBean(bean)
+            }
+        }
+        SagerDatabase.instance.withTransaction {
+            val startOrder = SagerDatabase.proxyDao.nextOrder(groupId) ?: 1
+            profiles.forEachIndexed { index, profile -> profile.userOrder = startOrder + index }
+            SagerDatabase.proxyDao.insert(profiles)
+        }
+        iterator { onBatchAdded(profiles) }
+        return profiles
     }
 
     suspend fun updateProfile(profile: ProxyEntity) {

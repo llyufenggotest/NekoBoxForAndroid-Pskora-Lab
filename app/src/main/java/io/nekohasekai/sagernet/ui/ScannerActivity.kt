@@ -126,10 +126,8 @@ class ScannerActivity : ThemedActivity(),
                         DataStore.selectedGroup = currentGroupId
                     }
 
-                    for (profile in results) {
-                        ProfileManager.createProfile(currentGroupId, profile)
-                        importedN.addAndGet(1)
-                    }
+                    ProfileManager.createProfiles(currentGroupId, results)
+                    importedN.addAndGet(results.size)
                 } else {
                     onMainDispatcher {
                         Toast.makeText(app, R.string.action_import_err, Toast.LENGTH_SHORT).show()

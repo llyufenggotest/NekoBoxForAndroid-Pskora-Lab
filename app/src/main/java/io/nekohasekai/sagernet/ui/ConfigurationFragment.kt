@@ -901,9 +901,8 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     suspend fun import(proxies: List<AbstractBean>) {
         val targetId = DataStore.selectedGroupForImport()
-        for (proxy in proxies) {
-            ProfileManager.createProfile(targetId, proxy)
-        }
+        ProfileManager.createProfiles(targetId, proxies)
+
         onMainDispatcher {
             DataStore.editingGroup = targetId
             snackbar(
@@ -1003,9 +1002,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                             } else null
                             val airportName = oppaProviderName
                                 ?: subscriptionUri.getQueryParameter("name")?.takeIf { it.isNotBlank() }
-                                ?: withTimeoutOrNull(5_000L) {
-                                    withContext(Dispatchers.IO) { fetchAirportName(subscriptionLink) }
-                                }
 
                             val group = ProxyGroup(type = GroupType.SUBSCRIPTION)
                             val subscription = SubscriptionBean()
@@ -1905,6 +1901,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                 DataStore.selectedGroup = profile.groupId
                 reload()
             }
+        }
+
+        override suspend fun onBatchAdded(profiles: List<ProxyEntity>) {
+            if (profiles.isNotEmpty()) onMainDispatcher { reload(now = true) }
         }
 
         override suspend fun onUpdated(data: List<TrafficData>) = Unit
