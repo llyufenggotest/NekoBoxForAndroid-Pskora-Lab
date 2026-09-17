@@ -16,12 +16,13 @@ import (
 )
 
 type Client struct {
-	psk     []byte
-	userKey []byte
-	reuse   bool
-	obfs    snell.ObfsConfig
-	dialer  N.Dialer
-	server  M.Socksaddr
+	psk              []byte
+	userKey          []byte
+	identityExporter []byte
+	reuse            bool
+	obfs             snell.ObfsConfig
+	dialer           N.Dialer
+	server           M.Socksaddr
 
 	pool      reuse.Pool[*reuseSession]
 	closeIdle atomic.Bool
@@ -34,8 +35,11 @@ type ClientOptions struct {
 	ObfsMode snell.ObfsMode
 	ObfsHost string
 	ObfsURI  string
-	Dialer   N.Dialer
-	Server   M.Socksaddr
+	// IdentityExporter enables OIX identity v2. It must be the per-connection
+	// TLS exporter (32 bytes); an absent exporter preserves ordinary Snell.
+	IdentityExporter []byte
+	Dialer           N.Dialer
+	Server           M.Socksaddr
 }
 
 func NewClient(options ClientOptions) (*Client, error) {
@@ -51,12 +55,13 @@ func NewClient(options ClientOptions) (*Client, error) {
 		return nil, E.New("snell: unknown obfs mode: ", int(options.ObfsMode))
 	}
 	client := &Client{
-		psk:     options.PSK,
-		userKey: options.UserKey,
-		reuse:   options.Reuse,
-		obfs:    snell.ObfsConfig{Mode: options.ObfsMode, Host: options.ObfsHost, URI: options.ObfsURI},
-		dialer:  options.Dialer,
-		server:  options.Server,
+		psk:              options.PSK,
+		userKey:          options.UserKey,
+		identityExporter: append([]byte(nil), options.IdentityExporter...),
+		reuse:            options.Reuse,
+		obfs:             snell.ObfsConfig{Mode: options.ObfsMode, Host: options.ObfsHost, URI: options.ObfsURI},
+		dialer:           options.Dialer,
+		server:           options.Server,
 	}
 	if options.Reuse {
 		client.pool.Init()
@@ -109,8 +114,9 @@ func (c *clientConn) writeRequest(payload []byte) error {
 	defer request.Release()
 
 	recordWriter := &writer{
-		upstream: c.Conn,
-		psk:      c.client.psk,
+		upstream:         c.Conn,
+		psk:              c.client.psk,
+		identityExporter: append([]byte(nil), c.client.identityExporter...),
 	}
 	_, err = recordWriter.Write(request.Bytes())
 	if err != nil {
@@ -130,8 +136,9 @@ func (c *clientConn) writeRequestBuffer(buffer *buf.Buffer) error {
 		return err
 	}
 	recordWriter := &writer{
-		upstream: c.Conn,
-		psk:      c.client.psk,
+		upstream:         c.Conn,
+		psk:              c.client.psk,
+		identityExporter: append([]byte(nil), c.client.identityExporter...),
 	}
 	err = recordWriter.WriteBuffer(buffer)
 	if err != nil {

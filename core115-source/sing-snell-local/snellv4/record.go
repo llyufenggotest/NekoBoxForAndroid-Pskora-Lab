@@ -232,6 +232,7 @@ func (r *reader) Upstream() any {
 type writer struct {
 	upstream          io.Writer
 	psk               []byte
+	identityExporter  []byte
 	cipher            cipher.AEAD
 	nonce             []byte
 	salt              []byte
@@ -266,9 +267,16 @@ func (w *writer) initialize() error {
 	return nil
 }
 
+func (w *writer) identityWireLength() int {
+	if len(w.identityExporter) == IdentityExporterLength {
+		return len(identityWireMagicV2) + IdentityHeaderLength + IdentityAuthTagLength
+	}
+	return 0
+}
+
 func (w *writer) payloadLimitFor(nowUnix int64) int {
 	if !w.saltSent {
-		return frameSize - firstRecordOverhead - w.initialPaddingLen
+		return frameSize - firstRecordOverhead - w.identityWireLength() - w.initialPaddingLen
 	}
 	if w.lastWriteUnix != 0 && nowUnix-w.lastWriteUnix < framePayloadResetInterval {
 		if w.payloadLimit > 0 {
@@ -334,16 +342,29 @@ func (w *writer) makeSliceRecordLocked(payload []byte, paddingLen int) (*buf.Buf
 		panic("snell: zero-length v4 record carries padding")
 	}
 	saltLen := 0
+	identityLen := 0
 	if !w.saltSent {
 		saltLen = snell.SaltLen
+		identityLen = w.identityWireLength()
 	}
 	payloadCipherLen := 0
 	if len(payload) > 0 {
 		payloadCipherLen = len(payload) + snell.AEADTagLen
 	}
-	out := buf.NewSize(saltLen + snell.HeaderCipherLen + paddingLen + payloadCipherLen)
+	out := buf.NewSize(saltLen + identityLen + snell.HeaderCipherLen + paddingLen + payloadCipherLen)
 	if saltLen > 0 {
 		common.Must1(out.Write(w.salt))
+		if len(w.identityExporter) == IdentityExporterLength {
+			identity := IdentityV2HeaderFromPSK(w.psk)
+			tag, err := IdentityV2AuthTag(w.psk, w.identityExporter, w.salt)
+			if err != nil {
+				out.Release()
+				return nil, err
+			}
+			common.Must1(out.WriteString(identityWireMagicV2))
+			common.Must1(out.Write(identity))
+			common.Must1(out.Write(tag))
+		}
 		w.saltSent = true
 	}
 	header := out.Extend(snell.HeaderCipherLen)
@@ -406,20 +427,29 @@ func (w *writer) makeBufferRecordLocked(buffer *buf.Buffer, paddingLen int) (*bu
 	if dataLen > maxPayload || paddingLen > maxPayload {
 		panic("snell: v4 record exceeds maximum")
 	}
-	if dataLen == 0 && paddingLen != 0 {
-		panic("snell: zero-length v4 record carries padding")
-	}
 	saltLen := 0
+	identityLen := 0
 	if !w.saltSent {
 		saltLen = snell.SaltLen
+		identityLen = w.identityWireLength()
 	}
-	frontLen := saltLen + snell.HeaderCipherLen + paddingLen
+	frontLen := saltLen + identityLen + snell.HeaderCipherLen + paddingLen
 	prefix := buffer.ExtendHeader(frontLen)
 	if saltLen > 0 {
 		copy(prefix[:saltLen], w.salt)
+		if identityLen > 0 {
+			identity := IdentityV2HeaderFromPSK(w.psk)
+			tag, err := IdentityV2AuthTag(w.psk, w.identityExporter, w.salt)
+			if err != nil {
+				return nil, err
+			}
+			copy(prefix[saltLen:], identityWireMagicV2)
+			copy(prefix[saltLen+len(identityWireMagicV2):], identity)
+			copy(prefix[saltLen+len(identityWireMagicV2)+len(identity):], tag)
+		}
 		w.saltSent = true
 	}
-	header := prefix[saltLen : saltLen+snell.HeaderCipherLen]
+	header := prefix[saltLen+identityLen : saltLen+identityLen+snell.HeaderCipherLen]
 	header[0] = snell.HeaderVersion
 	header[1] = 0
 	header[2] = 0

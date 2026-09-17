@@ -114,11 +114,34 @@ func TestSnellOIXTransportFactoryFailsClosed(t *testing.T) {
 	require.EqualError(t, err, "snell: OIX ECH-TLS transport is not implemented in this build")
 }
 
+func TestSnellOIXTransportFactorySeam(t *testing.T) {
+	original := buildSnellTransport
+	t.Cleanup(func() { buildSnellTransport = original })
+	called := false
+	buildSnellTransport = func(base N.Dialer, server M.Socksaddr, options option.SnellObfsClientOptions) (N.Dialer, error) {
+		called = true
+		require.Equal(t, "oix-ech-tls", options.ObfsMode)
+		require.True(t, options.OIXECH)
+		return nil, fmt.Errorf("factory sentinel")
+	}
+	created, err := NewOutbound(context.Background(), nil, log.NewNOPFactory().NewLogger("snell"), "snell-out", option.SnellOutboundOptions{
+		Version: 4,
+		AbstractSnellOutboundOptions: option.AbstractSnellOutboundOptions{
+			ServerOptions: option.ServerOptions{Server: "127.0.0.1", ServerPort: 443},
+			PSK:           "password",
+		},
+		ObfsOptions: option.SnellObfsClientOptions{ObfsMode: "oix-ech-tls", OIXECH: true, OIXIdentityVersion: 2, OIXALPN: "snell-ech/1", OIXSNI: "front.example", OIXConfig: "AQID"},
+	})
+	require.Nil(t, created)
+	require.EqualError(t, err, "factory sentinel")
+	require.True(t, called)
+}
+
 func TestValidateSnellOutboundObfs(t *testing.T) {
 	require.NoError(t, validateSnellOutboundObfs(3, "tls"))
 	require.NoError(t, validateSnellOutboundObfs(4, "tls"))
 	require.NoError(t, validateSnellOutboundObfs(5, "tls"))
-	require.ErrorContains(t, validateSnellOutboundObfs(4, "oix-ech-tls"), "registered OIX dialer")
+	require.NoError(t, validateSnellOutboundObfs(4, "oix-ech-tls"))
 }
 
 func TestQUICDestCacheRetainsAllEntriesUntilExpiry(t *testing.T) {
