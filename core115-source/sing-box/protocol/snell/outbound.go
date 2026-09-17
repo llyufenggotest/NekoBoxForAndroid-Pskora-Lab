@@ -3,6 +3,7 @@ package snell
 import (
 	"context"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/sagernet/sing-box/adapter/outbound"
 	"github.com/sagernet/sing-box/common/dialer"
 	"github.com/sagernet/sing-box/common/expiringmap"
+	boxTLS "github.com/sagernet/sing-box/common/tls"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
@@ -63,13 +65,66 @@ type snellClient interface {
 	Close() error
 }
 
-type snellTransportFactory func(base N.Dialer, server M.Socksaddr, options option.SnellObfsClientOptions) (N.Dialer, error)
+type snellTransportFactory func(ctx context.Context, logger logger.ContextLogger, base N.Dialer, server M.Socksaddr, options option.SnellObfsClientOptions) (N.Dialer, error)
 
 var buildSnellTransport snellTransportFactory = buildSnellOutboundTransport
 
-func buildSnellOutboundTransport(base N.Dialer, server M.Socksaddr, options option.SnellObfsClientOptions) (N.Dialer, error) {
+type oixECHDialer struct {
+	base   N.Dialer
+	config boxTLS.Config
+}
+
+func (d *oixECHDialer) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
+	if N.NetworkName(network) != N.NetworkTCP {
+		return nil, os.ErrInvalid
+	}
+	conn, err := d.base.DialContext(ctx, N.NetworkTCP, destination)
+	if err != nil {
+		return nil, err
+	}
+	tlsConn, err := boxTLS.ClientHandshake(ctx, conn, d.config.Clone())
+	if err != nil {
+		conn.Close()
+		return nil, E.Cause(err, "snell: OIX ECH handshake")
+	}
+	state := tlsConn.ConnectionState()
+	if !state.ECHAccepted {
+		tlsConn.Close()
+		return nil, E.New("snell: OIX ECH was not accepted")
+	}
+	if state.NegotiatedProtocol != "snell-ech/1" {
+		tlsConn.Close()
+		return nil, E.New("snell: unexpected OIX ALPN: ", state.NegotiatedProtocol)
+	}
+	return tlsConn, nil
+}
+
+func (d *oixECHDialer) ListenPacket(context.Context, M.Socksaddr) (net.PacketConn, error) {
+	return nil, os.ErrInvalid
+}
+
+func buildSnellOutboundTransport(ctx context.Context, logger logger.ContextLogger, base N.Dialer, server M.Socksaddr, options option.SnellObfsClientOptions) (N.Dialer, error) {
 	if options.ObfsMode == "oix-ech-tls" || options.OIXECH {
-		return nil, E.New("snell: OIX ECH-TLS transport is not implemented in this build")
+		configBytes, err := base64.StdEncoding.DecodeString(strings.TrimSpace(options.OIXConfig))
+		if err != nil {
+			return nil, fmt.Errorf("snell: invalid OIX ECH config base64: %w", err)
+		}
+		configPEM := pem.EncodeToMemory(&pem.Block{Type: "ECH CONFIGS", Bytes: configBytes})
+		tlsConfig, err := boxTLS.NewClient(ctx, logger, server.AddrString(), option.OutboundTLSOptions{
+			Enabled:    true,
+			ServerName: strings.TrimSpace(options.OIXSNI),
+			ALPN:       []string{options.OIXALPN},
+			MinVersion: "1.3",
+			MaxVersion: "1.3",
+			ECH: &option.OutboundECHOptions{
+				Enabled: true,
+				Config:  []string{string(configPEM)},
+			},
+		})
+		if err != nil {
+			return nil, E.Cause(err, "snell: configure OIX ECH")
+		}
+		return &oixECHDialer{base: base, config: tlsConfig}, nil
 	}
 	if options.ObfsMode == "" || options.ObfsMode == "none" {
 		return base, nil
@@ -80,6 +135,21 @@ func buildSnellOutboundTransport(base N.Dialer, server M.Socksaddr, options opti
 		host:   options.ObfsHost,
 		port:   fmt.Sprint(server.Port),
 	}, nil
+}
+
+func snellIdentityExporter(conn net.Conn) ([]byte, error) {
+	tlsConn, ok := conn.(boxTLS.Conn)
+	if !ok {
+		return nil, E.New("snell: OIX transport did not return a TLS connection")
+	}
+	state := tlsConn.ConnectionState()
+	if !state.ECHAccepted {
+		return nil, E.New("snell: OIX ECH was not accepted")
+	}
+	if state.NegotiatedProtocol != "snell-ech/1" {
+		return nil, E.New("snell: unexpected OIX ALPN: ", state.NegotiatedProtocol)
+	}
+	return state.ExportKeyingMaterial(snellv4.IdentityExporterLabel, nil, snellv4.IdentityExporterLength)
 }
 
 func validateSnellOIXOptions(version int, options option.SnellObfsClientOptions) error {
@@ -104,8 +174,11 @@ func validateSnellOIXOptions(version int, options option.SnellObfsClientOptions)
 	if options.OIXALPN != "snell-ech/1" {
 		return E.New("snell: OIX ECH-TLS requires ALPN snell-ech/1")
 	}
-	if options.OIXPreconnect < 0 {
-		return E.New("snell: OIX preconnect must not be negative")
+	if options.OIXLegacyFallback {
+		return E.New("snell: OIX legacy fallback is unsupported")
+	}
+	if options.OIXPreconnect != 0 {
+		return E.New("snell: OIX preconnect is unsupported")
 	}
 	if strings.TrimSpace(options.OIXSNI) == "" {
 		return E.New("snell: OIX ECH-TLS requires sni")
@@ -153,7 +226,7 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 	if err != nil {
 		return nil, err
 	}
-	tcpDialer, err := buildSnellTransport(outboundDialer, serverAddr, options.ObfsOptions)
+	tcpDialer, err := buildSnellTransport(ctx, logger, outboundDialer, serverAddr, options.ObfsOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -167,8 +240,15 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 			PSK:     []byte(options.PSK),
 			UserKey: []byte(options.UserKey),
 			Reuse:   options.Reuse,
-			Dialer:  tcpDialer,
-			Server:  serverAddr,
+			ExporterFromConn: func(conn net.Conn) ([]byte, error) {
+				if obfsMode != "oix-ech-tls" {
+					return nil, nil
+				}
+				return snellIdentityExporter(conn)
+			},
+			RequireExporter: obfsMode == "oix-ech-tls",
+			Dialer:          tcpDialer,
+			Server:          serverAddr,
 		})
 	case 6:
 		var mode snellv6.Mode

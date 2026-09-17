@@ -13,6 +13,7 @@ import (
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	snellprotocol "github.com/sagernet/sing-snell"
+	"github.com/sagernet/sing/common/logger"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/stretchr/testify/require"
@@ -107,18 +108,27 @@ func TestValidateSnellOIXOptions(t *testing.T) {
 	bad.OIXConfig = "!"
 	require.ErrorContains(t, validateSnellOIXOptions(4, bad), "invalid OIX ECH config")
 	require.ErrorContains(t, validateSnellOIXOptions(5, valid), "requires version 4")
+	bad = valid
+	bad.OIXLegacyFallback = true
+	require.ErrorContains(t, validateSnellOIXOptions(4, bad), "legacy fallback is unsupported")
+	bad = valid
+	bad.OIXPreconnect = 1
+	require.ErrorContains(t, validateSnellOIXOptions(4, bad), "preconnect is unsupported")
 }
 
-func TestSnellOIXTransportFactoryFailsClosed(t *testing.T) {
-	_, err := buildSnellOutboundTransport(nil, M.ParseSocksaddr("127.0.0.1:443"), option.SnellObfsClientOptions{ObfsMode: "oix-ech-tls", OIXECH: true})
-	require.EqualError(t, err, "snell: OIX ECH-TLS transport is not implemented in this build")
+func TestSnellOIXTransportFactoryBuildsStrictECHDialer(t *testing.T) {
+	dialer, err := buildSnellOutboundTransport(context.Background(), log.NewNOPFactory().NewLogger("snell"), nil, M.ParseSocksaddr("127.0.0.1:443"), option.SnellObfsClientOptions{
+		ObfsMode: "oix-ech-tls", OIXECH: true, OIXALPN: "snell-ech/1", OIXSNI: "front.example", OIXConfig: "AQID",
+	})
+	require.NoError(t, err)
+	require.IsType(t, &oixECHDialer{}, dialer)
 }
 
 func TestSnellOIXTransportFactorySeam(t *testing.T) {
 	original := buildSnellTransport
 	t.Cleanup(func() { buildSnellTransport = original })
 	called := false
-	buildSnellTransport = func(base N.Dialer, server M.Socksaddr, options option.SnellObfsClientOptions) (N.Dialer, error) {
+	buildSnellTransport = func(ctx context.Context, logg logger.ContextLogger, base N.Dialer, server M.Socksaddr, options option.SnellObfsClientOptions) (N.Dialer, error) {
 		called = true
 		require.Equal(t, "oix-ech-tls", options.ObfsMode)
 		require.True(t, options.OIXECH)
