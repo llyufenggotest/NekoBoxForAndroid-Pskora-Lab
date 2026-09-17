@@ -146,7 +146,7 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 	if err = validateSnellOIXOptions(version, options.ObfsOptions); err != nil {
 		return nil, err
 	}
-	if err = validateSnellOutboundObfs(version, obfsMode); err != nil {
+	if err = validateSnellOutboundObfs(version, obfsMode); err != nil && !(version == 4 && obfsMode == "oix-ech-tls" && buildSnellTransport != nil) {
 		return nil, err
 	}
 	networks, err := buildSnellNetworks(version, options.Network)

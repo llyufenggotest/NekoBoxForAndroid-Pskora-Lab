@@ -141,7 +141,7 @@ func TestValidateSnellOutboundObfs(t *testing.T) {
 	require.NoError(t, validateSnellOutboundObfs(3, "tls"))
 	require.NoError(t, validateSnellOutboundObfs(4, "tls"))
 	require.NoError(t, validateSnellOutboundObfs(5, "tls"))
-	require.NoError(t, validateSnellOutboundObfs(4, "oix-ech-tls"))
+	require.ErrorContains(t, validateSnellOutboundObfs(4, "oix-ech-tls"), "registered OIX dialer")
 }
 
 func TestQUICDestCacheRetainsAllEntriesUntilExpiry(t *testing.T) {
