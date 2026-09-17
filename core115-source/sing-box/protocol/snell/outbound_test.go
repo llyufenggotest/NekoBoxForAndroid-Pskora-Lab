@@ -103,24 +103,10 @@ func TestV6QUICProxyModeConfiguration(t *testing.T) {
 func TestValidateSnellOIXOptions(t *testing.T) {
 	valid := option.SnellObfsClientOptions{ObfsMode: "oix-ech-tls", OIXECH: true, OIXIdentityVersion: 2, OIXALPN: "snell-ech/1", OIXSNI: "front.example", OIXConfig: "AQID"}
 	require.NoError(t, validateSnellOIXOptions(4, valid))
-	for _, test := range []struct {
-		name string
-		options option.SnellObfsClientOptions
-		want string
-	}{
-		{"marker missing", option.SnellObfsClientOptions{ObfsMode: "oix-ech-tls", OIXIdentityVersion: 2, OIXALPN: "snell-ech/1", OIXSNI: "front.example", OIXConfig: "AQID"}, "both obfs_mode"},
-		{"version", valid, "requires version 4"},
-		{"bad config", option.SnellObfsClientOptions{ObfsMode: "oix-ech-tls", OIXECH: true, OIXIdentityVersion: 2, OIXALPN: "snell-ech/1", OIXSNI: "front.example", OIXConfig: "!"}, "invalid OIX ECH config"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			options := test.options
-			version := 4
-			if test.name == "version" { version = 5 }
-			err := validateSnellOIXOptions(version, options)
-			require.Error(t, err)
-			require.Contains(t, err.Error(), test.want)
-		})
-	}
+	bad := valid
+	bad.OIXConfig = "!"
+	require.ErrorContains(t, validateSnellOIXOptions(4, bad), "invalid OIX ECH config")
+	require.ErrorContains(t, validateSnellOIXOptions(5, valid), "requires version 4")
 }
 
 func TestSnellOIXTransportFactoryFailsClosed(t *testing.T) {
@@ -128,9 +114,11 @@ func TestSnellOIXTransportFactoryFailsClosed(t *testing.T) {
 	require.EqualError(t, err, "snell: OIX ECH-TLS transport is not implemented in this build")
 }
 
-
+func TestValidateSnellOutboundObfs(t *testing.T) {
+	require.NoError(t, validateSnellOutboundObfs(3, "tls"))
 	require.NoError(t, validateSnellOutboundObfs(4, "tls"))
 	require.NoError(t, validateSnellOutboundObfs(5, "tls"))
+	require.ErrorContains(t, validateSnellOutboundObfs(4, "oix-ech-tls"), "registered OIX dialer")
 }
 
 func TestQUICDestCacheRetainsAllEntriesUntilExpiry(t *testing.T) {

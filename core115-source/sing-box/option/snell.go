@@ -206,13 +206,13 @@ type SnellObfsClientOptions struct {
 
 	// OIXECH marks the OIX raw ECH-TLS transport. These fields are deliberately
 	// explicit so an OIX profile cannot be mistaken for ordinary Snell.
-	OIXECH            bool   `json:"oix_ech,omitempty"`
+	OIXECH             bool   `json:"oix_ech,omitempty"`
 	OIXIdentityVersion int    `json:"oix_identity_version,omitempty"`
-	OIXALPN           string `json:"oix_alpn,omitempty"`
-	OIXLegacyFallback bool   `json:"oix_legacy_fallback,omitempty"`
-	OIXPreconnect     int    `json:"oix_preconnect,omitempty"`
-	OIXSNI            string `json:"oix_sni,omitempty"`
-	OIXConfig         string `json:"oix_config,omitempty"`
+	OIXALPN            string `json:"oix_alpn,omitempty"`
+	OIXLegacyFallback  bool   `json:"oix_legacy_fallback,omitempty"`
+	OIXPreconnect      int    `json:"oix_preconnect,omitempty"`
+	OIXSNI             string `json:"oix_sni,omitempty"`
+	OIXConfig          string `json:"oix_config,omitempty"`
 }
 
 type SnellV6Options struct {

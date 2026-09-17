@@ -223,6 +223,7 @@ func validateSnellOutboundObfs(version int, obfsMode string) error {
 	case version <= 5 && (obfsMode == "" || obfsMode == "none" || obfsMode == "http" || obfsMode == "tls"):
 	case version == 6 && obfsMode == "":
 	case version == 4 && obfsMode == "oix-ech-tls":
+		return E.New("snell: OIX ECH-TLS transport requires a registered OIX dialer")
 	case (version == 4 || version == 5) && obfsMode == "tls":
 		return E.New("snell: TLS obfs is unsupported for version ", version, "; use ShadowTLS instead")
 	default:
