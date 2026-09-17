@@ -120,6 +120,7 @@ func buildSnellOutboundTransport(ctx context.Context, logger logger.ContextLogge
 				Enabled: true,
 				Config:  []string{string(configPEM)},
 			},
+			UTLS: &option.OutboundUTLSOptions{Enabled: true, Fingerprint: "chrome"},
 		})
 		if err != nil {
 			return nil, E.Cause(err, "snell: configure OIX ECH")
@@ -142,6 +143,9 @@ func snellIdentityExporter(conn net.Conn) ([]byte, error) {
 	if !ok {
 		return nil, E.New("snell: OIX transport did not return a TLS connection")
 	}
+	if tlsConn == nil {
+		return nil, E.New("snell: OIX TLS connection is nil")
+	}
 	state := tlsConn.ConnectionState()
 	if !state.ECHAccepted {
 		return nil, E.New("snell: OIX ECH was not accepted")
@@ -149,7 +153,13 @@ func snellIdentityExporter(conn net.Conn) ([]byte, error) {
 	if state.NegotiatedProtocol != "snell-ech/1" {
 		return nil, E.New("snell: unexpected OIX ALPN: ", state.NegotiatedProtocol)
 	}
-	return state.ExportKeyingMaterial(snellv4.IdentityExporterLabel, nil, snellv4.IdentityExporterLength)
+	exporter, ok := conn.(interface {
+		ExportKeyingMaterial(string, []byte, int) ([]byte, error)
+	})
+	if !ok {
+		return nil, E.New("snell: OIX TLS exporter is unavailable")
+	}
+	return exporter.ExportKeyingMaterial(snellv4.IdentityExporterLabel, nil, snellv4.IdentityExporterLength)
 }
 
 func validateSnellOIXOptions(version int, options option.SnellObfsClientOptions) error {

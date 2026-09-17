@@ -100,7 +100,18 @@ func (c *UTLSClientConfig) Client(conn net.Conn) (Conn, error) {
 	}
 	// ==========================================
 
-	return &utlsALPNWrapper{utlsConnWrapper{utls.UClient(conn, uCfg, c.id)}, c.config.NextProtos}, nil
+	uConn := utls.UClient(conn, uCfg, c.id)
+	if len(uCfg.EncryptedClientHelloConfigList) > 0 {
+		if err := uConn.BuildHandshakeState(); err != nil {
+			return nil, err
+		}
+		for _, extension := range uConn.Extensions {
+			if renegotiation, ok := extension.(*utls.RenegotiationInfoExtension); ok {
+				renegotiation.Renegotiation = utls.RenegotiateNever
+			}
+		}
+	}
+	return &utlsALPNWrapper{utlsConnWrapper{uConn}, c.config.NextProtos}, nil
 }
 
 func (c *UTLSClientConfig) SetSessionIDGenerator(generator func(clientHello []byte, sessionID []byte) error) {
@@ -134,6 +145,11 @@ func (c *UTLSClientConfig) SetECHConfigList(EncryptedClientHelloConfigList []byt
 	c.config.EncryptedClientHelloConfigList = EncryptedClientHelloConfigList
 }
 
+func (c *UTLSClientConfig) buildWithoutRenegotiation() error {
+	c.config.Renegotiation = utls.RenegotiateNever
+	return nil
+}
+
 type utlsConnWrapper struct {
 	*utls.UConn
 }
@@ -154,7 +170,13 @@ func (c *utlsConnWrapper) ConnectionState() tls.ConnectionState {
 		SignedCertificateTimestamps: state.SignedCertificateTimestamps,
 		OCSPResponse:                state.OCSPResponse,
 		TLSUnique:                   state.TLSUnique,
+		ECHAccepted:                 state.ECHAccepted,
 	}
+}
+
+func (c *utlsConnWrapper) ExportKeyingMaterial(label string, context []byte, length int) ([]byte, error) {
+	state := c.UConn.ConnectionState()
+	return state.ExportKeyingMaterial(label, context, length)
 }
 
 func (c *utlsConnWrapper) Upstream() any {
@@ -333,6 +355,9 @@ func newUTLSClient(ctx context.Context, logger logger.ContextLogger, serverAddre
 	}
 	config.SetServerName(serverName)
 	if options.ECH != nil && options.ECH.Enabled {
+		if err := config.(*UTLSClientConfig).buildWithoutRenegotiation(); err != nil {
+			return nil, err
+		}
 		if options.Reality != nil && options.Reality.Enabled {
 			return nil, E.New("Reality is conflict with ECH")
 		}
