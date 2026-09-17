@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - maintenance/core115-validated250-stable
+      - oix-snell-integration
     tags:
       - core115-validated250-maintenance-candidate-*
 
