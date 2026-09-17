@@ -100,8 +100,35 @@ func TestV6QUICProxyModeConfiguration(t *testing.T) {
 	}
 }
 
-func TestValidateSnellOutboundObfs(t *testing.T) {
-	require.NoError(t, validateSnellOutboundObfs(3, "tls"))
+func TestValidateSnellOIXOptions(t *testing.T) {
+	valid := option.SnellObfsClientOptions{ObfsMode: "oix-ech-tls", OIXECH: true, OIXIdentityVersion: 2, OIXALPN: "snell-ech/1", OIXSNI: "front.example", OIXConfig: "AQID"}
+	require.NoError(t, validateSnellOIXOptions(4, valid))
+	for _, test := range []struct {
+		name string
+		options option.SnellObfsClientOptions
+		want string
+	}{
+		{"marker missing", option.SnellObfsClientOptions{ObfsMode: "oix-ech-tls", OIXIdentityVersion: 2, OIXALPN: "snell-ech/1", OIXSNI: "front.example", OIXConfig: "AQID"}, "both obfs_mode"},
+		{"version", valid, "requires version 4"},
+		{"bad config", option.SnellObfsClientOptions{ObfsMode: "oix-ech-tls", OIXECH: true, OIXIdentityVersion: 2, OIXALPN: "snell-ech/1", OIXSNI: "front.example", OIXConfig: "!"}, "invalid OIX ECH config"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			options := test.options
+			version := 4
+			if test.name == "version" { version = 5 }
+			err := validateSnellOIXOptions(version, options)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), test.want)
+		})
+	}
+}
+
+func TestSnellOIXTransportFactoryFailsClosed(t *testing.T) {
+	_, err := buildSnellOutboundTransport(nil, M.ParseSocksaddr("127.0.0.1:443"), option.SnellObfsClientOptions{ObfsMode: "oix-ech-tls", OIXECH: true})
+	require.EqualError(t, err, "snell: OIX ECH-TLS transport is not implemented in this build")
+}
+
+
 	require.NoError(t, validateSnellOutboundObfs(4, "tls"))
 	require.NoError(t, validateSnellOutboundObfs(5, "tls"))
 }

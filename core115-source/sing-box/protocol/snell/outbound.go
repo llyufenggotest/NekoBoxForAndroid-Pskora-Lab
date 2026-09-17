@@ -2,9 +2,11 @@ package snell
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -61,6 +63,66 @@ type snellClient interface {
 	Close() error
 }
 
+type snellTransportFactory func(base N.Dialer, server M.Socksaddr, options option.SnellObfsClientOptions) (N.Dialer, error)
+
+var buildSnellTransport snellTransportFactory = buildSnellOutboundTransport
+
+func buildSnellOutboundTransport(base N.Dialer, server M.Socksaddr, options option.SnellObfsClientOptions) (N.Dialer, error) {
+	if options.ObfsMode == "oix-ech-tls" || options.OIXECH {
+		return nil, E.New("snell: OIX ECH-TLS transport is not implemented in this build")
+	}
+	if options.ObfsMode == "" || options.ObfsMode == "none" {
+		return base, nil
+	}
+	return &simpleObfsDialer{
+		Dialer: base,
+		mode:   options.ObfsMode,
+		host:   options.ObfsHost,
+		port:   fmt.Sprint(server.Port),
+	}, nil
+}
+
+func validateSnellOIXOptions(version int, options option.SnellObfsClientOptions) error {
+	enabled := options.ObfsMode == "oix-ech-tls" || options.OIXECH
+	hasMetadata := options.OIXIdentityVersion != 0 || options.OIXALPN != "" || options.OIXLegacyFallback ||
+		options.OIXPreconnect != 0 || options.OIXSNI != "" || options.OIXConfig != ""
+	if !enabled {
+		if hasMetadata {
+			return E.New("snell: OIX options require obfs_mode oix-ech-tls and oix_ech true")
+		}
+		return nil
+	}
+	if options.ObfsMode != "oix-ech-tls" || !options.OIXECH {
+		return E.New("snell: OIX requires both obfs_mode oix-ech-tls and oix_ech true")
+	}
+	if version != 4 {
+		return E.New("snell: OIX ECH-TLS requires version 4")
+	}
+	if options.OIXIdentityVersion != 2 {
+		return E.New("snell: OIX ECH-TLS requires identity version 2")
+	}
+	if options.OIXALPN != "snell-ech/1" {
+		return E.New("snell: OIX ECH-TLS requires ALPN snell-ech/1")
+	}
+	if options.OIXPreconnect < 0 {
+		return E.New("snell: OIX preconnect must not be negative")
+	}
+	if strings.TrimSpace(options.OIXSNI) == "" {
+		return E.New("snell: OIX ECH-TLS requires sni")
+	}
+	if strings.TrimSpace(options.OIXConfig) == "" {
+		return E.New("snell: OIX ECH-TLS requires ech config")
+	}
+	config, err := base64.StdEncoding.DecodeString(strings.TrimSpace(options.OIXConfig))
+	if err != nil {
+		return fmt.Errorf("snell: invalid OIX ECH config base64: %w", err)
+	}
+	if len(config) == 0 {
+		return E.New("snell: OIX ECH config is empty")
+	}
+	return nil
+}
+
 func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.SnellOutboundOptions) (adapter.Outbound, error) {
 	if options.PSK == "" {
 		return nil, E.New("snell: psk is required")
@@ -81,6 +143,9 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		return nil, err
 	}
 	obfsMode := options.ObfsOptions.ObfsMode
+	if err = validateSnellOIXOptions(version, options.ObfsOptions); err != nil {
+		return nil, err
+	}
 	if err = validateSnellOutboundObfs(version, obfsMode); err != nil {
 		return nil, err
 	}
@@ -88,14 +153,9 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 	if err != nil {
 		return nil, err
 	}
-	tcpDialer := N.Dialer(outboundDialer)
-	if obfsMode != "" && obfsMode != "none" {
-		tcpDialer = &simpleObfsDialer{
-			Dialer: outboundDialer,
-			mode:   obfsMode,
-			host:   options.ObfsOptions.ObfsHost,
-			port:   fmt.Sprint(serverAddr.Port),
-		}
+	tcpDialer, err := buildSnellTransport(outboundDialer, serverAddr, options.ObfsOptions)
+	if err != nil {
+		return nil, err
 	}
 	var client snellClient
 	var legacyClient *legacy.Client
@@ -162,6 +222,7 @@ func validateSnellOutboundObfs(version int, obfsMode string) error {
 	case version <= 3 && (obfsMode == "" || obfsMode == "none" || obfsMode == "http" || obfsMode == "tls"):
 	case version <= 5 && (obfsMode == "" || obfsMode == "none" || obfsMode == "http" || obfsMode == "tls"):
 	case version == 6 && obfsMode == "":
+	case version == 4 && obfsMode == "oix-ech-tls":
 	case (version == 4 || version == 5) && obfsMode == "tls":
 		return E.New("snell: TLS obfs is unsupported for version ", version, "; use ShadowTLS instead")
 	default:
