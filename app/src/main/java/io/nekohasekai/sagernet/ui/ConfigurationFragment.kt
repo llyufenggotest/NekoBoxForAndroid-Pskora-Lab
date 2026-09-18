@@ -485,6 +485,42 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+    private var lastGroupTabTapAt = 0L
+    private var lastGroupTabTapIndex = -1
+
+    private fun installGroupTabInteractions(tab: TabLayout.Tab, position: Int) {
+        tab.view.setOnLongClickListener {
+            if (position !in adapter.groupList.indices) return@setOnLongClickListener true
+            showDashboardGroupMenu(tab.view, adapter.groupList[position], position)
+            true
+        }
+        tab.view.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_UP) {
+                val now = SystemClock.elapsedRealtime()
+                if (lastGroupTabTapIndex == position && now - lastGroupTabTapAt in 1..350) {
+                    lastGroupTabTapAt = 0L
+                    lastGroupTabTapIndex = -1
+                    DataStore.selectedGroup = adapter.groupList.firstOrNull()?.id ?: DataStore.selectedGroup
+                    groupPager.setCurrentItem(0, false)
+                    tabLayout.post { tabLayout.setScrollPosition(0, 0f, true) }
+                    true
+                } else {
+                    lastGroupTabTapAt = now
+                    lastGroupTabTapIndex = position
+                    false
+                }
+            } else false
+        }
+    }
+
+    private fun restoreGroupTabPosition(groupIndex: Int) {
+        if (groupIndex !in adapter.groupList.indices) return
+        groupPager.setCurrentItem(groupIndex, false)
+        tabLayout.post {
+            tabLayout.getTabAt(groupIndex)?.select()
+            tabLayout.setScrollPosition(groupIndex, 0f, true)
+        }
+    }
     val updateSelectedCallback = object : ViewPager2.OnPageChangeCallback() {
         override fun onPageScrolled(
             position: Int, positionOffset: Float, positionOffsetPixels: Int
@@ -765,11 +801,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (adapter.groupList.size > position) {
                 tab.text = adapter.groupList[position].displayName()
             }
-            tab.view.setOnLongClickListener {
-                if (position !in adapter.groupList.indices) return@setOnLongClickListener true
-                showDashboardGroupMenu(tab.view, adapter.groupList[position], position)
-                true
-            }
+            installGroupTabInteractions(tab, position)
         }.attach()
 
         // Group tab actions are anchored to the long-pressed tab.
@@ -1747,6 +1779,8 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         fun reload(now: Boolean = false) {
             val generation = reloadGeneration.incrementAndGet()
+            val visibleGroupId = groupList.getOrNull(selectedGroupIndex)?.id
+                ?: DataStore.currentGroupId()
 
             if (!select) {
                 groupPager.unregisterOnPageChangeCallback(updateSelectedCallback)
@@ -1767,8 +1801,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 if (generation != reloadGeneration.get()) return@runOnDefaultDispatcher
 
-                var selectedGroup = selectedItem?.id?.let { SagerDatabase.proxyDao.getById(it)?.groupId }
-                    ?: DataStore.currentGroupId()
+                var selectedGroup = visibleGroupId
                 var newSelectedGroupIndex: Int? = null
                 if (selectedGroup > 0L) {
                     newSelectedGroupIndex = newGroupList.indexOfFirst { it.id == selectedGroup }
@@ -1803,7 +1836,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 groupList = newGroupList
                                 notifyDataSetChanged()
                                 if (newSelectedGroupIndex != null) {
-                                    groupPager.setCurrentItem(selectedGroupIndex, false)
+                                    restoreGroupTabPosition(selectedGroupIndex)
                                 }
                                 val hideTab = groupList.size < 2
                                 tabLayout.isGone = hideTab
@@ -1874,11 +1907,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                 groupFragments.remove(groupId)
                 preferredGroupFragments.remove(groupId)
                 fallbackId?.let { DataStore.selectedGroup = it }
-                selectedGroupIndex = groupList.indexOfFirst { it.id == DataStore.selectedGroup }
-                    .takeIf { it >= 0 } ?: 0
+                if (DataStore.selectedGroup == groupId) {
+                    selectedGroupIndex = groupList.indexOfFirst { it.id == DataStore.selectedGroup }
+                        .takeIf { it >= 0 } ?: 0
+                }
                 notifyItemRemoved(index)
                 if (groupList.isNotEmpty()) {
-                    groupPager.setCurrentItem(selectedGroupIndex.coerceIn(groupList.indices), false)
+                    restoreGroupTabPosition(selectedGroupIndex.coerceIn(groupList.indices))
                 }
                 tabLayout.isGone = groupList.size < 2
             }
