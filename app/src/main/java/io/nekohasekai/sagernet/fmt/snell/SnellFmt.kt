@@ -87,6 +87,7 @@ fun parseClashSnell(proxy: Map<String, Any?>): SnellBean {
                 oixConfig = obfsOpts["ech-config"] as? String ?: ""
             }
         }
+        initializeDefaultValues()
     }
 }
 
