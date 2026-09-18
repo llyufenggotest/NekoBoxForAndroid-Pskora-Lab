@@ -12,6 +12,7 @@ class GroupTabSyncContractTest {
             File("app/src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt")
         ).first { it.isFile }
         val source = file.readText()
+        assertTrue(source.contains("selectedGroupIndex = position"))
         assertTrue(source.contains("val visibleGroupId = groupList.getOrNull(selectedGroupIndex)?.id"))
         assertTrue(source.contains("var selectedGroup = visibleGroupId"))
         assertTrue(source.contains("lastGroupTabTapAt"))

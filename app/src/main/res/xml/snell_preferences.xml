@@ -66,6 +66,35 @@
             app:title="@string/snell_obfs_host"
             app:useSimpleSummaryProvider="true" />
 
+        <EditTextPreference
+            app:icon="@drawable/ic_settings_password"
+            app:key="oixSni"
+            app:title="@string/snell_oix_sni"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:icon="@drawable/ic_settings_password"
+            app:key="oixConfig"
+            app:title="@string/snell_oix_ech_config"
+            app:summary="@string/snell_oix_ech_config_summary" />
+
+        <EditTextPreference
+            app:icon="@drawable/ic_settings_password"
+            app:key="oixAlpn"
+            app:title="@string/snell_oix_alpn"
+            app:useSimpleSummaryProvider="true" />
+
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:entries="@array/snell_oix_identity_version_entry"
+            app:entryValues="@array/snell_oix_identity_version_value"
+            app:key="oixIdentityVersion"
+            app:title="@string/snell_oix_identity_version" />
+
+        <SwitchPreference
+            app:key="oixEchTls"
+            app:title="@string/snell_oix_enabled" />
+
+
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue="default"
             app:entries="@array/snell_v6_modes_entry"

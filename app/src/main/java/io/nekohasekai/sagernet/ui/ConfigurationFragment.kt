@@ -526,6 +526,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             position: Int, positionOffset: Float, positionOffsetPixels: Int
         ) {
             if (adapter.groupList.size > position) {
+                selectedGroupIndex = position
                 DataStore.selectedGroup = adapter.groupList[position].id
             }
         }

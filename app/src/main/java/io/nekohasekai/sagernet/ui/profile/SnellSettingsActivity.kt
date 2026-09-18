@@ -31,6 +31,11 @@ class SnellSettingsActivity : ProfileSettingsActivity<SnellBean>() {
     private val mode = pbm.add(PreferenceBinding(Type.Text, "mode"))
     private val quicProxyMode = pbm.add(PreferenceBinding(Type.Bool, "quicProxyMode"))
     private val reuse = pbm.add(PreferenceBinding(Type.Bool, "reuse"))
+    private val oixEchTls = pbm.add(PreferenceBinding(Type.Bool, "oixEchTls"))
+    private val oixIdentityVersion = pbm.add(PreferenceBinding(Type.TextToInt, "oixIdentityVersion"))
+    private val oixAlpn = pbm.add(PreferenceBinding(Type.Text, "oixAlpn"))
+    private val oixSni = pbm.add(PreferenceBinding(Type.Text, "oixSni"))
+    private val oixConfig = pbm.add(PreferenceBinding(Type.Text, "oixConfig"))
 
     override fun SnellBean.init() {
         pbm.writeToCacheAll(this)
@@ -78,9 +83,26 @@ class SnellSettingsActivity : ProfileSettingsActivity<SnellBean>() {
             updateReuseEnabled(newVersion, reusePref)
             updateObfsModeOptions(newVersion, obfsModePref)
             updateVersionFields(newVersion, userKeyPref, obfsModePref, obfsHostPref, modePref, quicProxyModePref)
+            updateOixFields(newVersion)
             true
         }
+        oixEchTls.setOnPreferenceChangeListener { _, newValue ->
+            if (newValue is Boolean) oixEchTls.bean = newValue
+            updateOixFields(initialVersion)
+            true
+        }
+        updateOixFields(initialVersion)
     }
+
+    private fun updateOixFields(version: Int) {
+        val enabled = DataStore.profileCacheStore.getBoolean("oixEchTls", false)
+        val visible = version == 4 && enabled
+        findPreference<Preference>("oixSni")?.isVisible = visible
+        findPreference<Preference>("oixConfig")?.isVisible = visible
+        findPreference<Preference>("oixAlpn")?.isVisible = visible
+        findPreference<Preference>("oixIdentityVersion")?.isVisible = visible
+    }
+
 
     private fun updateNetworkOptions(version: Int, networkPref: SimpleMenuPreference) {
         if (version <= 2) {
