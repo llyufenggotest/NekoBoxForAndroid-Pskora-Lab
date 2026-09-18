@@ -488,8 +488,14 @@ class ConfigurationFragment @JvmOverloads constructor(
     private var lastGroupTabTapAt = 0L
     private var lastGroupTabTapIndex = -1
 
+    private var suppressNextGroupLongPress = false
+
     private fun installGroupTabInteractions(tab: TabLayout.Tab, position: Int) {
         tab.view.setOnLongClickListener {
+            if (suppressNextGroupLongPress) {
+                suppressNextGroupLongPress = false
+                return@setOnLongClickListener true
+            }
             if (position !in adapter.groupList.indices) return@setOnLongClickListener true
             showDashboardGroupMenu(tab.view, adapter.groupList[position], position)
             true
@@ -500,6 +506,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                 if (lastGroupTabTapIndex == position && now - lastGroupTabTapAt in 1..350) {
                     lastGroupTabTapAt = 0L
                     lastGroupTabTapIndex = -1
+                    suppressNextGroupLongPress = true
+                    tab.view.postDelayed({ suppressNextGroupLongPress = false }, 450L)
                     DataStore.selectedGroup = adapter.groupList.firstOrNull()?.id ?: DataStore.selectedGroup
                     groupPager.setCurrentItem(0, false)
                     tabLayout.post { tabLayout.setScrollPosition(0, 0f, true) }
@@ -522,11 +530,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
     val updateSelectedCallback = object : ViewPager2.OnPageChangeCallback() {
-        override fun onPageScrolled(
-            position: Int, positionOffset: Float, positionOffsetPixels: Int
-        ) {
+        override fun onPageSelected(position: Int) {
             if (adapter.groupList.size > position) {
-                selectedGroupIndex = position
+                adapter.selectedGroupIndex = position
                 DataStore.selectedGroup = adapter.groupList[position].id
             }
         }
@@ -1886,13 +1892,11 @@ class ConfigurationFragment @JvmOverloads constructor(
         override suspend fun groupAdd(group: ProxyGroup) {
             tabLayout.post {
                 groupList.add(group)
-
-                if (groupList.any { !it.ungrouped }) tabLayout.post {
-                    tabLayout.visibility = View.VISIBLE
-                }
-
+                selectedGroupIndex = groupList.lastIndex
+                DataStore.selectedGroup = group.id
+                tabLayout.visibility = View.VISIBLE
                 notifyItemInserted(groupList.size - 1)
-                tabLayout.getTabAt(groupList.size - 1)?.select()
+                tabLayout.post { restoreGroupTabPosition(groupList.lastIndex) }
             }
         }
 

@@ -6,6 +6,7 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.fmt.snell.SnellBean
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
@@ -83,24 +84,25 @@ class SnellSettingsActivity : ProfileSettingsActivity<SnellBean>() {
             updateReuseEnabled(newVersion, reusePref)
             updateObfsModeOptions(newVersion, obfsModePref)
             updateVersionFields(newVersion, userKeyPref, obfsModePref, obfsHostPref, modePref, quicProxyModePref)
-            updateOixFields(newVersion)
+            updateOixFields(this, newVersion)
             true
         }
-        oixEchTls.setOnPreferenceChangeListener { _, newValue ->
-            if (newValue is Boolean) oixEchTls.bean = newValue
-            updateOixFields(initialVersion)
+        val oixEnabledPref = findPreference<Preference>("oixEchTls")!!
+        oixEnabledPref.setOnPreferenceChangeListener { _, newValue ->
+            DataStore.profileCacheStore.putBoolean("oixEchTls", newValue as Boolean)
+            updateOixFields(this, initialVersion)
             true
         }
-        updateOixFields(initialVersion)
+        updateOixFields(this, initialVersion)
     }
 
-    private fun updateOixFields(version: Int) {
+    private fun updateOixFields(fragment: PreferenceFragmentCompat, version: Int) {
         val enabled = DataStore.profileCacheStore.getBoolean("oixEchTls", false)
         val visible = version == 4 && enabled
-        findPreference<Preference>("oixSni")?.isVisible = visible
-        findPreference<Preference>("oixConfig")?.isVisible = visible
-        findPreference<Preference>("oixAlpn")?.isVisible = visible
-        findPreference<Preference>("oixIdentityVersion")?.isVisible = visible
+        fragment.findPreference<Preference>("oixSni")?.isVisible = visible
+        fragment.findPreference<Preference>("oixConfig")?.isVisible = visible
+        fragment.findPreference<Preference>("oixAlpn")?.isVisible = visible
+        fragment.findPreference<Preference>("oixIdentityVersion")?.isVisible = visible
     }
 
 
