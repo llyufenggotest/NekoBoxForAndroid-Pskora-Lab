@@ -372,6 +372,7 @@ fun buildConfig(
                             ?.subscription?.serverDnsResolver
                             ?.let { sanitizeDnsEntry(it) }
                             ?.takeIf { it.isNotBlank() }
+                            ?: ownerGroup?.customDirectDns?.let { sanitizeDnsEntry(it) }?.takeIf { it.isNotBlank() }
 
                         if (resolver != null) {
                             perGroupResolver[ownerGid] = resolver

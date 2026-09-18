@@ -496,7 +496,7 @@ private fun isValidServerDns(raw: String): Boolean {
 
     if (value.contains("://")) {
         val scheme = value.substringBefore("://").lowercase()
-        if (scheme !in setOf("https", "tls", "quic")) return false
+        if (scheme !in setOf("https", "tls", "quic", "udp", "tcp")) return false
         val rest = value.substringAfter("://")
         val host = rest.substringBefore("/").substringBefore("?")
         val bare = host.substringBeforeLast(":").trim('[', ']')
