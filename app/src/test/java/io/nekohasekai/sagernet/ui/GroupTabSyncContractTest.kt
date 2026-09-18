@@ -7,7 +7,10 @@ import org.junit.Test
 class GroupTabSyncContractTest {
     @Test
     fun configurationPreservesVisibleGroupDuringReloadAndSupportsDoubleTap() {
-        val file = File("src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt")
+        val file = listOf(
+            File("src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt"),
+            File("app/src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt")
+        ).first { it.isFile }
         val source = file.readText()
         assertTrue(source.contains("val visibleGroupId = groupList.getOrNull(selectedGroupIndex)?.id"))
         assertTrue(source.contains("var selectedGroup = visibleGroupId"))
