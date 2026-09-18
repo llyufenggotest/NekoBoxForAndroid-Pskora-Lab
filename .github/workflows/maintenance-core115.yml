@@ -105,6 +105,16 @@ jobs:
           done
           test "$tests_ok" = true
           ./gradlew --no-daemon app:assembleOssRelease --stacktrace --console=plain 2>&1 | tee gradle-release-build.log
+      - name: Upload Gradle diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gradle-diagnostics
+          path: |
+            gradle-unit-tests.log
+            gradle-release-build.log
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Verify target APK
         shell: bash
         run: |
