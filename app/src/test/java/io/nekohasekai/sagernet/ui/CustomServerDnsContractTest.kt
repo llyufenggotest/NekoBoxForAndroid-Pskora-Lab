@@ -7,7 +7,11 @@ import org.junit.Test
 class CustomServerDnsContractTest {
     @Test
     fun acceptsUdpAndTcpPrivateDnsSchemes() {
-        val file = File("app/src/main/java/io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt")
+        val files = listOf(
+            File("src/main/java/io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt"),
+            File("app/src/main/java/io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt")
+        )
+        val file = files.first { it.isFile }
         val source = file.readText()
         assertTrue(source.contains("\"udp\", \"tcp\""))
     }
