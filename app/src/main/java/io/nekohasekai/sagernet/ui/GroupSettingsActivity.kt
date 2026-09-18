@@ -68,12 +68,14 @@ class GroupSettingsActivity(
         DataStore.subscriptionAutoUpdateDelay = subscription.autoUpdateDelay
         DataStore.subscriptionFilterMode = subscription.filterMode
         DataStore.subscriptionFilterRegex = subscription.filterRegex
-        DataStore.subscriptionServerDns = subscription.serverDnsResolver ?: ""
+        DataStore.subscriptionServerDns = subscription.serverDnsResolver
+            .orEmpty()
+            .ifBlank { customDirectDns.orEmpty() }
     }
 
     fun ProxyGroup.serialize() {
         name = DataStore.groupName.takeIf { it.isNotBlank() } ?: "My group"
-        customDirectDns = DataStore.groupCustomDns // 🚀 从UI缓存写回数据库
+        customDirectDns = if (DataStore.groupType == GroupType.SUBSCRIPTION) null else DataStore.groupCustomDns
         type = DataStore.groupType
         order = DataStore.groupOrder
         isSelector = DataStore.groupIsSelector
@@ -168,11 +170,13 @@ class GroupSettingsActivity(
         val groupType = findPreference<SimpleMenuPreference>(Key.GROUP_TYPE)!!
         val groupSubscription = findPreference<PreferenceCategory>(Key.GROUP_SUBSCRIPTION)!!
         val subscriptionUpdate = findPreference<PreferenceCategory>(Key.SUBSCRIPTION_UPDATE)!!
+        val legacyGroupDns = findPreference<EditTextPreference>("groupCustomDns")!!
 
         fun updateGroupType(groupType: Int = DataStore.groupType) {
             val isSubscription = groupType == GroupType.SUBSCRIPTION
             groupSubscription.isVisible = isSubscription
             subscriptionUpdate.isVisible = isSubscription
+            legacyGroupDns.isVisible = !isSubscription
         }
         updateGroupType()
         groupType.setOnPreferenceChangeListener { _, newValue ->
