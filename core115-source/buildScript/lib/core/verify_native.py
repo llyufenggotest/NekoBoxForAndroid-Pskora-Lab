@@ -11,7 +11,7 @@ LOCK = Path(__file__).with_name('native-baseline.json')
 MARKERS = {
     'Juzi': ['#juzi', 'hello_pidun'],
     'X365': ['#x365'],
-    'SL': ['#sl'],
+    'SL': ['Shanlian AnyTLS', '64 hexadecimal characters before #sl'],
     'Fastup': ['fastup'],
     'TunNet': ['libcore/tunnetcontrol'],
     'Oppa': ['libcore/protocol/oppa'],

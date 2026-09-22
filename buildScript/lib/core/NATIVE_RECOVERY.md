@@ -24,7 +24,7 @@ Detailed JNI inventory and comparison: `F:/pskora-lab/evidence/native-jni-compat
 |---|---|---|
 | Juzi VLESS | `#juzi` and `hello_pidun`, each present once | Pinned sing-vmess local tests passed: suffix isolation/casing, known HMAC fixture, eight-byte request insertion, standard/X365 non-regression |
 | X365 VLESS | `#x365` once | Above local non-regression test passed |
-| Shanlian VLESS | `#sl` once | Static marker; pinned sing-box outbound strips only this mode at its layer |
+| Shanlian AnyTLS | password suffix `#sl` | 64hex password is decoded to the exact 32-byte AnyTLS authentication field; ordinary AnyTLS remains SHA-256 based |
 | Fastup Trojan | `fastup` once | Static marker; pinned sing-box has `#fastup` derivation and h2mux option path |
 | TunNet | `libcore/tunnetcontrol` 78 occurrences | Static package/symbol evidence; bridge methods match original DEX |
 | Oppa | `libcore/protocol/oppa` 35 occurrences | Static package/symbol evidence; local registry present |

@@ -70,14 +70,6 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 			return nil, E.Cause(err, "configure TunNet")
 		}
 	}
-	// Keep the existing Shanlian mode isolated from TunNet and sing-vmess modes.
-	if strings.HasSuffix(options.UUID, "#sl") {
-		options.UUID = strings.TrimSuffix(options.UUID, "#sl")
-		if options.TLS != nil {
-			options.TLS.ServerName = "MAGIC_SHANLIAN_TRIGGER"
-		}
-		logger.Info("Shanlian private VLESS mode enabled")
-	}
 	// #x365 and case-insensitive #juzi are handled independently by sing-vmess.
 
 	outboundDialer, err := dialer.New(ctx, options.DialerOptions, remoteIsDomain)

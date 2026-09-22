@@ -15,7 +15,7 @@ MARKERS = {
     'Pure': ['#pure', 'Pure response prefix invalid', 'Pure: UDP/XUDP unsupported'],
     'Juzi': ['#juzi', 'hello_pidun'],
     'X365': ['#x365'],
-    'SL': ['#sl'],
+    'SL': ['Shanlian AnyTLS', '64 hexadecimal characters before #sl'],
     'Fastup': ['fastup'],
     'TunNet': ['libcore/tunnetcontrol'],
     'Oppa': ['libcore/protocol/oppa'],

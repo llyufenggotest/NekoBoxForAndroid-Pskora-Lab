@@ -8,6 +8,9 @@ import moe.matsuri.nb4a.SingBoxOptions
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
+fun AnyTLSBean.isShanlian(): Boolean =
+    password?.matches(Regex("^[0-9a-fA-F]{64}#sl$", RegexOption.IGNORE_CASE)) == true
+
 fun buildSingBoxOutboundAnyTLSBean(bean: AnyTLSBean): SingBoxOptions.Outbound_AnyTLSOptions {
     return SingBoxOptions.Outbound_AnyTLSOptions().apply {
         type = "anytls"

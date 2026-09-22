@@ -384,7 +384,7 @@ object RawUpdater : GroupUpdater() {
 
         val proxies = mutableListOf<AbstractBean>()
 
-        if (text.contains("proxies:")) {
+        if (text.contains(Regex("(?m)^\\s*[\"']?proxies[\"']?\\s*:"))) {
 
             // clash & meta
 
@@ -401,7 +401,7 @@ object RawUpdater : GroupUpdater() {
                 ))) {
                     // Note: YAML numbers parsed as "Long"
 
-                    when (proxy["type"] as String) {
+                    when (proxy["type"]?.toString()?.lowercase()) {
                         "xhttp" -> {
                             proxies.add(XHttpBean().apply {
                                 serverAddress = proxy["server"]?.toString() ?: ""
@@ -786,34 +786,35 @@ object RawUpdater : GroupUpdater() {
                             val bean = AnyTLSBean()
                             for (opt in proxy) {
                                 if (opt.value == null) continue
-                                when (opt.key.replace("_", "-")) {
+                                when (opt.key.replace("_", "-").lowercase()) {
                                     "name" -> bean.name = opt.value.toString()
-                                    "server" -> bean.serverAddress = opt.value as String
-                                    "port" -> bean.serverPort = opt.value.toString().toInt()
-                                    "password" -> bean.password = opt.value.toString()
-                                    "client-fingerprint" -> bean.utlsFingerprint =
-                                        opt.value as String
+                                    "server", "address", "host" -> bean.serverAddress = opt.value.toString()
+                                    "port", "server-port" -> bean.serverPort = opt.value.toString().toInt()
+                                    "password", "passwd" -> bean.password = opt.value.toString()
+                                    "client-fingerprint", "fingerprint", "fp" -> bean.utlsFingerprint =
+                                        opt.value.toString()
 
-                                    "sni" -> bean.sni = opt.value.toString()
-                                    "skip-cert-verify" -> bean.allowInsecure =
-                                        opt.value.toString() == "true"
+                                    "sni", "server-name" -> bean.sni = opt.value.toString()
+                                    "skip-cert-verify", "insecure" -> bean.allowInsecure =
+                                        opt.value.toString().equals("true", true) || opt.value.toString() == "1"
 
                                     "alpn" -> {
-                                        val alpn = (opt.value as? (List<String>))
-                                        bean.alpn = alpn?.joinToString("\n")
+                                        bean.alpn = when (val value = opt.value) {
+                                            is List<*> -> value.joinToString("\n") { it.toString() }
+                                            else -> value.toString().split(',').joinToString("\n") { it.trim() }
+                                        }
                                     }
                                     "reality-pub-key", "public-key" -> bean.realityPubKey =
                                         opt.value.toString()
                                     "reality-short-id", "short-id" -> bean.realityShortId =
                                         opt.value.toString()
-                                        
-                                    // 🚀 新增解析这三项配置
-                                    "min-idle-session" -> bean.minIdleSession = 
+
+                                    "min-idle-session" -> bean.minIdleSession =
                                         opt.value.toString().toIntOrNull()
-                                    "idle-session-check-interval" -> bean.idleSessionCheckInterval = 
-                                        opt.value.toString().toIntOrNull()
-                                    "idle-session-timeout" -> bean.idleSessionTimeout = 
-                                        opt.value.toString().toIntOrNull()
+                                    "idle-session-check-interval" -> bean.idleSessionCheckInterval =
+                                        opt.value.toString().removeSuffix("s").toIntOrNull()
+                                    "idle-session-timeout" -> bean.idleSessionTimeout =
+                                        opt.value.toString().removeSuffix("s").toIntOrNull()
                                 }
                             }
                             proxies.add(bean)

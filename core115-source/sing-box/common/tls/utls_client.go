@@ -91,16 +91,7 @@ func (c *UTLSClientConfig) Client(conn net.Conn) (Conn, error) {
 		return nil, err
 	}
 
-	// ==========================================
-	// [!] 闪连魔改：每次握手前拦截触发词并注入动态暗号
-	// ==========================================
-	uCfg := c.config.Clone()
-	if uCfg.ServerName == "MAGIC_SHANLIAN_TRIGGER" {
-		uCfg.ServerName = GenerateMagicSNI()
-	}
-	// ==========================================
-
-	return &utlsALPNWrapper{utlsConnWrapper{utls.UClient(conn, uCfg, c.id)}, c.config.NextProtos}, nil
+	return &utlsALPNWrapper{utlsConnWrapper{utls.UClient(conn, c.config.Clone(), c.id)}, c.config.NextProtos}, nil
 }
 
 func (c *UTLSClientConfig) SetSessionIDGenerator(generator func(clientHello []byte, sessionID []byte) error) {
