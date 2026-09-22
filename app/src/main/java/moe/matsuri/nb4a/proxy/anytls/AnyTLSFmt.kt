@@ -11,12 +11,14 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 fun AnyTLSBean.isShanlian(): Boolean =
     password?.matches(Regex("^[0-9a-fA-F]{64}#sl$", RegexOption.IGNORE_CASE)) == true
 
+internal fun AnyTLSBean.passwordForRuntime(): String? = password
+
 fun buildSingBoxOutboundAnyTLSBean(bean: AnyTLSBean): SingBoxOptions.Outbound_AnyTLSOptions {
     return SingBoxOptions.Outbound_AnyTLSOptions().apply {
         type = "anytls"
         server = bean.serverAddress
         server_port = bean.serverPort
-        password = bean.password
+        password = bean.passwordForRuntime()
 
         // 动态读取闲置连接配置
         min_idle_session = bean.minIdleSession ?: 0

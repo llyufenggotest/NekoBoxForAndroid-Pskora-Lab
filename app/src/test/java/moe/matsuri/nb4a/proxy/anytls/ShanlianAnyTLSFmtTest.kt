@@ -18,7 +18,7 @@ class ShanlianAnyTLSFmtTest {
             initializeDefaultValues()
         }
         assertTrue(bean.isShanlian())
-        assertEquals("$credential#sl", buildSingBoxOutboundAnyTLSBean(bean).password)
+        assertEquals("$credential#sl", bean.passwordForRuntime())
     }
 
     @Test
@@ -40,7 +40,7 @@ class ShanlianAnyTLSFmtTest {
         for (password in listOf("ordinary", "$credential#sl-extra")) {
             val bean = AnyTLSBean().apply { this.password = password; initializeDefaultValues() }
             assertFalse(bean.isShanlian())
-            assertEquals(password, buildSingBoxOutboundAnyTLSBean(bean).password)
+            assertEquals(password, bean.passwordForRuntime())
         }
         val malformed = AnyTLSBean().apply { password = "short#sl"; initializeDefaultValues() }
         assertFalse(malformed.isShanlian())
