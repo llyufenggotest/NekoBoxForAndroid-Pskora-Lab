@@ -101,7 +101,8 @@ object ProfileManager {
         SagerDatabase.instance.withTransaction {
             val startOrder = SagerDatabase.proxyDao.nextOrder(groupId) ?: 1
             profiles.forEachIndexed { index, profile -> profile.userOrder = startOrder + index }
-            SagerDatabase.proxyDao.insert(profiles)
+            val ids = SagerDatabase.proxyDao.insert(profiles)
+            profiles.forEachIndexed { index, profile -> profile.id = ids[index] }
         }
         iterator { onBatchAdded(profiles) }
         return profiles

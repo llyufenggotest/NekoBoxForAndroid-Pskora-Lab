@@ -1944,7 +1944,11 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         override suspend fun onBatchAdded(profiles: List<ProxyEntity>) {
-            if (profiles.isNotEmpty()) onMainDispatcher { reload(now = true) }
+            val groupId = profiles.firstOrNull()?.groupId ?: return
+            if (groupList.none { it.id == groupId }) {
+                DataStore.selectedGroup = groupId
+                onMainDispatcher { reload(now = true) }
+            }
         }
 
         override suspend fun onUpdated(data: List<TrafficData>) = Unit
@@ -2577,6 +2581,27 @@ class ConfigurationFragment @JvmOverloads constructor(
                     configurationIdList.add(profile.id)
                     notifyItemInserted(pos)
                     refreshFromPosition(pos - 1)
+                }
+            }
+
+            override suspend fun onBatchAdded(profiles: List<ProxyEntity>) {
+                if (isGlobalSearch) {
+                    filterGlobal(searchQuery)
+                    return
+                }
+                val added = profiles.filter { it.groupId == proxyGroup.id }
+                if (added.isEmpty()) return
+                configurationListView.post {
+                    if (::undoManager.isInitialized) {
+                        undoManager.flush()
+                    }
+                    val start = configurationIdList.size
+                    added.forEach { profile ->
+                        configurationList[profile.id] = profile
+                        configurationIdList.add(profile.id)
+                    }
+                    notifyItemRangeInserted(start, added.size)
+                    refreshFromPosition(start - 1)
                 }
             }
 
