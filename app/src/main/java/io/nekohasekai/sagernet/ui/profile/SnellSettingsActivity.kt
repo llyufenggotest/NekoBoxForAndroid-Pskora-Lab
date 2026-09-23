@@ -6,6 +6,7 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.fmt.snell.SnellBean
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
@@ -31,6 +32,11 @@ class SnellSettingsActivity : ProfileSettingsActivity<SnellBean>() {
     private val mode = pbm.add(PreferenceBinding(Type.Text, "mode"))
     private val quicProxyMode = pbm.add(PreferenceBinding(Type.Bool, "quicProxyMode"))
     private val reuse = pbm.add(PreferenceBinding(Type.Bool, "reuse"))
+    private val oixEchTls = pbm.add(PreferenceBinding(Type.Bool, "oixEchTls"))
+    private val oixIdentityVersion = pbm.add(PreferenceBinding(Type.TextToInt, "oixIdentityVersion"))
+    private val oixAlpn = pbm.add(PreferenceBinding(Type.Text, "oixAlpn"))
+    private val oixSni = pbm.add(PreferenceBinding(Type.Text, "oixSni"))
+    private val oixConfig = pbm.add(PreferenceBinding(Type.Text, "oixConfig"))
 
     override fun SnellBean.init() {
         pbm.writeToCacheAll(this)
@@ -78,9 +84,27 @@ class SnellSettingsActivity : ProfileSettingsActivity<SnellBean>() {
             updateReuseEnabled(newVersion, reusePref)
             updateObfsModeOptions(newVersion, obfsModePref)
             updateVersionFields(newVersion, userKeyPref, obfsModePref, obfsHostPref, modePref, quicProxyModePref)
+            updateOixFields(this, newVersion)
             true
         }
+        val oixEnabledPref = findPreference<Preference>("oixEchTls")!!
+        oixEnabledPref.setOnPreferenceChangeListener { _, newValue ->
+            DataStore.profileCacheStore.putBoolean("oixEchTls", newValue as Boolean)
+            updateOixFields(this, initialVersion)
+            true
+        }
+        updateOixFields(this, initialVersion)
     }
+
+    private fun updateOixFields(fragment: PreferenceFragmentCompat, version: Int) {
+        val enabled = DataStore.profileCacheStore.getBoolean("oixEchTls", false)
+        val visible = version == 4 && enabled
+        fragment.findPreference<Preference>("oixSni")?.isVisible = visible
+        fragment.findPreference<Preference>("oixConfig")?.isVisible = visible
+        fragment.findPreference<Preference>("oixAlpn")?.isVisible = visible
+        fragment.findPreference<Preference>("oixIdentityVersion")?.isVisible = visible
+    }
+
 
     private fun updateNetworkOptions(version: Int, networkPref: SimpleMenuPreference) {
         if (version <= 2) {

@@ -201,8 +201,18 @@ func (u *SnellUser) UnmarshalJSON(content []byte) error {
 }
 
 type SnellObfsClientOptions struct {
-	ObfsMode string `json:"obfs_mode,omitempty" enum:"none,http,tls"`
+	ObfsMode string `json:"obfs_mode,omitempty" enum:"none,http,tls,oix-ech-tls"`
 	ObfsHost string `json:"obfs_host,omitempty"`
+
+	// OIXECH marks the OIX raw ECH-TLS transport. These fields are deliberately
+	// explicit so an OIX profile cannot be mistaken for ordinary Snell.
+	OIXECH             bool   `json:"oix_ech,omitempty"`
+	OIXIdentityVersion int    `json:"oix_identity_version,omitempty"`
+	OIXALPN            string `json:"oix_alpn,omitempty"`
+	OIXLegacyFallback  bool   `json:"oix_legacy_fallback,omitempty"`
+	OIXPreconnect      int    `json:"oix_preconnect,omitempty"`
+	OIXSNI             string `json:"oix_sni,omitempty"`
+	OIXConfig          string `json:"oix_config,omitempty"`
 }
 
 type SnellV6Options struct {

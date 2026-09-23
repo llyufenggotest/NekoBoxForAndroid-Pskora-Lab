@@ -4879,6 +4879,15 @@ public class SingBoxOptions {
 
         public Boolean reuse;
 
+        // OIX ECH-TLS metadata (transport support lives below this schema layer).
+        public Boolean oix_ech;
+        public Integer oix_identity_version;
+        public String oix_alpn;
+        public Boolean oix_legacy_fallback;
+        public Integer oix_preconnect;
+        public String oix_sni;
+        public String oix_config;
+
     }
     
     public static class Outbound_XHttpOptions extends Outbound {

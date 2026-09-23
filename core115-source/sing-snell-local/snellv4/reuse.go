@@ -48,6 +48,16 @@ func (c *Client) DialContext(ctx context.Context, destination M.Socksaddr) (net.
 	// Surge 6.4.4 (10661): -[SNConnectorV4 targetHandshakeData] appends the connector early data to
 	// the handshake buffer, and -[SNConnectorV4 firstDataPacket] encrypts and obfuscates the result
 	// in one piece, so the first record, and with obfs the first HTTP request body, carries both.
+	// OIX needs the exporter from this exact TLS session before its first Snell
+	// record. Preserve ordinary Snell's lazy first write path.
+	if c.requireExporter {
+		exporter, exportErr := c.exporterForConn(conn)
+		if exportErr != nil {
+			conn.Close()
+			return nil, exportErr
+		}
+		return &clientConn{client: c, Conn: c.obfs.ClientConn(conn), destination: destination, identityExporter: exporter}, nil
+	}
 	return c.DialEarlyConn(conn, destination), nil
 }
 
@@ -66,11 +76,16 @@ func (c *Client) reuseSession(ctx context.Context) (*reuseSession, error) {
 	if err != nil {
 		return nil, err
 	}
+	exporter, err := c.exporterForConn(conn)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
 	if c.pool.IsClosed() {
 		conn.Close()
 		return nil, net.ErrClosed
 	}
-	session = c.newReuseSession(conn)
+	session = c.newReuseSession(conn, exporter)
 	session.state.Store(uint32(reuse.StateActive))
 	return session, nil
 }
@@ -100,7 +115,8 @@ func (c *Client) Close() error {
 
 type reuseSession struct {
 	net.Conn
-	client *Client
+	client           *Client
+	identityExporter []byte
 
 	state    atomic.Uint32
 	keepOnce atomic.Bool
@@ -108,8 +124,8 @@ type reuseSession struct {
 	writer   *writer
 }
 
-func (c *Client) newReuseSession(conn net.Conn) *reuseSession {
-	return &reuseSession{Conn: c.obfs.ClientConn(conn), client: c}
+func (c *Client) newReuseSession(conn net.Conn, exporter []byte) *reuseSession {
+	return &reuseSession{Conn: c.obfs.ClientConn(conn), client: c, identityExporter: append([]byte(nil), exporter...)}
 }
 
 func (s *reuseSession) ReuseState() *atomic.Uint32 {
@@ -340,8 +356,9 @@ func (c *reuseConn) writeRequest(payload []byte) error {
 
 	if c.session.writer == nil {
 		c.session.writer = &writer{
-			upstream: c.session.Conn,
-			psk:      c.session.client.psk,
+			upstream:         c.session.Conn,
+			psk:              c.session.client.psk,
+			identityExporter: append([]byte(nil), c.session.identityExporter...),
 		}
 	}
 	_, err = c.session.writer.Write(request.Bytes())
@@ -363,8 +380,9 @@ func (c *reuseConn) writeRequestBuffer(buffer *buf.Buffer) error {
 	}
 	if c.session.writer == nil {
 		c.session.writer = &writer{
-			upstream: c.session.Conn,
-			psk:      c.session.client.psk,
+			upstream:         c.session.Conn,
+			psk:              c.session.client.psk,
+			identityExporter: append([]byte(nil), c.session.identityExporter...),
 		}
 	}
 	err = c.session.writer.WriteBuffer(buffer)

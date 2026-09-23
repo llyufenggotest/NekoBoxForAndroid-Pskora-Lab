@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - maintenance/core115-validated250-stable
-      - feature/shanlian-anytls
+      - feature/anytls-oix-snell
     tags:
       - core115-validated250-maintenance-candidate-*
 
@@ -94,12 +94,27 @@ jobs:
           chmod +x ./run ./gradlew buildScript/init/action/gradle.sh
           export GRADLE_OPTS="${GRADLE_OPTS:-} -Dhttps.protocols=TLSv1.2 -Djava.net.preferIPv4Stack=true"
           ./run init action gradle
+          tests_ok=false
           for attempt in 1 2 3; do
-            ./gradlew --no-daemon --refresh-dependencies app:testOssDebugUnitTest app:testOssReleaseUnitTest && break
+            if ./gradlew --no-daemon --refresh-dependencies app:testOssDebugUnitTest app:testOssReleaseUnitTest --stacktrace --console=plain 2>&1 | tee gradle-unit-tests.log; then
+              tests_ok=true
+              break
+            fi
             test "$attempt" -lt 3
             sleep 15
           done
-          ./gradlew --no-daemon app:assembleOssRelease
+          test "$tests_ok" = true
+          ./gradlew --no-daemon app:assembleOssRelease --stacktrace --console=plain 2>&1 | tee gradle-release-build.log
+      - name: Upload Gradle diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gradle-diagnostics
+          path: |
+            gradle-unit-tests.log
+            gradle-release-build.log
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Verify target APK
         shell: bash
         run: |

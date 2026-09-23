@@ -77,6 +77,18 @@ fun parseClashSnell(proxy: Map<String, Any?>): SnellBean {
         (proxy["obfs-opts"] as? Map<*, *>)?.let { obfsOpts ->
             obfsMode = obfsOpts["mode"] as? String ?: ""
             obfsHost = obfsOpts["host"] as? String ?: ""
+            if (obfsMode == OIX_ECH_TLS_MODE) {
+                oixEchTls = true
+                oixIdentityVersion = (obfsOpts["identity-version"] as? Number)?.toInt() ?: 2
+                oixAlpn = obfsOpts["alpn"] as? String ?: "snell-ech/1"
+                oixLegacyFallback = obfsOpts["legacy-fallback"] as? Boolean ?: false
+                oixPreconnect = (obfsOpts["preconnect"] as? Number)?.toInt() ?: 0
+                oixSni = obfsOpts["sni"] as? String ?: ""
+                oixConfig = obfsOpts["ech-config"] as? String ?: ""
+            }
         }
+        initializeDefaultValues()
     }
 }
+
+private const val OIX_ECH_TLS_MODE = "oix-ech-tls"

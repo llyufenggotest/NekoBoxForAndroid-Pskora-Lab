@@ -372,8 +372,10 @@ fun buildConfig(
                             ?.subscription?.serverDnsResolver
                             ?.let { sanitizeDnsEntry(it) }
                             ?.takeIf { it.isNotBlank() }
+                            ?: ownerGroup?.customDirectDns?.let { sanitizeDnsEntry(it) }?.takeIf { it.isNotBlank() }
 
                         if (resolver != null) {
+                            perGroupResolver[ownerGid] = resolver
                             profileList.forEach { hop ->
                                 val host = serverHostOf(hop.requireBean())
                                 if (host != null && !host.isIpAddress()) {
@@ -980,9 +982,10 @@ fun buildConfig(
             })
         }
 
-        if (group != null && !group.customDirectDns.isNullOrBlank()) {
+        val legacyDns = group?.customDirectDns?.takeIf { group.type != GroupType.SUBSCRIPTION }
+        if (!legacyDns.isNullOrBlank()) {
             dns.servers.add(DNSServerOptions().apply {
-                address = group.customDirectDns!!
+                address = legacyDns
                 tag = "dns-airport"
                 detour = TAG_DIRECT
                 address_resolver = "dns-local"
@@ -1100,7 +1103,7 @@ fun buildConfig(
             }
         }
 
-        if (group != null && !group.customDirectDns.isNullOrBlank() && nodeDomainList.isNotEmpty()) {
+        if (!legacyDns.isNullOrBlank() && nodeDomainList.isNotEmpty()) {
             (dns.rules as MutableList).add(0, DNSRule_DefaultOptions().apply {
                 makeSingBoxRule(nodeDomainList.toHashSet().toList())
                 server = "dns-airport"

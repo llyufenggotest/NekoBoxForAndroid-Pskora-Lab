@@ -92,6 +92,24 @@ func TestSnellV6QUICProxyModeOption(t *testing.T) {
 	require.Error(t, json.Unmarshal([]byte(`{"listen":"127.0.0.1","listen_port":1080,"psk":"password1234","version":6,"quic_proxy_mode":true}`), &inboundOptions))
 }
 
+func TestSnellOutboundOIXOptions(t *testing.T) {
+	var options SnellOutboundOptions
+	require.NoError(t, json.Unmarshal([]byte(`{"server":"127.0.0.1","server_port":443,"psk":"password","version":4,"obfs_mode":"oix-ech-tls","oix_ech":true,"oix_identity_version":2,"oix_alpn":"snell-ech/1","oix_legacy_fallback":true,"oix_preconnect":3,"oix_sni":"front.example","oix_config":"AQID"}`), &options))
+	require.Equal(t, "oix-ech-tls", options.ObfsOptions.ObfsMode)
+	require.True(t, options.ObfsOptions.OIXECH)
+	require.Equal(t, 2, options.ObfsOptions.OIXIdentityVersion)
+	require.Equal(t, "snell-ech/1", options.ObfsOptions.OIXALPN)
+	require.True(t, options.ObfsOptions.OIXLegacyFallback)
+	require.Equal(t, 3, options.ObfsOptions.OIXPreconnect)
+	require.Equal(t, "front.example", options.ObfsOptions.OIXSNI)
+	require.Equal(t, "AQID", options.ObfsOptions.OIXConfig)
+
+	encoded, err := json.Marshal(options)
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"obfs_mode":"oix-ech-tls"`)
+	require.Contains(t, string(encoded), `"oix_ech":true`)
+}
+
 func TestSnellOutboundVersionIsRequired(t *testing.T) {
 	var options SnellOutboundOptions
 	err := json.Unmarshal([]byte(`{"server":"127.0.0.1","server_port":1080,"psk":"password"}`), &options)

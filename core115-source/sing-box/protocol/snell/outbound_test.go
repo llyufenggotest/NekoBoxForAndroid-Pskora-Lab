@@ -13,6 +13,7 @@ import (
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	snellprotocol "github.com/sagernet/sing-snell"
+	"github.com/sagernet/sing/common/logger"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/stretchr/testify/require"
@@ -100,10 +101,57 @@ func TestV6QUICProxyModeConfiguration(t *testing.T) {
 	}
 }
 
+func TestValidateSnellOIXOptions(t *testing.T) {
+	valid := option.SnellObfsClientOptions{ObfsMode: "oix-ech-tls", OIXECH: true, OIXIdentityVersion: 2, OIXALPN: "snell-ech/1", OIXSNI: "front.example", OIXConfig: "AQID"}
+	require.NoError(t, validateSnellOIXOptions(4, valid))
+	bad := valid
+	bad.OIXConfig = "!"
+	require.ErrorContains(t, validateSnellOIXOptions(4, bad), "invalid OIX ECH config")
+	require.ErrorContains(t, validateSnellOIXOptions(5, valid), "requires version 4")
+	bad = valid
+	bad.OIXLegacyFallback = true
+	require.ErrorContains(t, validateSnellOIXOptions(4, bad), "legacy fallback is unsupported")
+	bad = valid
+	bad.OIXPreconnect = 1
+	require.ErrorContains(t, validateSnellOIXOptions(4, bad), "preconnect is unsupported")
+}
+
+func TestSnellOIXTransportFactoryBuildsStrictECHDialer(t *testing.T) {
+	dialer, err := buildSnellOutboundTransport(context.Background(), log.NewNOPFactory().NewLogger("snell"), nil, M.ParseSocksaddr("127.0.0.1:443"), option.SnellObfsClientOptions{
+		ObfsMode: "oix-ech-tls", OIXECH: true, OIXALPN: "snell-ech/1", OIXSNI: "front.example", OIXConfig: "AQID",
+	})
+	require.NoError(t, err)
+	require.IsType(t, &oixECHDialer{}, dialer)
+}
+
+func TestSnellOIXTransportFactorySeam(t *testing.T) {
+	original := buildSnellTransport
+	t.Cleanup(func() { buildSnellTransport = original })
+	called := false
+	buildSnellTransport = func(ctx context.Context, logg logger.ContextLogger, base N.Dialer, server M.Socksaddr, options option.SnellObfsClientOptions) (N.Dialer, error) {
+		called = true
+		require.Equal(t, "oix-ech-tls", options.ObfsMode)
+		require.True(t, options.OIXECH)
+		return nil, fmt.Errorf("factory sentinel")
+	}
+	created, err := NewOutbound(context.Background(), nil, log.NewNOPFactory().NewLogger("snell"), "snell-out", option.SnellOutboundOptions{
+		Version: 4,
+		AbstractSnellOutboundOptions: option.AbstractSnellOutboundOptions{
+			ServerOptions: option.ServerOptions{Server: "127.0.0.1", ServerPort: 443},
+			PSK:           "password",
+		},
+		ObfsOptions: option.SnellObfsClientOptions{ObfsMode: "oix-ech-tls", OIXECH: true, OIXIdentityVersion: 2, OIXALPN: "snell-ech/1", OIXSNI: "front.example", OIXConfig: "AQID"},
+	})
+	require.Nil(t, created)
+	require.EqualError(t, err, "factory sentinel")
+	require.True(t, called)
+}
+
 func TestValidateSnellOutboundObfs(t *testing.T) {
 	require.NoError(t, validateSnellOutboundObfs(3, "tls"))
 	require.NoError(t, validateSnellOutboundObfs(4, "tls"))
 	require.NoError(t, validateSnellOutboundObfs(5, "tls"))
+	require.ErrorContains(t, validateSnellOutboundObfs(4, "oix-ech-tls"), "registered OIX dialer")
 }
 
 func TestQUICDestCacheRetainsAllEntriesUntilExpiry(t *testing.T) {

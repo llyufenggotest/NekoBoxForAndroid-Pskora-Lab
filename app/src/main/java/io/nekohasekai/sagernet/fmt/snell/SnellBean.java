@@ -22,6 +22,16 @@ public class SnellBean extends AbstractBean {
     public Boolean reuse;
     public String network;       // "tcp", "udp", "tcp,udp"
 
+    // OIX raw ECH-TLS metadata. This layer only carries the values forward;
+    // the underlying transport is intentionally not implemented here.
+    public Boolean oixEchTls;
+    public Integer oixIdentityVersion;
+    public String oixAlpn;
+    public Boolean oixLegacyFallback;
+    public Integer oixPreconnect;
+    public String oixSni;
+    public String oixConfig;
+
     @Override
     public void initializeDefaultValues() {
         if (serverPort == null) serverPort = 443;
@@ -34,13 +44,20 @@ public class SnellBean extends AbstractBean {
         if (quicProxyMode == null) quicProxyMode = false;
         if (reuse == null) reuse = false;
         if (network == null) network = "";
+        if (oixEchTls == null) oixEchTls = false;
+        if (oixIdentityVersion == null) oixIdentityVersion = 2;
+        if (oixAlpn == null) oixAlpn = "snell-ech/1";
+        if (oixLegacyFallback == null) oixLegacyFallback = false;
+        if (oixPreconnect == null) oixPreconnect = 0;
+        if (oixSni == null) oixSni = "";
+        if (oixConfig == null) oixConfig = "";
 
         super.initializeDefaultValues();
     }
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(4); // version
+        output.writeInt(5); // version
         super.serialize(output);
         output.writeString(psk);
         output.writeInt(version);
@@ -51,6 +68,13 @@ public class SnellBean extends AbstractBean {
         output.writeString(userKey);
         output.writeString(mode);
         output.writeBoolean(quicProxyMode);
+        output.writeBoolean(oixEchTls);
+        output.writeInt(oixIdentityVersion);
+        output.writeString(oixAlpn);
+        output.writeBoolean(oixLegacyFallback);
+        output.writeInt(oixPreconnect);
+        output.writeString(oixSni);
+        output.writeString(oixConfig);
     }
 
     @Override
@@ -72,6 +96,16 @@ public class SnellBean extends AbstractBean {
         if (version >= 4) {
             quicProxyMode = input.readBoolean();
         }
+        if (version >= 5) {
+            oixEchTls = input.readBoolean();
+            oixIdentityVersion = input.readInt();
+            oixAlpn = input.readString();
+            oixLegacyFallback = input.readBoolean();
+            oixPreconnect = input.readInt();
+            oixSni = input.readString();
+            oixConfig = input.readString();
+        }
+        initializeDefaultValues();
     }
 
     @NotNull

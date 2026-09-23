@@ -16,26 +16,36 @@ import (
 )
 
 type Client struct {
-	psk     []byte
-	userKey []byte
-	reuse   bool
-	obfs    snell.ObfsConfig
-	dialer  N.Dialer
-	server  M.Socksaddr
+	psk              []byte
+	userKey          []byte
+	identityExporter []byte
+	exporterFromConn func(net.Conn) ([]byte, error)
+	requireExporter  bool
+	reuse            bool
+	obfs             snell.ObfsConfig
+	dialer           N.Dialer
+	server           M.Socksaddr
 
 	pool      reuse.Pool[*reuseSession]
 	closeIdle atomic.Bool
 }
 
 type ClientOptions struct {
-	PSK      []byte
-	UserKey  []byte
-	Reuse    bool
-	ObfsMode snell.ObfsMode
-	ObfsHost string
-	ObfsURI  string
-	Dialer   N.Dialer
-	Server   M.Socksaddr
+	PSK     []byte
+	UserKey []byte
+	Reuse   bool
+	// ExporterFromConn derives the per-session TLS exporter. OIX clients must
+	// provide it; ordinary clients leave it nil.
+	ExporterFromConn func(net.Conn) ([]byte, error)
+	RequireExporter  bool
+	ObfsMode         snell.ObfsMode
+	ObfsHost         string
+	ObfsURI          string
+	// IdentityExporter enables OIX identity v2. It must be the per-connection
+	// TLS exporter (32 bytes); an absent exporter preserves ordinary Snell.
+	IdentityExporter []byte
+	Dialer           N.Dialer
+	Server           M.Socksaddr
 }
 
 func NewClient(options ClientOptions) (*Client, error) {
@@ -50,13 +60,19 @@ func NewClient(options ClientOptions) (*Client, error) {
 	default:
 		return nil, E.New("snell: unknown obfs mode: ", int(options.ObfsMode))
 	}
+	if options.RequireExporter && options.ExporterFromConn == nil {
+		return nil, E.New("snell: OIX exporter callback is required")
+	}
 	client := &Client{
-		psk:     options.PSK,
-		userKey: options.UserKey,
-		reuse:   options.Reuse,
-		obfs:    snell.ObfsConfig{Mode: options.ObfsMode, Host: options.ObfsHost, URI: options.ObfsURI},
-		dialer:  options.Dialer,
-		server:  options.Server,
+		psk:              options.PSK,
+		userKey:          options.UserKey,
+		identityExporter: append([]byte(nil), options.IdentityExporter...),
+		exporterFromConn: options.ExporterFromConn,
+		requireExporter:  options.RequireExporter,
+		reuse:            options.Reuse,
+		obfs:             snell.ObfsConfig{Mode: options.ObfsMode, Host: options.ObfsHost, URI: options.ObfsURI},
+		dialer:           options.Dialer,
+		server:           options.Server,
 	}
 	if options.Reuse {
 		client.pool.Init()
@@ -64,8 +80,32 @@ func NewClient(options ClientOptions) (*Client, error) {
 	return client, nil
 }
 
+func (c *Client) exporterForConn(conn net.Conn) ([]byte, error) {
+	if c.exporterFromConn == nil {
+		if c.requireExporter {
+			return nil, E.New("snell: OIX exporter is unavailable")
+		}
+		return append([]byte(nil), c.identityExporter...), nil
+	}
+	exporter, err := c.exporterFromConn(conn)
+	if err != nil {
+		return nil, E.Cause(err, "derive OIX exporter")
+	}
+	if len(exporter) == 0 && !c.requireExporter {
+		return nil, nil
+	}
+	if len(exporter) != IdentityExporterLength {
+		return nil, E.New("snell: invalid OIX exporter length: ", len(exporter))
+	}
+	return append([]byte(nil), exporter...), nil
+}
+
 func (c *Client) DialConn(conn net.Conn, destination M.Socksaddr) (net.Conn, error) {
-	clientConn := &clientConn{client: c, Conn: c.obfs.ClientConn(conn), destination: destination}
+	exporter, err := c.exporterForConn(conn)
+	if err != nil {
+		return nil, err
+	}
+	clientConn := &clientConn{client: c, Conn: c.obfs.ClientConn(conn), destination: destination, identityExporter: exporter}
 	return clientConn, clientConn.writeRequest(nil)
 }
 
@@ -81,8 +121,9 @@ var _ snell.Method = (*Client)(nil)
 
 type clientConn struct {
 	net.Conn
-	client      *Client
-	destination M.Socksaddr
+	client           *Client
+	destination      M.Socksaddr
+	identityExporter []byte
 
 	access          sync.Mutex
 	readAccess      sync.Mutex
@@ -109,8 +150,9 @@ func (c *clientConn) writeRequest(payload []byte) error {
 	defer request.Release()
 
 	recordWriter := &writer{
-		upstream: c.Conn,
-		psk:      c.client.psk,
+		upstream:         c.Conn,
+		psk:              c.client.psk,
+		identityExporter: append([]byte(nil), c.identityExporter...),
 	}
 	_, err = recordWriter.Write(request.Bytes())
 	if err != nil {
@@ -130,8 +172,9 @@ func (c *clientConn) writeRequestBuffer(buffer *buf.Buffer) error {
 		return err
 	}
 	recordWriter := &writer{
-		upstream: c.Conn,
-		psk:      c.client.psk,
+		upstream:         c.Conn,
+		psk:              c.client.psk,
+		identityExporter: append([]byte(nil), c.identityExporter...),
 	}
 	err = recordWriter.WriteBuffer(buffer)
 	if err != nil {

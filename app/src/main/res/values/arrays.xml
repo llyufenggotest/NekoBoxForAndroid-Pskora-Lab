@@ -704,6 +704,12 @@
         <item>udp</item>
     </string-array>
 
+    <string-array name="snell_oix_identity_version_entry">
+        <item>v2</item>
+    </string-array>
+    <string-array name="snell_oix_identity_version_value">
+        <item>2</item>
+    </string-array>
     <string-array name="snell_v6_modes_entry">
         <item>Default</item>
         <item>Unshaped</item>

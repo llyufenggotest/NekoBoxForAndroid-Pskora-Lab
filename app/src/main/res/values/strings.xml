@@ -704,6 +704,12 @@
     <string name="snell_quic_proxy">QUIC Proxy Mode</string>
     <string name="snell_quic_proxy_summary">v6 only: legacy v5 QUIC Proxy compatibility</string>
     <string name="snell_reuse_summary">v4-v6 only</string>
+    <string name="snell_oix_enabled">OIX ECH-TLS</string>
+    <string name="snell_oix_sni">OIX SNI</string>
+    <string name="snell_oix_ech_config">OIX ECH Config</string>
+    <string name="snell_oix_ech_config_summary">Base64 ECHConfigList</string>
+    <string name="snell_oix_alpn">OIX ALPN</string>
+    <string name="snell_oix_identity_version">OIX Identity Version</string>
 
     <string name="core_alpha_title">Preview core</string>
     <string name="core_alpha_notice">This core is an Alpha preview and may have compatibility issues.</string>
