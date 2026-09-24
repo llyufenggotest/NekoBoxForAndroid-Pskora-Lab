@@ -266,11 +266,6 @@ abstract class BoxInstance(
         }
 
         box.start()
-        config.profileTagMap[profile.id]?.takeIf { it.isNotBlank() }?.let { expectedTag ->
-            check(box.selectOutbound(expectedTag)) {
-                "Failed to select launched profile outbound: $expectedTag"
-            }
-        }
     }
 
     suspend fun awaitLogWriters() {
