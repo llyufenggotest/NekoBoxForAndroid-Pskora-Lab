@@ -3310,7 +3310,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 qualityControls.isVisible = actions.qualityVisible || actions.speedVisible || actions.latencyEnabled
                 leafButton.isVisible = actions.qualityVisible
                 (leafButton as? android.widget.ImageButton)?.setColorFilter(
-                    requireContext().getColour(when (qualityTiers[proxyEntity.id]) {
+                    requireContext().getColour(when (pf.qualityTiers[proxyEntity.id]) {
                         "green" -> R.color.material_green_500
                         "yellow" -> R.color.material_amber_500
                         "red" -> R.color.material_red_500
@@ -3319,8 +3319,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                 )
                 speedButton.isVisible = actions.speedVisible
                 lightningButton.isVisible = actions.latencyEnabled
-                val rates = nodeRates[proxyEntity.id]
-                val tested = speedTestRows[proxyEntity.id]
+                val rates: Pair<Long, Long>? = pf.nodeRates[proxyEntity.id]
+                val tested: SpeedTestCardState? = pf.speedTestRows[proxyEntity.id]
                 trafficRow.isVisible = actions.speedVisible && (rates != null || tested != null)
                 if (tested != null) {
                     profileUploadSpeed.text = when {
