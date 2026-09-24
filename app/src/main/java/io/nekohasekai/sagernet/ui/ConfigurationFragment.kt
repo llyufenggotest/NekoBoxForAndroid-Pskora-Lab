@@ -333,26 +333,55 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     fun updateSpeedTestProgress(profileId: Long, phase: String, currentMBps: Double, peakMBps: Double) {
-        speedTestRows[profileId] = SpeedTestCardState(phase, currentMBps, peakMBps, running = true)
+        val previous = speedTestRows[profileId] ?: SpeedTestCardState()
+        speedTestRows[profileId] = when (phase) {
+            "download" -> previous.copy(
+                phase = phase,
+                downloadCurrent = currentMBps,
+                downloadPeak = maxOf(previous.downloadPeak, peakMBps),
+                running = true,
+                error = "",
+            )
+            "upload" -> previous.copy(
+                phase = phase,
+                uploadCurrent = currentMBps,
+                uploadPeak = maxOf(previous.uploadPeak, peakMBps),
+                running = true,
+                error = "",
+            )
+            else -> previous.copy(phase = phase, running = true, error = "")
+        }
         refreshDiagnosticCards()
     }
 
     fun updateSpeedTestComplete(profileId: Long, downloadMBps: Double, uploadMBps: Double) {
-        speedTestRows[profileId] = SpeedTestCardState("complete", uploadMBps, maxOf(downloadMBps, uploadMBps), running = false, downloadMBps)
+        val previous = speedTestRows[profileId] ?: SpeedTestCardState()
+        speedTestRows[profileId] = previous.copy(
+            phase = "complete",
+            running = false,
+            downloadAverage = downloadMBps,
+            uploadAverage = uploadMBps,
+            error = "",
+        )
         refreshDiagnosticCards()
     }
 
     fun updateSpeedTestError(profileId: Long, message: String) {
-        speedTestRows[profileId] = SpeedTestCardState("error", 0.0, 0.0, running = false, error = message)
+        speedTestRows[profileId] = (speedTestRows[profileId] ?: SpeedTestCardState()).copy(
+            phase = "error", running = false, error = message,
+        )
         refreshDiagnosticCards()
     }
 
     private data class SpeedTestCardState(
-        val phase: String,
-        val current: Double,
-        val peak: Double,
-        val running: Boolean,
-        val download: Double = 0.0,
+        val phase: String = "idle",
+        val downloadCurrent: Double = 0.0,
+        val uploadCurrent: Double = 0.0,
+        val downloadPeak: Double = 0.0,
+        val uploadPeak: Double = 0.0,
+        val downloadAverage: Double = 0.0,
+        val uploadAverage: Double = 0.0,
+        val running: Boolean = false,
         val error: String = "",
     )
 
@@ -3296,12 +3325,16 @@ class ConfigurationFragment @JvmOverloads constructor(
                 if (tested != null) {
                     profileUploadSpeed.text = when {
                         tested.error.isNotEmpty() -> tested.error
-                        tested.running -> "${tested.phase} ↑ ${"%.2f".format(tested.current)} MB/s"
-                        else -> "Peak ↑ ${"%.2f".format(tested.current)} MB/s"
+                        tested.running && tested.phase == "upload" ->
+                            "↑ ${"%.2f".format(tested.uploadCurrent)} MB/s · Peak ${"%.2f".format(tested.uploadPeak)}"
+                        tested.running -> "↑ waiting"
+                        else -> "↑ Avg ${"%.2f".format(tested.uploadAverage)} MB/s"
                     }
                     profileDownloadSpeed.text = when {
-                        tested.running -> "Peak ${"%.2f".format(tested.peak)} MB/s"
-                        else -> "Peak ↓ ${"%.2f".format(tested.download)} MB/s"
+                        tested.running && tested.phase == "download" ->
+                            "↓ ${"%.2f".format(tested.downloadCurrent)} MB/s · Peak ${"%.2f".format(tested.downloadPeak)}"
+                        tested.running -> "↓ Peak ${"%.2f".format(tested.downloadPeak)} MB/s"
+                        else -> "↓ Avg ${"%.2f".format(tested.downloadAverage)} MB/s"
                     }
                 } else rates?.let { (tx, rx) ->
                     profileUploadSpeed.text = "↑ " + android.text.format.Formatter.formatFileSize(requireContext(), tx) + "/s"

@@ -368,7 +368,7 @@ func runUpload(ctx context.Context, client *http.Client, uploadURL string, strea
 	})
 }
 
-func runTransfer(ctx context.Context, phase string, streams int, limits transferLimits, listener SpeedTestListener, request func(context.Context, int64) (int64, error)) (transferResult, error) {
+func runTransfer(parentCtx context.Context, phase string, streams int, limits transferLimits, listener SpeedTestListener, request func(context.Context, int64) (int64, error)) (transferResult, error) {
 	streams = normalizeSpeedTestStreams(int32(streams))
 	if limits.duration <= 0 {
 		limits.duration = defaultTransferDuration
@@ -379,7 +379,7 @@ func runTransfer(ctx context.Context, phase string, streams int, limits transfer
 	if limits.reportEvery <= 0 {
 		limits.reportEvery = 250 * time.Millisecond
 	}
-	ctx, cancel := context.WithTimeout(ctx, limits.duration)
+	ctx, cancel := context.WithTimeout(parentCtx, limits.duration)
 	defer cancel()
 	started := time.Now()
 	var reserved, completed atomic.Int64
@@ -435,6 +435,9 @@ func runTransfer(ctx context.Context, phase string, streams int, limits transfer
 			}
 			lastBytes, lastReport = total, now
 		case <-done:
+			if err := parentCtx.Err(); err != nil {
+				return transferResult{}, err
+			}
 			elapsed := time.Since(started).Seconds()
 			total := completed.Load()
 			if elapsed <= 0 {
