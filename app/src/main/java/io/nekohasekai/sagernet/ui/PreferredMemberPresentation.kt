@@ -56,6 +56,12 @@ internal class PreferredTestResults(
             values[id]?.takeIf { it.ticket == ticket && it.status == 0 }?.let { values.remove(id) }
         }
     }
+    @Synchronized fun finishPending(id: Long, ticket: Long): Boolean {
+        val result = values[id] ?: return false
+        if (result.ticket != ticket || result.status != 0) return false
+        values.remove(id)
+        return true
+    }
     private fun manualOwns(id: Long, result: Result): Boolean {
         if (result.status == 0) return true
         val automaticSample = automatic[id] ?: return true
@@ -74,9 +80,10 @@ internal class PreferredTestResults(
 
     /** Only a currently effective successful sample participates in latency ordering. */
     private fun effectiveLatency(id: Long, persistedStatus: Int, persistedPing: Int): Int? {
+        val persisted = persistedPing.takeIf { persistedStatus == 1 && it >= 0 }
         val manual = values[id]?.takeIf { manualOwns(id, it) }
-        if (manual != null) return manual.ping.takeIf { manual.status == 1 && it >= 0 }
-        return automatic[id]?.ping ?: persistedPing.takeIf { persistedStatus == 1 && it >= 0 }
+        if (manual != null) return manual.ping.takeIf { manual.status == 1 && it >= 0 } ?: persisted
+        return automatic[id]?.ping ?: persisted
     }
     @Synchronized fun healthyLatency(id: Long, persistedStatus: Int, persistedPing: Int): Int? =
         effectiveLatency(id, persistedStatus, persistedPing)

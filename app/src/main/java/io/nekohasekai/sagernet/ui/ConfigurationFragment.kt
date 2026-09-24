@@ -428,21 +428,32 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     private fun service(): ISagerNetService? = (activity as? MainActivity)?.connection?.service
+    private val nodeLatencyTickets = ConcurrentHashMap<Long, Long>()
+    private val nodeLatencySequence = AtomicLong()
 
     private fun testNodeLatency(profile: ProxyEntity, mode: NodeLatencyMode = NodeLatencyMode.URL_TEST) {
+        val ticket = nodeLatencySequence.incrementAndGet()
+        nodeLatencyTickets[profile.id] = ticket
         runOnDefaultDispatcher {
-            profile.status = 0
-            profile.error = null
-            ProfileManager.postUpdate(profile)
+            val previousStatus = profile.status
+            val previousPing = profile.ping
+            val previousError = profile.error
             try {
-                profile.ping = runNodeLatency(profile, mode)
+                val testedPing = runNodeLatency(profile, mode)
+                if (nodeLatencyTickets[profile.id] != ticket) return@runOnDefaultDispatcher
+                profile.ping = testedPing
                 profile.status = 1
                 profile.error = null
+                ProfileManager.updateProfile(profile)
             } catch (e: Exception) {
-                profile.status = 3
-                profile.error = e.readableMessage
+                if (nodeLatencyTickets[profile.id] != ticket) return@runOnDefaultDispatcher
+                profile.status = previousStatus
+                profile.ping = previousPing
+                profile.error = previousError
+                ProfileManager.postUpdate(profile)
+            } finally {
+                nodeLatencyTickets.remove(profile.id, ticket)
             }
-            ProfileManager.updateProfile(profile)
         }
     }
 

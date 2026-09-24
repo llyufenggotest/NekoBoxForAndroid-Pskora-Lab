@@ -232,21 +232,28 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
     }
 
     private fun testSingleMember(profile: ProxyEntity, mode: NodeLatencyMode) {
+        val previousStatus = profile.status
+        val previousPing = profile.ping
+        val previousError = profile.error
         val ticket = preferredTestResults.begin(
             profile.id,
             if (mode == NodeLatencyMode.TCP) "TCPing" else "URLTest",
         )
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
             try {
-                profile.ping = runNodeLatency(profile, mode)
+                val testedPing = runNodeLatency(profile, mode)
+                if (!preferredTestResults.complete(profile.id, ticket, 1, testedPing)) return@launch
+                profile.ping = testedPing
                 profile.status = 1
                 profile.error = null
+                ProfileManager.updateProfile(profile)
             } catch (e: Exception) {
-                profile.status = 3
-                profile.error = e.readableMessage
+                if (!preferredTestResults.finishPending(profile.id, ticket)) return@launch
+                profile.status = previousStatus
+                profile.ping = previousPing
+                profile.error = previousError
+                ProfileManager.postUpdate(profile)
             }
-            preferredTestResults.complete(profile.id, ticket, profile.status, profile.ping)
-            ProfileManager.updateProfile(profile)
             withContext(Dispatchers.Main) { refreshDiagnosticCards() }
         }
     }

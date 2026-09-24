@@ -11,6 +11,7 @@ class PreferredTestResultsPriorityTest {
         results.replaceAutomatic("session", mapOf(7L to PreferredAutoSample(900L, 80)))
         val ticket = results.begin(7L, "URLTest")
         assertEquals(null, results.label(7L))
+        assertEquals("64 ms", results.numericLabel(7L, persistedStatus = 1, persistedPing = 64))
 
         // A batch begun before manual completion may arrive later; it must not win.
         results.replaceAutomatic("session", mapOf(7L to PreferredAutoSample(950L, 30)))
@@ -19,6 +20,21 @@ class PreferredTestResultsPriorityTest {
         assertEquals("42 ms", results.label(7L))
         results.replaceAutomatic("session", mapOf(7L to PreferredAutoSample(1_050L, 25)))
         assertEquals("42 ms", results.label(7L))
+    }
+
+    @Test fun failedManualRetainsLastSuccessfulPersistedLatency() {
+        val results = PreferredTestResults(clock = { 1_000L })
+        val ticket = results.begin(9L, "URLTest")
+        results.complete(9L, ticket, status = 3, ping = 0)
+        assertEquals("88 ms", results.numericLabel(9L, persistedStatus = 1, persistedPing = 88))
+    }
+
+    @Test fun stalePendingTicketCannotClearNewerAttempt() {
+        val results = PreferredTestResults(clock = { 1_000L })
+        val oldTicket = results.begin(5L, "URLTest")
+        val newTicket = results.begin(5L, "TCPing")
+        assertEquals(false, results.finishPending(5L, oldTicket))
+        assertEquals(true, results.finishPending(5L, newTicket))
     }
 
     @Test fun newerPeriodicAutomaticTakesOverAfterOneInterval() {
