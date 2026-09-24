@@ -352,6 +352,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             else -> previous.copy(phase = phase, running = true, error = "")
         }
         refreshDiagnosticCards()
+        renderSpeedTestDialog(profileId)
     }
 
     fun updateSpeedTestComplete(profileId: Long, downloadMBps: Double, uploadMBps: Double) {
@@ -364,6 +365,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             error = "",
         )
         refreshDiagnosticCards()
+        renderSpeedTestDialog(profileId)
     }
 
     fun updateSpeedTestError(profileId: Long, message: String) {
@@ -371,6 +373,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             phase = "error", running = false, error = message,
         )
         refreshDiagnosticCards()
+        renderSpeedTestDialog(profileId)
     }
 
     private data class SpeedTestCardState(
@@ -386,6 +389,12 @@ class ConfigurationFragment @JvmOverloads constructor(
     )
 
     private val speedTestRows = mutableMapOf<Long, SpeedTestCardState>()
+    private var speedTestDialog: androidx.appcompat.app.AlertDialog? = null
+    private var speedTestDialogProfileId = 0L
+    private var speedTestDialogPhase: TextView? = null
+    private var speedTestDialogUpload: TextView? = null
+    private var speedTestDialogDownload: TextView? = null
+    private var speedTestDialogProgress: android.widget.ProgressBar? = null
     private val qualityTiers = mutableMapOf<Long, String>()
 
     fun qualityTier(profileId: Long): String? = qualityTiers[profileId]
@@ -421,13 +430,65 @@ class ConfigurationFragment @JvmOverloads constructor(
     private fun service(): ISagerNetService? = (activity as? MainActivity)?.connection?.service
 
     fun startSpeedTestForProfile(profileId: Long, streams: Int) {
+        if (DataStore.groupLayoutMode == 1) showSpeedTestDialog(profileId)
         runOnDefaultDispatcher {
             val result = runCatching { service()?.startSpeedTest(profileId, streams) ?: "Service disconnected" }
                 .getOrElse { it.readableMessage }
             if (result.isNotEmpty()) onMainDispatcher {
+                updateSpeedTestError(profileId, result)
                 snackbar(result).show()
             }
         }
+    }
+
+    private fun showSpeedTestDialog(profileId: Long) {
+        speedTestDialog?.dismiss()
+        val content = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_speed_test, null)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(requireContext()).setView(content).create()
+        speedTestDialogProfileId = profileId
+        speedTestDialogPhase = content.findViewById(R.id.speed_test_dialog_phase)
+        speedTestDialogUpload = content.findViewById(R.id.speed_test_dialog_upload)
+        speedTestDialogDownload = content.findViewById(R.id.speed_test_dialog_download)
+        speedTestDialogProgress = content.findViewById(R.id.speed_test_dialog_progress)
+        content.findViewById<TextView>(R.id.speed_test_dialog_node).text =
+            ProfileManager.getProfile(profileId)?.displayName().orEmpty()
+        content.findViewById<View>(R.id.speed_test_dialog_close).setOnClickListener { dialog.dismiss() }
+        dialog.setOnDismissListener {
+            if (speedTestDialog === dialog) {
+                speedTestDialog = null
+                speedTestDialogProfileId = 0L
+            }
+        }
+        dialog.setOnShowListener { dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT)) }
+        speedTestDialog = dialog
+        dialog.show()
+        renderSpeedTestDialog(profileId)
+    }
+
+    private fun renderSpeedTestDialog(profileId: Long) {
+        if (speedTestDialogProfileId != profileId || speedTestDialog?.isShowing != true) return
+        val state = speedTestRows[profileId]
+        speedTestDialogUpload?.text = when {
+            state == null -> "↑ -- MB/s"
+            state.running && state.phase == "upload" -> "↑ ${"%.2f".format(state.uploadCurrent)} MB/s"
+            !state.running -> "↑ ${"%.2f".format(state.uploadAverage)} MB/s"
+            else -> "↑ -- MB/s"
+        }
+        speedTestDialogDownload?.text = when {
+            state == null -> "↓ -- MB/s"
+            state.running && state.downloadPeak > 0.0 ->
+                "↓ ${"%.2f".format(state.downloadCurrent.takeIf { it > 0.0 } ?: state.downloadPeak)} MB/s"
+            !state.running -> "↓ ${"%.2f".format(state.downloadAverage)} MB/s"
+            else -> "↓ -- MB/s"
+        }
+        speedTestDialogPhase?.text = when {
+            state == null -> "准备测速…"
+            state.error.isNotEmpty() -> "测速失败：${state.error}"
+            state.running && state.phase == "download" -> "正在测试下载速度…"
+            state.running && state.phase == "upload" -> "正在测试上传速度…"
+            else -> "测速完成"
+        }
+        speedTestDialogProgress?.visibility = if (state?.running == false) View.INVISIBLE else View.VISIBLE
     }
 
     fun showIPQualityForProfile(profileId: Long) {
@@ -1050,6 +1111,13 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     override fun onDestroyView() {
         stopDashboardPulse()
+        speedTestDialog?.dismiss()
+        speedTestDialog = null
+        speedTestDialogProfileId = 0L
+        speedTestDialogPhase = null
+        speedTestDialogUpload = null
+        speedTestDialogDownload = null
+        speedTestDialogProgress = null
         super.onDestroyView()
     }
 
@@ -2959,6 +3027,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             val profileName: TextView = view.findViewById(R.id.profile_name)
+            private val profileSourceGroup: TextView = view.findViewById(R.id.profile_source_group)
             val profileType: TextView = view.findViewById(R.id.profile_type)
             val profileAddress: TextView = view.findViewById(R.id.profile_address)
             val profileStatus: TextView = view.findViewById(R.id.profile_status)
@@ -3101,8 +3170,27 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val popup = PopupMenu(requireContext(), anchor)
                 popup.menuInflater.inflate(R.menu.double_column_item_menu, popup.menu)
                 if (select) popup.menu.removeItem(R.id.action_delete)
+                val actions = nodeDiagnosticActions(
+                    DataStore.serviceState,
+                    proxyEntity.id,
+                    DataStore.selectedProxy,
+                    DataStore.currentProfile,
+                )
+                popup.menu.findItem(R.id.action_ip_quality).isVisible = actions.qualityVisible
+                popup.menu.findItem(R.id.action_speed_test).isVisible = actions.speedVisible
+                popup.setForceShowIcon(true)
                 popup.setOnMenuItemClickListener { menuItem ->
                     when (menuItem.itemId) {
+                        R.id.action_ip_quality -> {
+                            (parentFragment as? ConfigurationFragment)
+                                ?.showIPQualityForProfile(proxyEntity.id)
+                            true
+                        }
+                        R.id.action_speed_test -> {
+                            (parentFragment as? ConfigurationFragment)
+                                ?.startSpeedTestForProfile(proxyEntity.id, 1)
+                            true
+                        }
                         R.id.action_edit -> {
                             anchor.context.startActivity(
                                 proxyEntity.settingIntent(
@@ -3136,6 +3224,24 @@ class ConfigurationFragment @JvmOverloads constructor(
                 card.setCardBackgroundColor(if (selected) ColorUtils.compositeColors(
                     ColorUtils.setAlphaComponent(primary, 24), background) else Color.TRANSPARENT)
             }
+            private fun applyLayoutSpacing(doubleColumn: Boolean) {
+                val density = resources.displayMetrics.density
+                val params = card.layoutParams as? ViewGroup.MarginLayoutParams ?: return
+                if (doubleColumn) {
+                    params.marginStart = (2 * density).toInt()
+                    params.marginEnd = (2 * density).toInt()
+                    params.topMargin = (2 * density).toInt()
+                    params.bottomMargin = (2 * density).toInt()
+                } else {
+                    val inset = resources.getDimensionPixelSize(R.dimen.lab_content_inset)
+                    params.marginStart = inset
+                    params.marginEnd = inset
+                    params.topMargin = (4 * density).toInt()
+                    params.bottomMargin = (4 * density).toInt()
+                }
+                card.layoutParams = params
+            }
+
             fun bind(proxyEntity: ProxyEntity) {
                 val pf = parentFragment as? ConfigurationFragment ?: return
 
@@ -3143,6 +3249,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val bean = proxyEntity.requireBean()
 
                 profileName.text = bean.displayName()
+                profileSourceGroup.isGone = true
                 profileType.text = proxyEntity.displayType()
                 profileType.setTextColor(requireContext().getProtocolColor(proxyEntity.type))
                 val address = if (pf.alwaysShowAddress && bean.name.isNotBlank()) {
@@ -3213,69 +3320,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 }
                 
-                doubleColumnMenuButton.setOnClickListener {
-                    val popup = PopupMenu(requireContext(), it)
-                    popup.menuInflater.inflate(R.menu.double_column_item_menu, popup.menu)
-                    popup.setOnMenuItemClickListener { menuItem ->
-                        when (menuItem.itemId) {
-                            R.id.action_edit -> {
-                                if (proxyEntity.type == ProxyEntity.TYPE_XHTTP) {
-                                    android.widget.Toast.makeText(
-                                        it.context,
-                                        R.string.special_protocol_not_editable,
-                                        android.widget.Toast.LENGTH_SHORT
-                                    ).show()
-                                    return@setOnMenuItemClickListener true
-                                }
-                                try {
-                                    it.context.startActivity(
-                                        proxyEntity.settingIntent(
-                                            it.context, adapter?.isSubscription(proxyEntity) == true
-                                        )
-                                    )
-                                } catch (e: Exception) {
-                                    Logs.w(e)
-                                    android.widget.Toast.makeText(
-                                        it.context,
-                                        getString(R.string.profile_edit_failed, e.readableMessage),
-                                        android.widget.Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                                true
-                            }
-                            R.id.action_share -> {
-                                showShareMenu(it, proxyEntity)
-                                true
-                            }
-                            R.id.action_delete -> {
-                                adapter?.let { adapter ->
-                                    val index = adapter.configurationIdList.indexOf(proxyEntity.id)
-                                    if (DataStore.confirmProfileDelete) {
-                                        AlertDialog.Builder(requireContext())
-                                            .setTitle(R.string.delete_confirm_prompt)
-                                            .setPositiveButton(R.string.yes) { dialog: DialogInterface, which: Int ->
-                                                adapter.remove(index)
-                                                undoManager.remove(index to proxyEntity)
-                                            }
-                                            .setNegativeButton(R.string.no, null)
-                                            .show()
-                                    } else {
-                                        adapter.remove(index)
-                                        undoManager.remove(index to proxyEntity)
-                                    }
-                                }
-                                true
-                            }
-                            else -> false
-                        }
-                    }
-                    popup.show()
-                }
-
                 val selectOrChain = select || proxyEntity.type == ProxyEntity.TYPE_CHAIN
                 val isDoubleColumn = layoutManager is FixedGridLayoutManager
+                applyLayoutSpacing(isDoubleColumn)
                 
                 if (isDoubleColumn) {
+                    leafButton.isGone = true
+                    speedButton.isGone = true
                     editButton.isGone = true
                     shareLayout.isGone = true
                     removeButton.isGone = true
@@ -3301,7 +3352,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     DataStore.currentProfile,
                 )
                 lightningButton.isEnabled = actions.latencyEnabled
-                leafButton.isVisible = actions.qualityVisible
+                leafButton.isVisible = !isDoubleColumn && actions.qualityVisible
                 (leafButton as? android.widget.ImageButton)?.setColorFilter(
                     requireContext().getColour(when (pf.qualityTiers[proxyEntity.id]) {
                         "green" -> R.color.material_green_500
@@ -3310,7 +3361,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         else -> R.color.profile_card_icon
                     })
                 )
-                speedButton.isVisible = actions.speedVisible
+                speedButton.isVisible = !isDoubleColumn && actions.speedVisible
                 lightningButton.isVisible = true
                 val rates: Pair<Long, Long>? = pf.nodeRates[proxyEntity.id]
                 val tested: SpeedTestCardState? = pf.speedTestRows[proxyEntity.id]

@@ -1,12 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
+        android:id="@+id/action_ip_quality"
+        android:icon="@drawable/ic_profile_leaf_outline"
+        android:title="@string/profile_leaf_description" />
+    <item
+        android:id="@+id/action_speed_test"
+        android:icon="@drawable/ic_profile_speedometer_outline"
+        android:title="@string/profile_speedometer_description" />
+    <item
         android:id="@+id/action_edit"
+        android:icon="@drawable/ic_profile_edit_outline"
         android:title="@string/edit" />
     <item
         android:id="@+id/action_share"
+        android:icon="@drawable/ic_profile_share_outline"
         android:title="@string/share" />
     <item
         android:id="@+id/action_delete"
+        android:icon="@drawable/ic_profile_delete_outline"
         android:title="@string/delete" />
 </menu>

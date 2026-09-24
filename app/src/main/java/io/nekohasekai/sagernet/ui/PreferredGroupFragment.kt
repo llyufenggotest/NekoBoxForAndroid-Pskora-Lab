@@ -78,7 +78,9 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
         override fun onBindViewHolder(holder: Card, position: Int) {
             val (node, source) = rows[position]
             holder.name.text = node?.displayName() ?: source
-            holder.type.text = node?.let { "${it.displayType()} · $source" }.orEmpty()
+            holder.type.text = node?.displayType().orEmpty()
+            holder.sourceGroup.text = "引用分组 · $source"
+            holder.sourceGroup.visibility = if (node == null) View.GONE else View.VISIBLE
             holder.type.setTextColor(node?.let { requireContext().getProtocolColor(it.type) }
                 ?: requireContext().getColorAttr(android.R.attr.textColorSecondary))
             // status/ping are the persisted test of this exact source ID. Never use owner.ping
@@ -155,6 +157,7 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
     }
     private class Card(view: View) : RecyclerView.ViewHolder(view) {
         val name: TextView = view.findViewById(R.id.profile_name)
+        val sourceGroup: TextView = view.findViewById(R.id.profile_source_group)
         val type: TextView = view.findViewById(R.id.profile_type)
         val health: TextView = view.findViewById(R.id.profile_status)
         val uploadSpeed: TextView = view.findViewById(R.id.profile_upload_speed)
@@ -167,6 +170,24 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
         private val share: View = view.findViewById(R.id.share)
         private val remove: View = view.findViewById(R.id.remove)
         fun bindLayoutMode(doubleColumn: Boolean, showActions: Boolean) {
+            val density = itemView.resources.displayMetrics.density
+            (itemView.layoutParams as? ViewGroup.MarginLayoutParams)?.let { params ->
+                if (doubleColumn) {
+                    params.marginStart = (2 * density).toInt()
+                    params.marginEnd = (2 * density).toInt()
+                    params.topMargin = (2 * density).toInt()
+                    params.bottomMargin = (2 * density).toInt()
+                } else {
+                    val inset = itemView.resources.getDimensionPixelSize(R.dimen.lab_content_inset)
+                    params.marginStart = inset
+                    params.marginEnd = inset
+                    params.topMargin = (4 * density).toInt()
+                    params.bottomMargin = (4 * density).toInt()
+                }
+                itemView.layoutParams = params
+            }
+            leaf.visibility = if (!doubleColumn && leaf.visibility == View.VISIBLE) View.VISIBLE else View.GONE
+            speed.visibility = if (!doubleColumn && speed.visibility == View.VISIBLE) View.VISIBLE else View.GONE
             edit.visibility = if (!doubleColumn && showActions) View.VISIBLE else View.GONE
             share.visibility = if (!doubleColumn && showActions) View.VISIBLE else View.GONE
             remove.visibility = if (!doubleColumn && showActions) View.VISIBLE else View.GONE
@@ -330,8 +351,20 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
     private fun showDoubleColumnMenu(anchor: View, node: ProxyEntity) {
         PopupMenu(requireContext(), anchor).apply {
             menuInflater.inflate(R.menu.double_column_item_menu, menu)
+            val ownerId = owner?.id ?: 0L
+            val active = node.id in activeMemberIds
+            val actions = nodeDiagnosticActions(
+                DataStore.serviceState, ownerId, DataStore.selectedProxy, DataStore.currentProfile,
+            )
+            menu.findItem(R.id.action_ip_quality).isVisible = active && actions.qualityVisible
+            menu.findItem(R.id.action_speed_test).isVisible = active && actions.speedVisible
+            setForceShowIcon(true)
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
+                    R.id.action_ip_quality -> (parentFragment as? ConfigurationFragment)
+                        ?.showIPQualityForProfile(ownerId)
+                    R.id.action_speed_test -> (parentFragment as? ConfigurationFragment)
+                        ?.startSpeedTestForProfile(ownerId, 1)
                     R.id.action_edit -> sourceAction(node, R.id.edit)
                     R.id.action_share -> sourceAction(node, R.id.share)
                     R.id.action_delete -> sourceAction(node, R.id.remove)

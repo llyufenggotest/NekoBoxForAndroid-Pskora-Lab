@@ -24,8 +24,8 @@ const (
 	defaultSpeedTestTimeout     = 30 * time.Second
 	defaultTransferDuration     = 8 * time.Second
 	defaultTransferByteLimit    = int64(128 * 1000 * 1000)
-	defaultSpeedtestUploadBytes = int64(1 << 20)
-	defaultOoklaUploadBytes     = int64(2 << 20)
+	defaultSpeedtestUploadBytes = int64(512 * 1024)
+	defaultOoklaUploadBytes     = int64(512 * 1024)
 	downloadReadBufferBytes     = 256 * 1024
 )
 
@@ -355,6 +355,11 @@ func runUpload(ctx context.Context, client *http.Client, uploadURL string, strea
 		} else {
 			requestBytes = defaultOoklaUploadBytes
 		}
+	}
+	// Multi-stream mode uses conservative per-request payloads: several
+	// Speedtest-Custom/Ookla servers close large concurrent POST bodies early.
+	if streams > 1 && requestBytes > 256*1024 {
+		requestBytes = 256 * 1024
 	}
 	payload := make([]byte, requestBytes)
 	if _, err := rand.Read(payload); err != nil {
