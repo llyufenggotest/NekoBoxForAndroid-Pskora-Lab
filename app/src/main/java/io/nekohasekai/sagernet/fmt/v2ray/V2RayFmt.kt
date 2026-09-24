@@ -352,7 +352,44 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
     }
 }
 
-// 不确定是谁的格式
+internal data class ShadowrocketLegacyLink(
+    val isVless: Boolean,
+    val encryption: String,
+    val uuid: String,
+    val server: String,
+    val port: Int,
+    val query: Map<String, String>,
+)
+
+internal fun parseShadowrocketLegacyLink(server: String): ShadowrocketLegacyLink {
+    val payload = server.substringAfter("://").substringBefore('?')
+    val decoded = String(
+        Base64.getUrlDecoder().decode(payload.padEnd((payload.length + 3) / 4 * 4, '=')),
+        Charsets.UTF_8,
+    )
+    val credentials = decoded.substringBefore('@').split(':', limit = 2)
+    require(credentials.size == 2)
+    val endpoint = decoded.substringAfter('@')
+    val host = endpoint.substringBeforeLast(':')
+    val port = endpoint.substringAfterLast(':').toInt()
+    require(host.isNotBlank() && port in 1..65535)
+    val query = server.substringAfter('?', "").split('&').mapNotNull { field ->
+        if (field.isBlank()) return@mapNotNull null
+        val key = java.net.URLDecoder.decode(field.substringBefore('='), "UTF-8")
+        val value = java.net.URLDecoder.decode(field.substringAfter('=', ""), "UTF-8")
+        key to value
+    }.toMap()
+    return ShadowrocketLegacyLink(
+        isVless = server.startsWith("vless://", ignoreCase = true),
+        encryption = credentials[0],
+        uuid = credentials[1],
+        server = host,
+        port = port,
+        query = query,
+    )
+}
+
+// Shadowrocket/Kitsunebi legacy Base64-authority format.
 private fun tryResolveVmess4Kitsunebi(server: String): VMessBean {
     // vmess://YXV0bzo1YWY1ZDBlYy02ZWEwLTNjNDMtOTNkYi1jYTMwMDg1MDNiZGJAMTgzLjIzMi41Ni4xNjE6MTIwMg
     // ?remarks=*%F0%9F%87%AF%F0%9F%87%B5JP%20-355%20TG@moon365free&obfsParam=%7B%22Host%22:%22183.232.56.161%22%7D&path=/v2ray&obfs=websocket&alterId=0

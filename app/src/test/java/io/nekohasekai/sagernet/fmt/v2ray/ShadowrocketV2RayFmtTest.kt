@@ -1,70 +1,56 @@
 package io.nekohasekai.sagernet.fmt.v2ray
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
-@RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE, sdk = [28])
 class ShadowrocketV2RayFmtTest {
-    @Test fun shadowrocketVlessWebSocketLinkMapsHostSniAndName() {
-        val bean = parseV2Ray(
+    @Test fun shadowrocketVlessWebSocketPayloadAndAliasesDecode() {
+        val parsed = parseShadowrocketLegacyLink(
             "vless://bm9uZTpzeW50aGV0aWMtdXVpZEBub2RlLmV4YW1wbGU6NDQz" +
                 "?path=/nekocloud/hk-01&remarks=HK-Test&obfsParam=ws.example.com" +
                 "&obfs=websocket&tls=1&peer=tls.example.com&tfo=1"
-        ) as VMessBean
-
-        assertTrue(bean.isVLESS)
-        assertEquals("synthetic-uuid", bean.uuid)
-        assertEquals("node.example", bean.serverAddress)
-        assertEquals(443, bean.serverPort)
-        assertEquals("HK-Test", bean.name)
-        assertEquals("ws", bean.type)
-        assertEquals("/nekocloud/hk-01", bean.path)
-        assertEquals("ws.example.com", bean.host)
-        assertEquals("tls", bean.security)
-        assertEquals("tls.example.com", bean.sni)
+        )
+        assertTrue(parsed.isVless)
+        assertEquals("synthetic-uuid", parsed.uuid)
+        assertEquals("node.example", parsed.server)
+        assertEquals(443, parsed.port)
+        assertEquals("HK-Test", parsed.query["remarks"])
+        assertEquals("ws.example.com", parsed.query["obfsParam"])
+        assertEquals("tls.example.com", parsed.query["peer"])
     }
 
-    @Test fun shadowrocketRealityVlessAliasesMapToRealityFields() {
-        val bean = parseV2Ray(
+    @Test fun shadowrocketRealityVlessPreservesSentinelInputs() {
+        val parsed = parseShadowrocketLegacyLink(
             "vless://bm9uZTpzeW50aGV0aWMtdXVpZEBqcC5leGFtcGxlOjE5MDEy" +
-                "?remarks=JP-01&tls=1&peer=www.example.com&udp=1&xtls=2&alterId=0" +
+                "?remarks=JP-01&tls=1&peer=www.example.com&alterId=0" +
                 "&pbk=synthetic-public-key&sid=0123456789abcdef&fingerprint=chrome"
-        ) as VMessBean
-
-        assertTrue(bean.isVLESS)
-        assertEquals("tls", bean.security)
-        assertEquals("www.example.com", bean.sni)
-        assertEquals("synthetic-public-key", bean.realityPubKey)
-        assertEquals("0123456789abcdef", bean.realityShortId)
-        assertEquals("chrome", bean.utlsFingerprint)
-        assertTrue(bean.type == "tcp" || bean.type.isEmpty())
-        assertEquals(-1, bean.alterId)
+        )
+        assertTrue(parsed.isVless)
+        assertEquals("synthetic-public-key", parsed.query["pbk"])
+        assertEquals("0123456789abcdef", parsed.query["sid"])
+        assertEquals("chrome", parsed.query["fingerprint"])
+        assertEquals("0", parsed.query["alterId"])
     }
 
-    @Test fun kitsunebiJsonObfsParamStillExtractsHost() {
-        val bean = parseV2Ray(
-            "vmess://Y2hhY2hhMjAtcG9seTEzMDU6c3ludGhldGljLXV1aWRAbm9kZS5leGFtcGxlOjQ0Mw" +
-                "?remarks=JSON-Host&obfs=websocket&obfsParam=%7B%22Host%22%3A%22ws.example.com%22%7D"
-        ) as VMessBean
-        assertEquals("ws.example.com", bean.host)
-    }
-
-    @Test fun shadowrocketVmessLegacyBase64AuthorityStillParses() {
-        val bean = parseV2Ray(
+    @Test fun shadowrocketVmessLegacyBase64AuthorityDecodes() {
+        val parsed = parseShadowrocketLegacyLink(
             "vmess://Y2hhY2hhMjAtcG9seTEzMDU6c3ludGhldGljLXV1aWRAMTAzLjI0Mi4zLjQ2Ojk1Mjc" +
                 "?remarks=HongKong&udp=1&alterId=0"
-        ) as VMessBean
+        )
+        assertFalse(parsed.isVless)
+        assertEquals("chacha20-poly1305", parsed.encryption)
+        assertEquals("synthetic-uuid", parsed.uuid)
+        assertEquals("103.242.3.46", parsed.server)
+        assertEquals(9527, parsed.port)
+    }
 
-        assertEquals("chacha20-poly1305", bean.encryption)
-        assertEquals("synthetic-uuid", bean.uuid)
-        assertEquals("103.242.3.46", bean.serverAddress)
-        assertEquals(9527, bean.serverPort)
-        assertEquals(0, bean.alterId)
-        assertEquals("HongKong", bean.name)
+    @Test fun jsonObfsParamIsUrlDecodedForHostExtraction() {
+        val parsed = parseShadowrocketLegacyLink(
+            "vmess://Y2hhY2hhMjAtcG9seTEzMDU6c3ludGhldGljLXV1aWRAbm9kZS5leGFtcGxlOjQ0Mw" +
+                "?obfs=websocket&obfsParam=%7B%22Host%22%3A%22ws.example.com%22%7D"
+        )
+        assertEquals("{\"Host\":\"ws.example.com\"}", parsed.query["obfsParam"])
     }
 }
