@@ -430,8 +430,12 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     private fun service(): ISagerNetService? = (activity as? MainActivity)?.connection?.service
 
-    private suspend fun awaitDiagnosticService(timeoutMillis: Long = 2_000L): ISagerNetService? {
+    private suspend fun awaitDiagnosticService(timeoutMillis: Long = 5_000L): ISagerNetService? {
         service()?.let { return it }
+        val mainActivity = activity as? MainActivity ?: return null
+        withContext(Dispatchers.Main.immediate) {
+            mainActivity.reconnectServiceBinding()
+        }
         return withTimeoutOrNull(timeoutMillis) {
             var diagnosticService: ISagerNetService? = null
             while (diagnosticService == null) {

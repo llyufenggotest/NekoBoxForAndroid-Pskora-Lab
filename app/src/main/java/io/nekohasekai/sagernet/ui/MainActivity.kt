@@ -715,6 +715,11 @@ class MainActivity : ThemedActivity(),
     }
 
     val connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND, true)
+    fun reconnectServiceBinding() {
+        connection.disconnect(this)
+        connection.connect(this, this)
+    }
+
     override fun onServiceConnected(service: ISagerNetService) = changeState(
         try {
             BaseService.State.values()[service.state]
@@ -723,11 +728,13 @@ class MainActivity : ThemedActivity(),
         }
     )
 
-    override fun onServiceDisconnected() = changeState(BaseService.State.Idle,
-        if (DataStore.serviceState.started) "VPN 服务连接丢失" else null)
+    override fun onServiceDisconnected() {
+        val serviceWasStarted = DataStore.serviceState.started
+        changeState(BaseService.State.Idle, if (serviceWasStarted) "VPN 服务连接丢失" else null)
+        if (serviceWasStarted) reconnectServiceBinding()
+    }
     override fun onBinderDied() {
-        connection.disconnect(this)
-        connection.connect(this, this)
+        reconnectServiceBinding()
     }
 
     private val connect = registerForActivityResult(VpnRequestActivity.StartService()) {
