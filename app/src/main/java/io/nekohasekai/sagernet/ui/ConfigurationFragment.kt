@@ -626,9 +626,22 @@ class ConfigurationFragment @JvmOverloads constructor(
                         add("$flag ${place.optString("provider")}：$detail")
                     }
                 }.joinToString("\n")
+                val asDomain = value.optString("asDomain").ifBlank { "—" }
+                val ipRange = listOf(
+                    value.optString("ipRangeStart"),
+                    value.optString("ipRangeEnd"),
+                ).filter { it.isNotBlank() }.joinToString(" - ").ifBlank { "—" }
+                val humanTraffic = value.optDouble("humanTraffic", 0.0)
+                val botTraffic = value.optDouble("botTraffic", 0.0)
+                val trafficText = if (value.optBoolean("trafficKnown")) {
+                    "human ${"%.2f".format(humanTraffic)}% · bot ${"%.2f".format(botTraffic)}%"
+                } else "统计数据不足"
                 details.text = if (score >= 0) getString(
                     R.string.ip_quality_result,
                     value.optString("asn"),
+                    asDomain,
+                    ipRange,
+                    trafficText,
                     ipSourceChinese(value.optString("ipSource")),
                     ipAttributeChinese(value.optString("ipAttribute")),
                     score,
@@ -637,6 +650,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                 ) else getString(
                     R.string.ip_quality_result_without_score,
                     value.optString("asn"),
+                    asDomain,
+                    ipRange,
+                    trafficText,
                     ipSourceChinese(value.optString("ipSource")),
                     ipAttributeChinese(value.optString("ipAttribute")),
                     locationText,

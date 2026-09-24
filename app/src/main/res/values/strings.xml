@@ -53,8 +53,8 @@
     <string name="ip_quality_tier_description">IP 质量等级</string>
     <string name="ip_quality_loading">正在检测当前节点出口…</string>
     <string name="ip_quality_failed">IP 质量检测失败</string>
-    <string name="ip_quality_result">ASN：%1$s\nIP 来源：%2$s\nIP 属性：%3$s\nIPPure 系数：%4$d%% · %5$s\n\n位置（多源对照）\n%6$s</string>
-    <string name="ip_quality_result_without_score">ASN：%1$s\nIP 来源：%2$s\nIP 属性：%3$s\nIPPure 系数：暂未返回\n\n位置（多源对照）\n%4$s</string>
+    <string name="ip_quality_result">ASN：%1$s\nAS 域名：%2$s\nIP 范围：%3$s\n人机流量比：%4$s\nIP 来源：%5$s\nIP 属性：%6$s\nIPPure 系数：%7$d%% · %8$s\n\n位置（多源对照）\n%9$s</string>
+    <string name="ip_quality_result_without_score">ASN：%1$s\nAS 域名：%2$s\nIP 范围：%3$s\n人机流量比：%4$s\nIP 来源：%5$s\nIP 属性：%6$s\nIPPure 系数：暂未返回\n\n位置（多源对照）\n%7$s</string>
     <string name="sort_and_layout">Sort and Appearance</string>
     <string name="card_style">Card</string>
     <string name="card_style_classic">Classic</string>

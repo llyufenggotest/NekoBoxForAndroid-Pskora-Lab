@@ -1,17 +1,60 @@
 package libcore
 
 import (
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	box "github.com/sagernet/sing-box"
 	"github.com/sagernet/sing-box/adapter"
 )
+
+func TestIPPureSessionSignsRetryWithIssuedKey(t *testing.T) {
+	const key = "test-session-key"
+	var calls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			w.Header().Set("x-k", key)
+			w.Header().Set("x-t", strconv.FormatInt(time.Now().UnixMilli(), 10))
+			_, _ = io.WriteString(w, `{"ok":false}`)
+			return
+		}
+		signed := r.Header.Get("x-t")
+		parts := strings.SplitN(signed, "-", 2)
+		if len(parts) != 2 {
+			t.Fatalf("missing signed timestamp: %q", signed)
+		}
+		payload := strings.Join([]string{r.Method, "http://" + r.Host + r.URL.RequestURI(), "", parts[0]}, "-")
+		mac := hmac.New(sha256.New, []byte(key))
+		_, _ = mac.Write([]byte(payload))
+		if r.Header.Get("x-k") != key || parts[1] != hex.EncodeToString(mac.Sum(nil)) {
+			t.Fatalf("invalid signed request headers: x-k=%q x-t=%q", r.Header.Get("x-k"), signed)
+		}
+		_, _ = io.WriteString(w, `{"ok":true}`)
+	}))
+	defer server.Close()
+
+	var response struct {
+		OK bool `json:"ok"`
+	}
+	if err := new(ipPureSession).getJSON(context.Background(), server.Client(), server.URL+"/basic", &response); err != nil {
+		t.Fatal(err)
+	}
+	if !response.OK || calls != 2 {
+		t.Fatalf("response=%+v calls=%d", response, calls)
+	}
+}
 
 func TestIPQualityOfficialScoreTiers(t *testing.T) {
 	for _, test := range []struct {
@@ -72,7 +115,34 @@ func TestIPQualityKeepsPartialResultsWhenSourceFails(t *testing.T) {
 	}
 }
 
-func TestIPQualityKeepsOfficialIPWhenFraudScoreIsMissing(t *testing.T) {
+func TestIPQualityUsesRichIPPureDataWhenMyIPResponseOmitsScore(t *testing.T) {
+	server := newIPQualityServer(t, map[string]serverReply{
+		"/official":           {body: `{"ip":"198.51.100.9","asn":64496,"isBroadcast":false,"isResidential":false}`},
+		"/basic/198.51.100.9": {body: `{"ok":true,"data":{"ip":"198.51.100.9","asn":{"number":64496,"organization":"Example Transit","domain":"example.net","network":{"range":{"start":"198.51.100.0","end":"198.51.100.255"}},"is_residential":false,"type":"hosting"}}}`},
+		"/risk/198.51.100.9":  {body: `{"ok":true,"data":{"risk_score":39}}`},
+		"/bot/64496":          {body: `{"ok":true,"data":{"bot":37.400209,"human":62.599791}}`},
+		"/ip2location":        {body: `{}`},
+		"/ipwhois":            {body: `{}`},
+		"/dbip":               {body: `{}`},
+	})
+	defer server.Close()
+
+	result, err := queryIPQuality(server.Client(), testIPQualityEndpoints(server.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.IP != "198.51.100.9" || result.Score != 39 || result.ScoreTier != "yellow" {
+		t.Fatalf("unexpected score result: %+v", result)
+	}
+	if result.ASDomain != "example.net" || result.IPRangeStart != "198.51.100.0" || result.IPRangeEnd != "198.51.100.255" {
+		t.Fatalf("missing ASN details: %+v", result)
+	}
+	if result.HumanTraffic != 62.599791 || result.BotTraffic != 37.400209 || !result.TrafficKnown {
+		t.Fatalf("missing traffic split: %+v", result)
+	}
+}
+
+func TestIPQualityKeepsOfficialIPWhenRichIPPureDataIsUnavailable(t *testing.T) {
 	server := newIPQualityServer(t, map[string]serverReply{
 		"/official":    {body: `{"ip":"198.51.100.9","asn":64496,"isBroadcast":false,"isResidential":false}`},
 		"/ip2location": {body: `{}`},
@@ -208,6 +278,9 @@ func newIPQualityServer(t *testing.T, replies map[string]serverReply) *httptest.
 func testIPQualityEndpoints(base string) ipQualityEndpoints {
 	return ipQualityEndpoints{
 		official:    base + "/official",
+		basic:       base + "/basic/%s",
+		risk:        base + "/risk/%s",
+		botClass:    base + "/bot/%s",
 		ip2Location: base + "/ip2location",
 		ipWhoIs:     base + "/ipwhois",
 		dbIP:        base + "/dbip",

@@ -60,6 +60,10 @@ class DashboardHealthUiContractTest {
         assertTrue(fragment.contains("value.optString(\"error\")"))
         assertTrue(fragment.contains("runCatching { org.json.JSONObject(json) }"))
         assertTrue(fragment.contains("R.string.ip_quality_result_without_score"))
+        assertTrue(fragment.contains("value.optString(\"asDomain\")"))
+        assertTrue(fragment.contains("value.optString(\"ipRangeStart\")"))
+        assertTrue(fragment.contains("value.optDouble(\"humanTraffic\""))
+        assertTrue(fragment.contains("value.optBoolean(\"trafficKnown\")"))
     }
 
     @Test fun updateShortcutUsesExistingUpdaterWithoutReplacingOtherActions() {
