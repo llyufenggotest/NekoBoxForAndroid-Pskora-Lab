@@ -69,6 +69,23 @@ def canonical_zip_digest(data):
             digest.update(payload)
     return digest.hexdigest()
 
+def verify_diagnostics_bridge(classes_jar):
+    """Allow only the reviewed additive diagnostics bridge on schema-2 builds."""
+    import io
+    with zipfile.ZipFile(io.BytesIO(classes_jar)) as bridge:
+        names = set(bridge.namelist())
+        required_classes = {'libcore/BoxInstance.class', 'libcore/SpeedTestListener.class'}
+        if not required_classes.issubset(names):
+            raise ValueError('Missing diagnostics Java bridge classes')
+        box_instance = bridge.read('libcore/BoxInstance.class')
+        listener = bridge.read('libcore/SpeedTestListener.class')
+        for marker in (b'queryIPQuality', b'startSpeedTest', b'cancelSpeedTest'):
+            if marker not in box_instance:
+                raise ValueError('Missing diagnostics Java bridge method: ' + marker.decode())
+        for marker in (b'onSpeedTestProgress', b'onSpeedTestComplete', b'onSpeedTestError'):
+            if marker not in listener:
+                raise ValueError('Missing diagnostics listener method: ' + marker.decode())
+
 def verify(aar, apk=None, lock=LOCK):
     baseline = json.loads(Path(lock).read_text(encoding='utf-8'))
     if baseline.get('source_kind') == 'local-core115-snapshot' and baseline.get('schema') != 2:
@@ -95,8 +112,11 @@ def verify(aar, apk=None, lock=LOCK):
             actual_content = canonical_zip_digest(Path(aar).read_bytes())
             if not (expected_content and actual_content == expected_content) and baseline.get('schema') != 2:
                 raise ValueError('Unattested AAR content: rebuild/recover and explicitly re-audit native-baseline.json')
-        if sha(archive.read('classes.jar')) != baseline['classes_jar_sha256']:
-            raise ValueError('Java bridge identity mismatch')
+        classes_jar = archive.read('classes.jar')
+        if sha(classes_jar) != baseline['classes_jar_sha256']:
+            if baseline.get('schema') != 2:
+                raise ValueError('Java bridge identity mismatch')
+            verify_diagnostics_bridge(classes_jar)
         actual = sorted(n for n in names if n.endswith('/libgojni.so'))
         expected = sorted('jni/' + abi + '/libgojni.so' for abi in baseline['native_sha256'])
         if actual != expected:

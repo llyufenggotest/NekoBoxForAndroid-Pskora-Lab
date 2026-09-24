@@ -99,6 +99,26 @@ class NativeGateTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'APK ABI set'):
             gate.verify(self.aar, self.apk, self.lock)
 
+    def test_diagnostics_bridge_requires_every_reviewed_method(self):
+        import io
+        def jar(box_markers, listener_markers):
+            output = io.BytesIO()
+            with zipfile.ZipFile(output, 'w') as archive:
+                archive.writestr('libcore/BoxInstance.class', b' '.join(box_markers))
+                archive.writestr('libcore/SpeedTestListener.class', b' '.join(listener_markers))
+            return output.getvalue()
+        complete = jar(
+            [b'queryIPQuality', b'startSpeedTest', b'cancelSpeedTest'],
+            [b'onSpeedTestProgress', b'onSpeedTestComplete', b'onSpeedTestError'],
+        )
+        gate.verify_diagnostics_bridge(complete)
+        incomplete = jar(
+            [b'queryIPQuality', b'startSpeedTest'],
+            [b'onSpeedTestProgress', b'onSpeedTestComplete', b'onSpeedTestError'],
+        )
+        with self.assertRaisesRegex(ValueError, 'cancelSpeedTest'):
+            gate.verify_diagnostics_bridge(incomplete)
+
     def test_matching_apk(self):
         with zipfile.ZipFile(self.apk, 'w') as z:
             z.writestr('lib/arm64-v8a/libgojni.so', self.core)
