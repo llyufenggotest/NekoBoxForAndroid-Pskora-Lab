@@ -110,22 +110,24 @@ func queryIPQuality(client *http.Client, endpoints ipQualityEndpoints) (ipQualit
 	if official.IP == "" {
 		return ipQualityResult{}, errors.New("IPPure query failed: response has no IP")
 	}
-	if official.FraudScore == nil {
-		return ipQualityResult{}, errors.New("IPPure query failed: response has no fraud score")
-	}
-	if *official.FraudScore < 0 || *official.FraudScore > 100 {
-		return ipQualityResult{}, errors.New("IPPure query failed: score is outside 0-100")
-	}
-
 	result := ipQualityResult{
 		IP:          official.IP,
 		ASN:         formatIPQualityASN(official.ASN, official.ASOrganization),
 		Locations:   make([]ipQualityLocation, 0, 3),
 		IPSource:    "unknown",
 		IPAttribute: "unknown",
-		Score:       *official.FraudScore,
-		ScoreTier:   ipQualityScoreTier(*official.FraudScore),
+		Score:       -1,
+		ScoreTier:   "unknown",
 		Errors:      make(map[string]string),
+	}
+	if official.FraudScore != nil {
+		if *official.FraudScore < 0 || *official.FraudScore > 100 {
+			return ipQualityResult{}, errors.New("IPPure query failed: score is outside 0-100")
+		}
+		result.Score = *official.FraudScore
+		result.ScoreTier = ipQualityScoreTier(*official.FraudScore)
+	} else {
+		result.Errors["IPPure"] = "response has no fraud score"
 	}
 	if official.IsBroadcast != nil {
 		result.IPSource = "native"

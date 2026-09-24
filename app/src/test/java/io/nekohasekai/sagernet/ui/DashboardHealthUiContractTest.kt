@@ -50,6 +50,18 @@ class DashboardHealthUiContractTest {
         assertFalse(fragment.contains("service()?.queryIpQuality(profileId) ?: error(\"Service disconnected\")"))
     }
 
+    @Test fun ipQualityFailureStaysStructuredAcrossBinderAndUi() {
+        val service = listOf(
+            File("src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt"),
+            File("app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt"),
+        ).first { it.isFile }.readText().replace("\r\n", "\n")
+        val fragment = source("ConfigurationFragment")
+        assertTrue(service.contains(".put(\"error\", e.readableMessage)"))
+        assertTrue(fragment.contains("value.optString(\"error\")"))
+        assertTrue(fragment.contains("runCatching { org.json.JSONObject(json) }"))
+        assertTrue(fragment.contains("R.string.ip_quality_result_without_score"))
+    }
+
     @Test fun updateShortcutUsesExistingUpdaterWithoutReplacingOtherActions() {
         val fragment = source("ConfigurationFragment")
         assertTrue(fragment.contains("GroupUpdater.executeUpdate(group, true)"))

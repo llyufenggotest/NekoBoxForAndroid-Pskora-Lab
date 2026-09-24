@@ -245,8 +245,13 @@ class BaseService {
             return proxy.box
         }
 
-        override fun queryIpQuality(profileId: Long): String =
-            requireDiagnosticBox(profileId).queryIPQuality()
+        override fun queryIpQuality(profileId: Long): String = try {
+            requireDiagnosticBox(profileId).queryIPQuality().orEmpty()
+        } catch (e: Exception) {
+            org.json.JSONObject()
+                .put("error", e.readableMessage)
+                .toString()
+        }
 
         override fun startSpeedTest(profileId: Long, streams: Int): String {
             val box = requireDiagnosticBox(profileId)

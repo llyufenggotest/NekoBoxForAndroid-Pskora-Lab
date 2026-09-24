@@ -72,15 +72,21 @@ func TestIPQualityKeepsPartialResultsWhenSourceFails(t *testing.T) {
 	}
 }
 
-func TestIPQualityRejectsMissingOfficialScore(t *testing.T) {
+func TestIPQualityKeepsOfficialIPWhenFraudScoreIsMissing(t *testing.T) {
 	server := newIPQualityServer(t, map[string]serverReply{
-		"/official": {body: `{"ip":"198.51.100.9","isBroadcast":false,"isResidential":false}`},
+		"/official":    {body: `{"ip":"198.51.100.9","asn":64496,"isBroadcast":false,"isResidential":false}`},
+		"/ip2location": {body: `{}`},
+		"/ipwhois":     {body: `{}`},
+		"/dbip":        {body: `{}`},
 	})
 	defer server.Close()
 
-	_, err := queryIPQuality(server.Client(), testIPQualityEndpoints(server.URL))
-	if err == nil || !strings.Contains(err.Error(), "no fraud score") {
-		t.Fatalf("error = %v, want missing fraud score", err)
+	result, err := queryIPQuality(server.Client(), testIPQualityEndpoints(server.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.IP != "198.51.100.9" || result.Score != -1 || result.ScoreTier != "unknown" {
+		t.Fatalf("unexpected partial result: %+v", result)
 	}
 }
 

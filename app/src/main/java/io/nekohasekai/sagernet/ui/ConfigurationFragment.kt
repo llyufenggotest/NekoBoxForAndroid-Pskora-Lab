@@ -598,9 +598,18 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
             if (!isAdded || !dialog.isShowing) return@launch
             raw.onSuccess { json ->
-                val value = org.json.JSONObject(json)
-                val score = value.optInt("score")
-                val tier = value.optString("scoreTier")
+                val value = runCatching { org.json.JSONObject(json) }.getOrElse {
+                    summary.setText(R.string.ip_quality_failed)
+                    details.text = "IP 质量服务返回了无效数据"
+                    return@onSuccess
+                }
+                value.optString("error").takeIf { it.isNotBlank() }?.let { error ->
+                    summary.setText(R.string.ip_quality_failed)
+                    details.text = error
+                    return@onSuccess
+                }
+                val score = value.optInt("score", -1)
+                val tier = value.optString("scoreTier", "unknown")
                 qualityTiers[profileId] = tier
                 refreshDiagnosticCards()
                 summary.text = "${value.optString("ip")} · ${ipAttributeChinese(value.optString("ipAttribute"))}"
@@ -617,7 +626,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         add("$flag ${place.optString("provider")}：$detail")
                     }
                 }.joinToString("\n")
-                details.text = getString(
+                details.text = if (score >= 0) getString(
                     R.string.ip_quality_result,
                     value.optString("asn"),
                     ipSourceChinese(value.optString("ipSource")),
@@ -625,12 +634,19 @@ class ConfigurationFragment @JvmOverloads constructor(
                     score,
                     ipQualityTierChinese(tier),
                     locationText,
+                ) else getString(
+                    R.string.ip_quality_result_without_score,
+                    value.optString("asn"),
+                    ipSourceChinese(value.optString("ipSource")),
+                    ipAttributeChinese(value.optString("ipAttribute")),
+                    locationText,
                 )
                 content.findViewById<android.widget.ImageView>(R.id.ip_quality_dialog_leaf)
                     .setColorFilter(requireContext().getColour(when (tier) {
                         "green" -> R.color.material_green_500
                         "yellow" -> R.color.material_amber_500
-                        else -> R.color.material_red_500
+                        "red" -> R.color.material_red_500
+                        else -> R.color.profile_card_icon
                     }))
             }.onFailure {
                 summary.setText(R.string.ip_quality_failed)
