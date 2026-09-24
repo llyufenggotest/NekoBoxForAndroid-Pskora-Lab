@@ -34,6 +34,13 @@ class DashboardHealthUiContractTest {
         assertFalse(fragment.contains("Color.parseColor(if (connected)"))
     }
 
+    @Test fun ipQualityWaitsForTransientForegroundServiceBinding() {
+        val fragment = source("ConfigurationFragment")
+        assertTrue(fragment.contains("private suspend fun awaitDiagnosticService"))
+        assertTrue(fragment.contains("awaitDiagnosticService()?.queryIpQuality(profileId)"))
+        assertFalse(fragment.contains("service()?.queryIpQuality(profileId) ?: error(\"Service disconnected\")"))
+    }
+
     @Test fun updateShortcutUsesExistingUpdaterWithoutReplacingOtherActions() {
         val fragment = source("ConfigurationFragment")
         assertTrue(fragment.contains("GroupUpdater.executeUpdate(group, true)"))

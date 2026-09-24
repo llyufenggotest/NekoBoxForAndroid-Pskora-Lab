@@ -36,6 +36,7 @@ import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.core.view.size
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceDataStore
@@ -428,6 +429,18 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     private fun service(): ISagerNetService? = (activity as? MainActivity)?.connection?.service
+
+    private suspend fun awaitDiagnosticService(timeoutMillis: Long = 2_000L): ISagerNetService? {
+        service()?.let { return it }
+        return withTimeoutOrNull(timeoutMillis) {
+            var diagnosticService: ISagerNetService? = null
+            while (diagnosticService == null) {
+                delay(50)
+                diagnosticService = service()
+            }
+            diagnosticService
+        }
+    }
     private val nodeLatencyTickets = ConcurrentHashMap<Long, Long>()
     private val nodeLatencySequence = AtomicLong()
 
@@ -535,7 +548,10 @@ class ConfigurationFragment @JvmOverloads constructor(
         dialog.show()
         viewLifecycleOwner.lifecycleScope.launch {
             val raw = withContext(Dispatchers.IO) {
-                runCatching { service()?.queryIpQuality(profileId) ?: error("Service disconnected") }
+                runCatching {
+                    awaitDiagnosticService()?.queryIpQuality(profileId)
+                        ?: error("VPN 服务正在重新连接，请稍后重试")
+                }
             }
             if (!isAdded || !dialog.isShowing) return@launch
             raw.onSuccess { json ->
