@@ -28,9 +28,11 @@ class ClipboardImportPerformanceContractTest {
     @Test
     fun bulkImportRefreshesEveryProfileInTheVisibleGroup() {
         val fragment = source("io/nekohasekai/sagernet/ui/ConfigurationFragment.kt")
-        assertTrue(fragment.contains("override suspend fun onBatchAdded(profiles: List<ProxyEntity>)"))
-        assertTrue(fragment.contains("profiles.filter { it.groupId == proxyGroup.id }"))
-        assertTrue(fragment.contains("notifyItemRangeInserted(start, added.size)"))
+        val configurationAdapter = fragment.substringAfter("inner class ConfigurationAdapter")
+            .substringBefore("val profileAccess = Mutex()")
+        assertTrue(configurationAdapter.contains("override suspend fun onBatchAdded(profiles: List<ProxyEntity>)"))
+        assertTrue(configurationAdapter.contains("profiles.none { it.groupId == proxyGroup.id }"))
+        assertTrue(configurationAdapter.contains("reloadProfiles()"))
         assertFalse(fragment.contains("if (profiles.isNotEmpty()) onMainDispatcher { reload(now = true) }"))
         assertTrue(fragment.contains("if (groupList.none { it.id == groupId })"))
     }

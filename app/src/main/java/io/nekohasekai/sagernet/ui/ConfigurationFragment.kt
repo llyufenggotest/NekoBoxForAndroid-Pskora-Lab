@@ -2585,24 +2585,8 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             override suspend fun onBatchAdded(profiles: List<ProxyEntity>) {
-                if (isGlobalSearch) {
-                    filterGlobal(searchQuery)
-                    return
-                }
-                val added = profiles.filter { it.groupId == proxyGroup.id }
-                if (added.isEmpty()) return
-                configurationListView.post {
-                    if (::undoManager.isInitialized) {
-                        undoManager.flush()
-                    }
-                    val start = configurationIdList.size
-                    added.forEach { profile ->
-                        configurationList[profile.id] = profile
-                        configurationIdList.add(profile.id)
-                    }
-                    notifyItemRangeInserted(start, added.size)
-                    refreshFromPosition(start - 1)
-                }
+                if (profiles.none { it.groupId == proxyGroup.id }) return
+                if (isGlobalSearch) filterGlobal(searchQuery) else reloadProfiles()
             }
 
             override suspend fun onUpdated(profile: ProxyEntity, noTraffic: Boolean) {
