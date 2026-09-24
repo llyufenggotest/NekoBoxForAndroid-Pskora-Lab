@@ -756,7 +756,10 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     private var lastGroupTabTapAt = 0L
-    private var lastGroupTabTapIndex = -1
+    private var lastGroupTabTapRawX = Float.NaN
+    private val groupTabDoubleTapSlop by lazy {
+        android.view.ViewConfiguration.get(requireContext()).scaledDoubleTapSlop
+    }
 
     private var suppressNextGroupLongPress = false
     private val GROUP_DOUBLE_TAP_LONG_PRESS_GUARD_MS = 700L
@@ -782,15 +785,19 @@ class ConfigurationFragment @JvmOverloads constructor(
         tab.view.setOnTouchListener { _, event ->
             if (event.actionMasked == MotionEvent.ACTION_DOWN) {
                 val now = SystemClock.elapsedRealtime()
-                if (lastGroupTabTapIndex == position && now - lastGroupTabTapAt in 1..350) {
+                if (groupTabDoubleTapMatches(
+                        lastGroupTabTapAt, now, lastGroupTabTapRawX, event.rawX, groupTabDoubleTapSlop
+                    )) {
                     suppressGroupLongPressForDoubleTapWindow()
                 }
                 false
             } else if (event.actionMasked == MotionEvent.ACTION_UP) {
                 val now = SystemClock.elapsedRealtime()
-                if (lastGroupTabTapIndex == position && now - lastGroupTabTapAt in 1..350) {
+                if (groupTabDoubleTapMatches(
+                        lastGroupTabTapAt, now, lastGroupTabTapRawX, event.rawX, groupTabDoubleTapSlop
+                    )) {
                     lastGroupTabTapAt = 0L
-                    lastGroupTabTapIndex = -1
+                    lastGroupTabTapRawX = Float.NaN
                     suppressGroupLongPressForDoubleTapWindow()
                     if (adapter.groupList.isEmpty()) return@setOnTouchListener true
                     val targetIndex = groupTabDoubleTapTarget(
@@ -804,7 +811,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     true
                 } else {
                     lastGroupTabTapAt = now
-                    lastGroupTabTapIndex = position
+                    lastGroupTabTapRawX = event.rawX
                     false
                 }
             } else false
