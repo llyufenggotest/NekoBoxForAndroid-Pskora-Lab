@@ -14,4 +14,7 @@ interface ISagerNetService {
   String reconfigureLog(int level);
   int urlTest();
   String getPreferredSelection(long profileId);
+  String queryIpQuality(long profileId);
+  String startSpeedTest(long profileId, int streams);
+  oneway void cancelSpeedTest();
 }

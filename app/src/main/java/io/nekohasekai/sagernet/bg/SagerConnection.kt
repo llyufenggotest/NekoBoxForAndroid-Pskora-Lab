@@ -43,6 +43,9 @@ class SagerConnection(
         fun cbSpeedUpdate(stats: SpeedDisplayData) {}
         suspend fun cbTrafficUpdate(data: TrafficDataBatch) {}
         fun cbSelectorUpdate(id: Long) {}
+        fun cbSpeedTestProgress(profileId: Long, phase: String, currentMBps: Double, peakMBps: Double, transferredBytes: Long) {}
+        fun cbSpeedTestComplete(profileId: Long, downloadMBps: Double, uploadMBps: Double) {}
+        fun cbSpeedTestError(profileId: Long, message: String) {}
 
         fun stateChanged(state: BaseService.State, profileName: String?, msg: String?)
 
@@ -91,6 +94,32 @@ class SagerConnection(
             runOnMainDispatcher {
                 callback.cbSelectorUpdate(id)
             }
+        }
+
+        override fun cbSpeedTestProgress(
+            profileId: Long, phase: String?, currentMBps: Double,
+            peakMBps: Double, transferredBytes: Long,
+        ) {
+            val callback = callback ?: return
+            runOnMainDispatcher {
+                callback.cbSpeedTestProgress(
+                    profileId, phase.orEmpty(), currentMBps, peakMBps, transferredBytes,
+                )
+            }
+        }
+
+        override fun cbSpeedTestComplete(
+            profileId: Long, downloadMBps: Double, uploadMBps: Double,
+        ) {
+            val callback = callback ?: return
+            runOnMainDispatcher {
+                callback.cbSpeedTestComplete(profileId, downloadMBps, uploadMBps)
+            }
+        }
+
+        override fun cbSpeedTestError(profileId: Long, message: String?) {
+            val callback = callback ?: return
+            runOnMainDispatcher { callback.cbSpeedTestError(profileId, message.orEmpty()) }
         }
 
         override fun missingPlugin(profileName: String, pluginName: String) {

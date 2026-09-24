@@ -4,4 +4,17 @@
 </style>
 <dimen name="lab_content_inset">20dp</dimen>
 <style name="LabCompactLabel" parent="TextAppearance.AppCompat.Small"><item name="android:textSize">12sp</item></style>
+<style name="LabProfileMetadata" parent="TextAppearance.AppCompat.Caption">
+    <item name="android:textSize">11sp</item>
+    <item name="android:fontFamily">sans</item>
+</style>
+<style name="ThemeOverlay.SagerNet.IpQualityDialog" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+    <item name="android:windowBackground">@drawable/bg_ip_quality_dialog</item>
+    <item name="backgroundTint">@color/ip_quality_dialog_surface</item>
+    <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.SagerNet.IpQualityDialog</item>
+</style>
+<style name="ShapeAppearanceOverlay.SagerNet.IpQualityDialog" parent="">
+    <item name="cornerFamily">rounded</item>
+    <item name="cornerSize">24dp</item>
+</style>
 </resources>

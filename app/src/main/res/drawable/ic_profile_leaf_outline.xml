@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="@color/profile_card_icon">
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M19.5,4.5C12,4.5 6,8.4 6,14c0,1.5 0.5,2.8 1.4,3.8M19.5,4.5C19.5,12 15.6,18 10,18c-1,0 -1.9,-0.2 -2.6,-0.6M19.5,4.5C14.4,8.1 10.7,12 7.4,17.4M7.4,17.4L4.5,20.3"
+        android:strokeColor="@color/profile_card_icon"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="1.7" />
+</vector>

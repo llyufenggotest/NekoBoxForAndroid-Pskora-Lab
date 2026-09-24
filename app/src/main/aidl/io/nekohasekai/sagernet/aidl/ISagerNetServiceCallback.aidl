@@ -9,4 +9,7 @@ oneway interface ISagerNetServiceCallback {
   void cbSpeedUpdate(in SpeedDisplayData stats);
   void cbTrafficUpdate(in TrafficDataBatch stats);
   void cbSelectorUpdate(long id);
+  void cbSpeedTestProgress(long profileId, String phase, double currentMBps, double peakMBps, long transferredBytes);
+  void cbSpeedTestComplete(long profileId, double downloadMBps, double uploadMBps);
+  void cbSpeedTestError(long profileId, String message);
 }

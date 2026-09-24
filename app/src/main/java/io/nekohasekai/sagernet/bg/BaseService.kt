@@ -25,6 +25,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import libcore.Libcore
+import libcore.SpeedTestListener
 import moe.matsuri.nb4a.Protocols
 import moe.matsuri.nb4a.utils.Util
 import java.net.UnknownHostException
@@ -117,6 +118,7 @@ class BaseService {
 
         fun changeState(s: State, msg: String? = null) {
             if (state == s && msg == null) return
+            if (s != State.Connected) proxy?.box?.cancelSpeedTest()
             state = s
             if (s != State.Connected) binder.clearPreferredSession()
             DataStore.serviceState = s
@@ -231,6 +233,56 @@ class BaseService {
             } catch (e: Exception) {
                 error(Protocols.genFriendlyMsg(e.readableMessage))
             }
+        }
+
+        private fun requireDiagnosticBox(profileId: Long): libcore.BoxInstance {
+            val current = data ?: error("Service disconnected")
+            val proxy = current.proxy ?: error("Core not started")
+            if (current.state != State.Connected || !proxy.isInitialized() ||
+                DataStore.currentProfile != profileId) {
+                error("Node is not the active connected profile")
+            }
+            return proxy.box
+        }
+
+        override fun queryIpQuality(profileId: Long): String =
+            requireDiagnosticBox(profileId).queryIPQuality()
+
+        override fun startSpeedTest(profileId: Long, streams: Int): String {
+            val box = requireDiagnosticBox(profileId)
+            return try {
+                box.startSpeedTest(streams, object : SpeedTestListener {
+                    override fun onSpeedTestProgress(
+                        phase: String?, currentMBps: Double, peakMBps: Double,
+                        transferredBytes: Long,
+                    ) {
+                        launch {
+                            broadcast {
+                                it.cbSpeedTestProgress(
+                                    profileId, phase, currentMBps, peakMBps, transferredBytes,
+                                )
+                            }
+                        }
+                    }
+
+                    override fun onSpeedTestComplete(downloadMBps: Double, uploadMBps: Double) {
+                        launch { broadcast { it.cbSpeedTestComplete(profileId, downloadMBps, uploadMBps) } }
+                    }
+
+                    override fun onSpeedTestError(message: String?) {
+                        launch {
+                            broadcast { it.cbSpeedTestError(profileId, message ?: "Speed test failed") }
+                        }
+                    }
+                })
+                ""
+            } catch (e: Exception) {
+                e.readableMessage
+            }
+        }
+
+        override fun cancelSpeedTest() {
+            data?.proxy?.box?.cancelSpeedTest()
         }
 
         fun stateChanged(s: State, msg: String?) = launch {

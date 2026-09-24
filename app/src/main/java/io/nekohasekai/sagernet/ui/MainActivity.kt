@@ -707,6 +707,9 @@ class MainActivity : ThemedActivity(),
     }
 
     override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {
+        if (state != BaseService.State.Connected) {
+            (currentMainFragment as? ConfigurationFragment)?.clearDiagnosticSessions()
+        }
         changeState(state, msg, true)
     }
 
@@ -750,6 +753,24 @@ class MainActivity : ThemedActivity(),
 
     override suspend fun cbTrafficUpdate(data: TrafficDataBatch) {
         ProfileManager.postUpdate(data.items)
+    }
+
+    override fun cbSpeedTestProgress(
+        profileId: Long, phase: String, currentMBps: Double,
+        peakMBps: Double, transferredBytes: Long,
+    ) {
+        (currentMainFragment as? ConfigurationFragment)
+            ?.updateSpeedTestProgress(profileId, phase, currentMBps, peakMBps)
+    }
+
+    override fun cbSpeedTestComplete(profileId: Long, downloadMBps: Double, uploadMBps: Double) {
+        (currentMainFragment as? ConfigurationFragment)
+            ?.updateSpeedTestComplete(profileId, downloadMBps, uploadMBps)
+    }
+
+    override fun cbSpeedTestError(profileId: Long, message: String) {
+        (currentMainFragment as? ConfigurationFragment)?.updateSpeedTestError(profileId, message)
+        snackbar(message).show()
     }
 
     override fun cbSelectorUpdate(id: Long) {

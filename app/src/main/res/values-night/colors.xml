@@ -51,4 +51,10 @@
     <color name="lab_control_success_foreground">#FF74DDB7</color>
     <color name="lab_divider">#33FFFFFF</color>
     <color name="lab_ring">#FF7D8796</color>
+
+    <color name="profile_card_icon">#FFC2CAD6</color>
+    <color name="profile_card_secondary">#FFB2BAC8</color>
+    <color name="profile_card_accent">#FF74DDB7</color>
+    <color name="ip_quality_dialog_surface">#FF20252D</color>
+    <color name="ip_quality_dialog_separator">#33FFFFFF</color>
 </resources>

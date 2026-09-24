@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.view.isVisible
 import android.content.Intent
 import io.nekohasekai.sagernet.fmt.toUniversalLink
 import io.nekohasekai.sagernet.GroupType
@@ -19,6 +20,7 @@ import androidx.appcompat.widget.PopupMenu
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.TrafficData
+import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.database.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -39,6 +41,7 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
     private var list: RecyclerView? = null
     private var status: TextView? = null
     private var generation = 0
+    private var activeMemberIds = emptySet<Long>()
     private fun rowId(row: Pair<ProxyEntity?, String>): Long = row.first?.id
         ?: (Long.MIN_VALUE + row.second.hashCode().toLong())
     private fun sortedRows(source: List<Pair<ProxyEntity?, String>>) = preferredMembersByLatency(
@@ -75,7 +78,9 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
         override fun onBindViewHolder(holder: Card, position: Int) {
             val (node, source) = rows[position]
             holder.name.text = node?.displayName() ?: source
-            holder.type.text = node?.let { "${it.displayType()} · $source" }.orEmpty()
+            holder.type.text = node?.displayType().orEmpty()
+            holder.preferredGroup.text = source
+            holder.preferredGroup.visibility = if (node == null) View.GONE else View.VISIBLE
             holder.type.setTextColor(node?.let { requireContext().getProtocolColor(it.type) }
                 ?: requireContext().getColorAttr(android.R.attr.textColorSecondary))
             // status/ping are the persisted test of this exact source ID. Never use owner.ping
@@ -87,6 +92,40 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
                 PreferredHealthTone.UNHEALTHY -> requireContext().getColour(R.color.material_red_500)
                 else -> requireContext().getColorAttr(android.R.attr.textColorSecondary)
             })
+            val ownerId = owner?.id ?: 0L
+            val ownerActions = nodeDiagnosticActions(
+                DataStore.serviceState,
+                ownerId,
+                DataStore.selectedProxy,
+                DataStore.currentProfile,
+            )
+            val isRuntimeMember = node?.id in activeMemberIds
+            val qualityVisible = ownerActions.qualityVisible && isRuntimeMember
+            val speedVisible = ownerActions.speedVisible && isRuntimeMember
+            holder.qualityControls.visibility =
+                if (qualityVisible || speedVisible || ownerActions.latencyEnabled) View.VISIBLE else View.GONE
+            holder.leaf.visibility = if (qualityVisible) View.VISIBLE else View.GONE
+            (holder.leaf as? android.widget.ImageButton)?.setColorFilter(
+                requireContext().getColour(when ((parentFragment as? ConfigurationFragment)?.qualityTier(ownerId)) {
+                    "green" -> R.color.material_green_500
+                    "yellow" -> R.color.material_amber_500
+                    "red" -> R.color.material_red_500
+                    else -> R.color.profile_card_icon
+                })
+            )
+            holder.speed.visibility = if (speedVisible) View.VISIBLE else View.GONE
+            holder.lightning.visibility = if (ownerActions.latencyEnabled && node != null) View.VISIBLE else View.GONE
+            holder.leaf.setOnClickListener {
+                (parentFragment as? ConfigurationFragment)?.showIPQualityForProfile(ownerId)
+            }
+            holder.speed.setOnClickListener {
+                (parentFragment as? ConfigurationFragment)?.startSpeedTestForProfile(ownerId, 1)
+            }
+            holder.speed.setOnLongClickListener {
+                (parentFragment as? ConfigurationFragment)?.startSpeedTestForProfile(ownerId, 8)
+                true
+            }
+            holder.lightning.setOnClickListener { node?.let { testSingleMember(it) } }
             listOf(R.id.edit, R.id.share, R.id.remove).forEach { id ->
                 holder.itemView.findViewById<View>(id).apply {
                     visibility = if (node != null && !requireArguments().getBoolean("select")) View.VISIBLE else View.GONE
@@ -109,7 +148,12 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
     private class Card(view: View) : RecyclerView.ViewHolder(view) {
         val name: TextView = view.findViewById(R.id.profile_name)
         val type: TextView = view.findViewById(R.id.profile_type)
+        val preferredGroup: TextView = view.findViewById(R.id.profile_preferred_group)
         val health: TextView = view.findViewById(R.id.profile_status)
+        val qualityControls: View = view.findViewById(R.id.profile_quality_controls)
+        val leaf: View = view.findViewById(R.id.profile_leaf)
+        val speed: View = view.findViewById(R.id.profile_speedometer)
+        val lightning: View = view.findViewById(R.id.profile_lightning)
         val menu: View = view.findViewById(R.id.double_column_menu)
         private val edit: View = view.findViewById(R.id.edit)
         private val share: View = view.findViewById(R.id.share)
@@ -133,9 +177,30 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
                 width = 0
                 weight = 1f
             }
-            val metadata = type.parent as LinearLayout
-            metadata.getChildAt(1).visibility = View.GONE
             view.findViewById<View>(R.id.content_lin).isFocusable = false
+        }
+    }
+
+    fun refreshDiagnosticCards() {
+        if (cards.itemCount > 0) cards.notifyItemRangeChanged(0, cards.itemCount, Unit)
+    }
+
+    private fun testSingleMember(profile: ProxyEntity) {
+        if (DataStore.serviceState != BaseService.State.Stopped &&
+            DataStore.serviceState != BaseService.State.Idle) return
+        val ticket = preferredTestResults.begin(profile.id, "URLTest")
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                profile.ping = io.nekohasekai.sagernet.bg.proto.UrlTest().doTest(profile)
+                profile.status = 1
+                profile.error = null
+            } catch (e: Exception) {
+                profile.status = 3
+                profile.error = e.readableMessage
+            }
+            preferredTestResults.complete(profile.id, ticket, profile.status, profile.ping)
+            ProfileManager.updateProfile(profile)
+            withContext(Dispatchers.Main) { refreshDiagnosticCards() }
         }
     }
 
@@ -199,12 +264,17 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
                         preferredRuntimeLabel(service, profileId) { snapshot = it }
                     }
                     if (owner?.id == profileId && DataStore.serviceState.connected && DataStore.currentProfile == profileId) {
+                        activeMemberIds = setOfNotNull(
+                            snapshot?.optLong("tcpId")?.takeIf { it > 0L },
+                            snapshot?.optLong("udpId")?.takeIf { it > 0L },
+                        )
                         preferredTestResults.replaceAutomatic(snapshot?.optString("session").orEmpty(),
                             snapshot?.let { readPreferredAutomatic(it) }.orEmpty())
                         status?.text = label
                         status?.visibility = View.VISIBLE
                     }
                 } else if (owner != null && rows.isNotEmpty()) {
+                    activeMemberIds = emptySet()
                     preferredTestResults.replaceAutomatic("", emptyMap())
                     status?.text = ""
                     status?.visibility = View.GONE

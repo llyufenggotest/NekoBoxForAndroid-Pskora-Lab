@@ -86,6 +86,10 @@ type BoxInstance struct {
 	v2api        *boxapi.SbV2rayServer
 	selector     *group.Selector
 	pauseManager pause.Manager
+
+	speedTestMu      sync.Mutex
+	speedTestSession *speedTestSession
+	speedTestRun     func(context.Context, int, SpeedTestListener, speedTestEndpoints) error
 }
 
 func NewSingBoxInstance(config string, localTransport LocalDNSTransport) (b *BoxInstance, err error) {
@@ -156,6 +160,7 @@ func (b *BoxInstance) Start() (err error) {
 }
 
 func (b *BoxInstance) Close() (err error) {
+	b.CancelSpeedTest()
 	b.access.Lock()
 	defer b.access.Unlock()
 

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.DialogInterface
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
@@ -53,6 +54,7 @@ import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.TrafficData
+import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.proto.TUN_NET_CLIENT_VERSION
 import io.nekohasekai.sagernet.bg.proto.UrlTest
@@ -317,6 +319,124 @@ class ConfigurationFragment @JvmOverloads constructor(
         dashboardPulse = null
     }
 
+    private var dashboardPeakUpload = 0L
+    private var dashboardPeakDownload = 0L
+    private val nodeRates = mutableMapOf<Long, Pair<Long, Long>>()
+    fun refreshDiagnosticCards() {
+        if (!::adapter.isInitialized) return
+        adapter.groupFragments.values.forEach { fragment ->
+            fragment.adapter?.let { child ->
+                if (child.itemCount > 0) child.notifyItemRangeChanged(0, child.itemCount, Unit)
+            }
+        }
+        adapter.preferredGroupFragments.values.forEach { it.refreshDiagnosticCards() }
+    }
+
+    fun updateSpeedTestProgress(profileId: Long, phase: String, currentMBps: Double, peakMBps: Double) {
+        speedTestRows[profileId] = SpeedTestCardState(phase, currentMBps, peakMBps, running = true)
+        refreshDiagnosticCards()
+    }
+
+    fun updateSpeedTestComplete(profileId: Long, downloadMBps: Double, uploadMBps: Double) {
+        speedTestRows[profileId] = SpeedTestCardState("complete", uploadMBps, maxOf(downloadMBps, uploadMBps), running = false, downloadMBps)
+        refreshDiagnosticCards()
+    }
+
+    fun updateSpeedTestError(profileId: Long, message: String) {
+        speedTestRows[profileId] = SpeedTestCardState("error", 0.0, 0.0, running = false, error = message)
+        refreshDiagnosticCards()
+    }
+
+    private data class SpeedTestCardState(
+        val phase: String,
+        val current: Double,
+        val peak: Double,
+        val running: Boolean,
+        val download: Double = 0.0,
+        val error: String = "",
+    )
+
+    private val speedTestRows = mutableMapOf<Long, SpeedTestCardState>()
+    private val qualityTiers = mutableMapOf<Long, String>()
+
+    fun qualityTier(profileId: Long): String? = qualityTiers[profileId]
+
+    fun clearDiagnosticSessions() {
+        nodeRates.clear()
+        speedTestRows.clear()
+        qualityTiers.clear()
+        dashboardPeakUpload = 0L
+        dashboardPeakDownload = 0L
+        refreshDiagnosticCards()
+    }
+
+    private fun service(): ISagerNetService? = (activity as? MainActivity)?.connection?.service
+
+    fun startSpeedTestForProfile(profileId: Long, streams: Int) {
+        runOnDefaultDispatcher {
+            val result = runCatching { service()?.startSpeedTest(profileId, streams) ?: "Service disconnected" }
+                .getOrElse { it.readableMessage }
+            if (result.isNotEmpty()) onMainDispatcher {
+                snackbar(result).show()
+            }
+        }
+    }
+
+    fun showIPQualityForProfile(profileId: Long) {
+        val content = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_ip_quality, null)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setView(content)
+            .create()
+        content.findViewById<View>(R.id.ip_quality_dialog_close).setOnClickListener { dialog.dismiss() }
+        val summary = content.findViewById<TextView>(R.id.ip_quality_dialog_summary)
+        val details = content.findViewById<TextView>(R.id.ip_quality_dialog_content)
+        summary.setText(R.string.ip_quality_loading)
+        details.text = ""
+        dialog.setOnShowListener {
+            dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        }
+        dialog.show()
+        viewLifecycleOwner.lifecycleScope.launch {
+            val raw = withContext(Dispatchers.IO) {
+                runCatching { service()?.queryIpQuality(profileId) ?: error("Service disconnected") }
+            }
+            if (!isAdded || !dialog.isShowing) return@launch
+            raw.onSuccess { json ->
+                val value = org.json.JSONObject(json)
+                val score = value.optInt("score")
+                val tier = value.optString("scoreTier")
+                qualityTiers[profileId] = tier
+                refreshDiagnosticCards()
+                summary.text = "${value.optString("ip")} · ${value.optString("ipAttribute")}"
+                val locations = value.optJSONArray("locations")
+                val locationText = buildList {
+                    if (locations != null) for (index in 0 until locations.length()) {
+                        val place = locations.getJSONObject(index)
+                        add("${place.optString("provider")}: ${listOf(place.optString("country"), place.optString("region"), place.optString("city")).filter { it.isNotBlank() }.joinToString(" · ")}")
+                    }
+                }.joinToString("\n")
+                details.text = getString(
+                    R.string.ip_quality_result,
+                    value.optString("asn"),
+                    value.optString("ipSource"),
+                    value.optString("ipAttribute"),
+                    score,
+                    tier,
+                    locationText,
+                )
+                content.findViewById<android.widget.ImageView>(R.id.ip_quality_dialog_leaf)
+                    .setColorFilter(requireContext().getColour(when (tier) {
+                        "green" -> R.color.material_green_500
+                        "yellow" -> R.color.material_amber_500
+                        else -> R.color.material_red_500
+                    }))
+            }.onFailure {
+                summary.setText(R.string.ip_quality_failed)
+                details.text = it.readableMessage
+            }
+        }
+    }
+
     fun updateDashboardSpeed(
         targetProfileId: Long,
         txRate: Long,
@@ -331,10 +451,17 @@ class ConfigurationFragment @JvmOverloads constructor(
             DataStore.selectedProxy
         }
         if (targetProfileId != activeProfileId) return
+        dashboardPeakUpload = maxOf(dashboardPeakUpload, txRate)
+        dashboardPeakDownload = maxOf(dashboardPeakDownload, rxRate)
+        nodeRates[targetProfileId] = txRate to rxRate
         dashboardUpload.text = android.text.format.Formatter.formatFileSize(requireContext(), txRate) + "/s"
         dashboardDownload.text = android.text.format.Formatter.formatFileSize(requireContext(), rxRate) + "/s"
         dashboardSessionUpload.text = android.text.format.Formatter.formatFileSize(requireContext(), txTotal)
         dashboardSessionDownload.text = android.text.format.Formatter.formatFileSize(requireContext(), rxTotal)
+        adapter.groupFragments.values.forEach { fragment ->
+            fragment.adapter?.refreshProfileState(setOf(targetProfileId))
+        }
+        adapter.preferredGroupFragments.values.forEach { it.refreshDiagnosticCards() }
     }
 
     fun updateDashboardConnectionTest(targetProfileId: Long, result: DashboardConnectionTestResult?, refreshState: Boolean = true) {
@@ -2781,6 +2908,14 @@ class ConfigurationFragment @JvmOverloads constructor(
             val profileType: TextView = view.findViewById(R.id.profile_type)
             val profileAddress: TextView = view.findViewById(R.id.profile_address)
             val profileStatus: TextView = view.findViewById(R.id.profile_status)
+            private val profileLatency: TextView = view.findViewById(R.id.profile_latency)
+            private val profileUploadSpeed: TextView = view.findViewById(R.id.profile_upload_speed)
+            private val profileDownloadSpeed: TextView = view.findViewById(R.id.profile_download_speed)
+            private val trafficRow: View = view.findViewById(R.id.profile_traffic_row)
+            private val qualityControls: View = view.findViewById(R.id.profile_quality_controls)
+            private val leafButton: View = view.findViewById(R.id.profile_leaf)
+            private val speedButton: View = view.findViewById(R.id.profile_speedometer)
+            private val lightningButton: View = view.findViewById(R.id.profile_lightning)
 
             private val card = view as MaterialCardView
             private val selectedIndicator: View = view.findViewById(R.id.selected_indicator)
@@ -2807,6 +2942,37 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 }
                 profileStatus.isFocusable = false
+                leafButton.setOnClickListener { showIPQualityForProfile(entity.id) }
+                speedButton.setOnClickListener {
+                    startSpeedTestForProfile(entity.id, 1)
+                }
+                speedButton.setOnLongClickListener {
+                    startSpeedTestForProfile(entity.id, 8)
+                    true
+                }
+                lightningButton.setOnClickListener {
+                    val profile = entity
+                    if (!nodeDiagnosticActions(
+                            DataStore.serviceState,
+                            profile.id,
+                            DataStore.selectedProxy,
+                            DataStore.currentProfile,
+                        ).latencyEnabled
+                    ) return@setOnClickListener
+                    runOnDefaultDispatcher {
+                        profile.status = 0
+                        ProfileManager.postUpdate(profile)
+                        try {
+                            profile.ping = UrlTest().doTest(profile)
+                            profile.status = 1
+                            profile.error = null
+                        } catch (e: Exception) {
+                            profile.status = 3
+                            profile.error = e.readableMessage
+                        }
+                        ProfileManager.updateProfile(profile)
+                    }
+                }
                 editButton.setOnClickListener {
                     val proxyEntity = entity
                     it.context.startActivity(
@@ -2927,6 +3093,19 @@ class ConfigurationFragment @JvmOverloads constructor(
                 profileName.text = bean.displayName()
                 profileType.text = proxyEntity.displayType()
                 profileType.setTextColor(requireContext().getProtocolColor(proxyEntity.type))
+                profileLatency.text = when (proxyEntity.status) {
+                    1 -> "⚡ ${proxyEntity.ping} ms"
+                    2, 3 -> "⚡ ${getString(R.string.unavailable)}"
+                    else -> "⚡"
+                }
+                profileLatency.setTextColor(
+                    requireContext().getColour(
+                        if (proxyEntity.status == 1) R.color.material_green_500
+                        else if (proxyEntity.status >= 2) R.color.material_red_500
+                        else R.color.profile_card_secondary
+                    )
+                )
+                profileLatency.isVisible = true
 
                 val address = if (pf.alwaysShowAddress && bean.name.isNotBlank()) {
                     bean.displayAddress()
@@ -3092,6 +3271,42 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
 
                 val selected = pf.isSelectedProfile(proxyEntity.id)
+                val actions = nodeDiagnosticActions(
+                    DataStore.serviceState,
+                    proxyEntity.id,
+                    DataStore.selectedProxy,
+                    DataStore.currentProfile,
+                )
+                lightningButton.isEnabled = actions.latencyEnabled
+                qualityControls.isVisible = actions.qualityVisible || actions.speedVisible || actions.latencyEnabled
+                leafButton.isVisible = actions.qualityVisible
+                (leafButton as? android.widget.ImageButton)?.setColorFilter(
+                    requireContext().getColour(when (qualityTiers[proxyEntity.id]) {
+                        "green" -> R.color.material_green_500
+                        "yellow" -> R.color.material_amber_500
+                        "red" -> R.color.material_red_500
+                        else -> R.color.profile_card_icon
+                    })
+                )
+                speedButton.isVisible = actions.speedVisible
+                lightningButton.isVisible = actions.latencyEnabled
+                val rates = nodeRates[proxyEntity.id]
+                val tested = speedTestRows[proxyEntity.id]
+                trafficRow.isVisible = actions.speedVisible && (rates != null || tested != null)
+                if (tested != null) {
+                    profileUploadSpeed.text = when {
+                        tested.error.isNotEmpty() -> tested.error
+                        tested.running -> "${tested.phase} ↑ ${"%.2f".format(tested.current)} MB/s"
+                        else -> "Peak ↑ ${"%.2f".format(tested.current)} MB/s"
+                    }
+                    profileDownloadSpeed.text = when {
+                        tested.running -> "Peak ${"%.2f".format(tested.peak)} MB/s"
+                        else -> "Peak ↓ ${"%.2f".format(tested.download)} MB/s"
+                    }
+                } else rates?.let { (tx, rx) ->
+                    profileUploadSpeed.text = "↑ " + android.text.format.Formatter.formatFileSize(requireContext(), tx) + "/s"
+                    profileDownloadSpeed.text = "↓ " + android.text.format.Formatter.formatFileSize(requireContext(), rx) + "/s"
+                }
                 val started =
                     selected && DataStore.serviceState.started && pf.isCurrentProfile(proxyEntity.id)
                 editButton.isEnabled = !started

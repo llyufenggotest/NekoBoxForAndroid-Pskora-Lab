@@ -347,4 +347,11 @@
     <color name="lab_divider">#1F8290A3</color>
     <color name="lab_ring">#FF858B96</color>
 
+    <!-- Semantic profile-card and IP-quality surfaces; paired in values-night. -->
+    <color name="profile_card_icon">#FF596273</color>
+    <color name="profile_card_secondary">#FF687082</color>
+    <color name="profile_card_accent">#FF287F65</color>
+    <color name="ip_quality_dialog_surface">#FFFFFFFF</color>
+    <color name="ip_quality_dialog_separator">#1F8290A3</color>
+
 </resources>
