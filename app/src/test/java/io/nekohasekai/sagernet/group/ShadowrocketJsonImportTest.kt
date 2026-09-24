@@ -2,28 +2,18 @@ package io.nekohasekai.sagernet.group
 
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
 import io.nekohasekai.sagernet.fmt.v2ray.VMessBean
-import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ShadowrocketJsonImportTest {
-    @Test fun shadowrocketVmessJsonImportsAsNativeBean() = runBlocking {
-        val json = """
-            {
-              "host":"103.242.3.46",
-              "type":"Vmess",
-              "method":"chacha20-poly1305",
-              "port":"9527",
-              "alterId":"0",
-              "title":"Hong Kong 2",
-              "password":"synthetic-uuid",
-              "udp":1,
-              "obfs":"none"
-            }
-        """.trimIndent()
-
-        val bean = RawUpdater.parseRaw(json).orEmpty().single() as VMessBean
+    @Test fun shadowrocketVmessJsonImportsAsNativeBean() {
+        val bean = RawUpdater.parseShadowrocketJson(JSONObject("""
+            {"host":"103.242.3.46","type":"Vmess","method":"chacha20-poly1305",
+             "port":"9527","alterId":"0","title":"Hong Kong 2",
+             "password":"synthetic-uuid","udp":1,"obfs":"none"}
+        """.trimIndent())) as VMessBean
         assertEquals("103.242.3.46", bean.serverAddress)
         assertEquals(9527, bean.serverPort)
         assertEquals("synthetic-uuid", bean.uuid)
@@ -32,25 +22,13 @@ class ShadowrocketJsonImportTest {
         assertEquals("Hong Kong 2", bean.name)
     }
 
-    @Test fun shadowrocketRealityVlessJsonImportsAsNativeBean() = runBlocking {
-        val json = """
-            {
-              "host":"jp.example",
-              "type":"VLESS",
-              "tls":true,
-              "tlsProfile":"chrome",
-              "port":"19012",
-              "peer":"www.example.com",
-              "password":"synthetic-uuid",
-              "publicKey":"synthetic-public-key",
-              "shortId":"0123456789abcdef",
-              "title":"JP-01",
-              "xtls":2,
-              "obfs":"none"
-            }
-        """.trimIndent()
-
-        val bean = RawUpdater.parseRaw(json).orEmpty().single() as VMessBean
+    @Test fun shadowrocketRealityVlessJsonImportsAsNativeBean() {
+        val bean = RawUpdater.parseShadowrocketJson(JSONObject("""
+            {"host":"jp.example","type":"VLESS","tls":true,"tlsProfile":"chrome",
+             "port":"19012","peer":"www.example.com","password":"synthetic-uuid",
+             "publicKey":"synthetic-public-key","shortId":"0123456789abcdef",
+             "title":"JP-01","xtls":2,"obfs":"none"}
+        """.trimIndent())) as VMessBean
         assertTrue(bean.isVLESS)
         assertEquals("tls", bean.security)
         assertEquals("www.example.com", bean.sni)
@@ -59,20 +37,11 @@ class ShadowrocketJsonImportTest {
         assertEquals("0123456789abcdef", bean.realityShortId)
     }
 
-    @Test fun shadowrocketTrojanJsonImportsAsNativeBean() = runBlocking {
-        val json = """
-            {
-              "host":"trojan.example",
-              "type":"Trojan",
-              "port":"443",
-              "title":"Taiwan",
-              "password":"synthetic-password",
-              "peer":"sni.example",
-              "tls":true
-            }
-        """.trimIndent()
-
-        val bean = RawUpdater.parseRaw(json).orEmpty().single() as TrojanBean
+    @Test fun shadowrocketTrojanJsonImportsAsNativeBean() {
+        val bean = RawUpdater.parseShadowrocketJson(JSONObject("""
+            {"host":"trojan.example","type":"Trojan","port":"443","title":"Taiwan",
+             "password":"synthetic-password","peer":"sni.example","tls":true}
+        """.trimIndent())) as TrojanBean
         assertEquals("trojan.example", bean.serverAddress)
         assertEquals(443, bean.serverPort)
         assertEquals("synthetic-password", bean.password)
@@ -81,7 +50,7 @@ class ShadowrocketJsonImportTest {
     }
 
     @Test fun singBoxTrojanJsonIsNotMisclassifiedAsShadowrocket() {
-        val json = org.json.JSONObject("""
+        val json = JSONObject("""
             {"type":"trojan","server":"node.example","server_port":443,
              "password":"synthetic","tls":{"enabled":true,"server_name":"sni.example"}}
         """.trimIndent())

@@ -362,7 +362,10 @@ private fun tryResolveVmess4Kitsunebi(server: String): VMessBean {
     if (indexSplit > 0) {
         result = result.substring(0, indexSplit)
     }
-    result = NGUtil.decode(result)
+    result = String(
+        Base64.getUrlDecoder().decode(result.padEnd((result.length + 3) / 4 * 4, '=')),
+        Charsets.UTF_8,
+    )
 
     val arr1 = result.split('@')
     if (arr1.count() != 2) {

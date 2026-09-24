@@ -17,7 +17,7 @@ class PreferredMemberOrderingTest {
         val results = PreferredTestResults(clock = { 1_000L })
         results.begin(2L, "URLTest")
         val members = listOf(Member(1, 0), Member(2, 1, 1), Member(3, 2), Member(4, 1, 50))
-        assertEquals(listOf(4L, 1L, 2L, 3L), preferredMembersByLatency(members,
+        assertEquals(listOf(2L, 4L, 1L, 3L), preferredMembersByLatency(members,
             id = { it.id }, persistedStatus = { it.persistedStatus }, persistedPing = { it.persistedPing },
             results = results).map { it.id })
     }
