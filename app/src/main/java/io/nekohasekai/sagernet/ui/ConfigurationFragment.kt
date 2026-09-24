@@ -2971,12 +2971,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 }
                 profileStatus.isFocusable = false
-                leafButton.setOnClickListener { showIPQualityForProfile(entity.id) }
+                leafButton.setOnClickListener { pf.showIPQualityForProfile(entity.id) }
                 speedButton.setOnClickListener {
-                    startSpeedTestForProfile(entity.id, 1)
+                    pf.startSpeedTestForProfile(entity.id, 1)
                 }
                 speedButton.setOnLongClickListener {
-                    startSpeedTestForProfile(entity.id, 8)
+                    pf.startSpeedTestForProfile(entity.id, 8)
                     true
                 }
                 lightningButton.setOnClickListener {
