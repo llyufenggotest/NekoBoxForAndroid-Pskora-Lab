@@ -80,7 +80,7 @@ object RawUpdater : GroupUpdater() {
                 else -> "tcp"
             }
             path = json.optString("path")
-            host = json.optString("obfsParam")
+            this.host = json.optString("obfsParam")
             security = if (json.optBoolean("tls", false) || json.optInt("xtls") > 0 ||
                 json.optString("publicKey").isNotBlank()) "tls" else "none"
             sni = json.optString("peer")
