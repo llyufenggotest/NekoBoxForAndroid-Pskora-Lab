@@ -391,64 +391,45 @@ internal fun parseShadowrocketLegacyLink(server: String): ShadowrocketLegacyLink
 
 // Shadowrocket/Kitsunebi legacy Base64-authority format.
 private fun tryResolveVmess4Kitsunebi(server: String): VMessBean {
-    // vmess://YXV0bzo1YWY1ZDBlYy02ZWEwLTNjNDMtOTNkYi1jYTMwMDg1MDNiZGJAMTgzLjIzMi41Ni4xNjE6MTIwMg
-    // ?remarks=*%F0%9F%87%AF%F0%9F%87%B5JP%20-355%20TG@moon365free&obfsParam=%7B%22Host%22:%22183.232.56.161%22%7D&path=/v2ray&obfs=websocket&alterId=0
-
-    var result = server.substringAfter("://")
-    val indexSplit = result.indexOf("?")
-    if (indexSplit > 0) {
-        result = result.substring(0, indexSplit)
-    }
-    result = String(
-        Base64.getUrlDecoder().decode(result.padEnd((result.length + 3) / 4 * 4, '=')),
-        Charsets.UTF_8,
-    )
-
-    val arr1 = result.split('@')
-    if (arr1.count() != 2) {
-        throw IllegalStateException("invalid kitsunebi format")
-    }
-    val arr21 = arr1[0].split(':')
-    val arr22 = arr1[1].split(':')
-    if (arr21.count() != 2) {
-        throw IllegalStateException("invalid kitsunebi format")
-    }
-
-    val isVless = server.startsWith("vless://", ignoreCase = true)
+    val parsed = parseShadowrocketLegacyLink(server)
+    val query = parsed.query
     return VMessBean().apply {
-        serverAddress = arr22[0]
-        serverPort = NGUtil.parseInt(arr22[1])
-        uuid = arr21[1]
-        if (isVless) {
+        serverAddress = parsed.server
+        serverPort = parsed.port
+        uuid = parsed.uuid
+        if (parsed.isVless) {
             alterId = -1
             encryption = ""
         } else {
-            encryption = arr21[0]
+            alterId = query["alterId"]?.toIntOrNull() ?: 0
+            encryption = parsed.encryption
         }
-        if (indexSplit < 0) return@apply
-
-        val url = ("https://localhost/path?" + server.substringAfter("?")).toHttpUrl()
-        url.queryParameter("remarks")?.apply { name = this }
-        if (!isVless) url.queryParameter("alterId")?.toIntOrNull()?.let { alterId = it }
-        url.queryParameter("path")?.apply { path = this }
-        if (url.queryParameter("tls") in listOf("1", "true")) security = "tls"
-        url.queryParameter("allowInsecure")
-            ?.apply { if (this == "1" || this == "true") allowInsecure = true }
-        url.queryParameter("obfs")?.apply {
-            type = this.replace("websocket", "ws").replace("none", "tcp")
-            if (type == "ws") {
-                url.queryParameter("obfsParam")?.takeIf { it.isNotBlank() }?.apply {
-                    host = if (startsWith("{")) JSONObject(this).getStr("Host").orEmpty() else this
-                }
-            }
+        name = query["remarks"].orEmpty()
+        path = query["path"].orEmpty()
+        security = if (query["tls"].isTruthy() || query["pbk"].orEmpty().isNotBlank()) "tls" else "none"
+        allowInsecure = query["allowInsecure"].isTruthy()
+        type = when (query["obfs"]?.lowercase()) {
+            "websocket", "ws" -> "ws"
+            "grpc" -> "grpc"
+            "http", "h2" -> "http"
+            else -> "tcp"
         }
-        url.queryParameter("peer")?.takeIf { it.isNotBlank() }?.let { sni = it }
-        url.queryParameter("fingerprint")?.takeIf { it.isNotBlank() }?.let { utlsFingerprint = it }
-        url.queryParameter("pbk")?.takeIf { it.isNotBlank() }?.let { realityPubKey = it }
-        url.queryParameter("sid")?.takeIf { it.isNotBlank() }?.let { realityShortId = it }
-        if (isVless && realityPubKey.isNotBlank()) security = "tls"
+        if (type == "ws") {
+            val obfsHost = query["obfsParam"].orEmpty()
+            host = if (obfsHost.startsWith("{")) {
+                runCatching { JSONObject(obfsHost).optString("Host") }.getOrDefault("")
+            } else obfsHost
+        }
+        sni = query["peer"].orEmpty()
+        utlsFingerprint = query["fingerprint"].orEmpty()
+        realityPubKey = query["pbk"].orEmpty()
+        realityShortId = query["sid"].orEmpty()
     }
 }
+
+private fun String?.isTruthy(): Boolean =
+    this.equals("1", ignoreCase = true) || this.equals("true", ignoreCase = true) ||
+        this.equals("yes", ignoreCase = true) || this.equals("on", ignoreCase = true)
 
 // SagerNet's
 // Do not support some format and then throw exception
