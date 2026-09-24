@@ -356,6 +356,10 @@ func runUpload(ctx context.Context, client *http.Client, uploadURL string, strea
 			requestBytes = defaultOoklaUploadBytes
 		}
 	}
+	return runUploadWithRequestBytes(ctx, client, uploadURL, streams, limits, listener, speedtestPayload, requestBytes, 0)
+}
+
+func runUploadWithRequestBytes(ctx context.Context, client *http.Client, uploadURL string, streams int, limits transferLimits, listener SpeedTestListener, speedtestPayload bool, requestBytes int64, retry int) (transferResult, error) {
 	// Multi-stream mode uses conservative per-request payloads: several
 	// Speedtest-Custom/Ookla servers close large concurrent POST bodies early.
 	if streams > 1 && requestBytes > 256*1024 {
@@ -370,7 +374,7 @@ func runUpload(ctx context.Context, client *http.Client, uploadURL string, strea
 	}
 	uploadLimits := limits
 	uploadLimits.requestBytes = requestBytes
-	return runTransfer(ctx, "upload", streams, uploadLimits, listener, true, func(ctx context.Context, allowance int64, report func(int64) int64, begin func(time.Time)) (int64, error) {
+	result, err := runTransfer(ctx, "upload", streams, uploadLimits, listener, true, func(ctx context.Context, allowance int64, report func(int64) int64, begin func(time.Time)) (int64, error) {
 		size := min(requestBytes, allowance)
 		requestURL := uploadURL
 		if !speedtestPayload {
@@ -413,6 +417,11 @@ func runUpload(ctx context.Context, client *http.Client, uploadURL string, strea
 		begin(requestStarted)
 		return report(confirmed), nil
 	})
+	if err != nil && result.bytes == 0 && !speedtestPayload && retry < 3 && ctx.Err() == nil && requestBytes > 64*1024 {
+		client.CloseIdleConnections()
+		return runUploadWithRequestBytes(ctx, client, uploadURL, max(1, streams/2), limits, listener, false, max(64*1024, requestBytes/2), retry+1)
+	}
+	return result, err
 }
 
 var errTransferLimit = errors.New("transfer byte limit reached")

@@ -55,10 +55,10 @@ class ProfileCardQualityResourcesContractTest {
 
         listOf("edit", "share", "remove", "profile_leaf", "profile_speedometer", "profile_lightning")
             .forEach { id -> assertTrue("$id missing", byId.containsKey(id)) }
-        assertEquals("9dp", byId.getValue("edit").android("padding"))
-        assertEquals("9dp", byId.getValue("remove").android("padding"))
-        assertEquals("7dp", byId.getValue("profile_leaf").android("padding"))
-        assertEquals("7dp", byId.getValue("profile_speedometer").android("padding"))
+        assertEquals("8dp", byId.getValue("edit").android("padding"))
+        assertEquals("8dp", byId.getValue("remove").android("padding"))
+        assertEquals("6dp", byId.getValue("profile_leaf").android("padding"))
+        assertEquals("6dp", byId.getValue("profile_speedometer").android("padding"))
     }
 
     @Test

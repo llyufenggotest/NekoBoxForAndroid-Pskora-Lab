@@ -93,7 +93,7 @@
                     android:focusable="true"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
-                    android:padding="7dp"
+                    android:padding="6dp"
                     android:visibility="gone"
                     app:srcCompat="@drawable/ic_profile_leaf_outline"
                     app:tint="@color/profile_card_icon" />
@@ -108,7 +108,7 @@
                     android:focusable="true"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
-                    android:padding="7dp"
+                    android:padding="6dp"
                     android:visibility="gone"
                     app:srcCompat="@drawable/ic_profile_speedometer_outline"
                     app:tint="@color/profile_card_icon" />
@@ -121,7 +121,7 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/edit"
                     android:focusable="true"
-                    android:padding="9dp"
+                    android:padding="8dp"
                     app:srcCompat="@drawable/ic_profile_edit_outline" />
 
                 <androidx.appcompat.widget.AppCompatImageView
@@ -132,7 +132,7 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/profile_more_actions_description"
                     android:focusable="true"
-                    android:padding="9dp"
+                    android:padding="8dp"
                     android:visibility="gone"
                     app:srcCompat="@drawable/ic_baseline_more_vert_24" />
 
@@ -150,7 +150,7 @@
                         android:id="@+id/share_layer"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:padding="9dp">
+                        android:padding="8dp">
 
                         <androidx.appcompat.widget.AppCompatImageView
                             android:id="@+id/shareIcon"
@@ -168,7 +168,7 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/delete"
                     android:focusable="true"
-                    android:padding="9dp"
+                    android:padding="8dp"
                     android:visibility="gone"
                     app:srcCompat="@drawable/ic_profile_delete_outline" />
             </LinearLayout>
@@ -258,7 +258,7 @@
                     android:contentDescription="@string/profile_lightning_description"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
-                    android:padding="3dp"
+                    android:padding="2dp"
                     app:srcCompat="@drawable/ic_profile_lightning_outline"
                     app:tint="@color/profile_card_icon" />
 

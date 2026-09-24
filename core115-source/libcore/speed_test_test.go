@@ -429,6 +429,40 @@ func TestSpeedtestUploadUsesFormPayload(t *testing.T) {
 	}
 }
 
+func TestGoogleFiberUploadRetriesClosedLargeBodyWithSmallerRequest(t *testing.T) {
+	const acceptedMax = int64(64 * 1024)
+	var attempts atomic.Int32
+	var accepted atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
+		if r.ContentLength > acceptedMax {
+			if hijacker, ok := w.(http.Hijacker); ok {
+				conn, _, err := hijacker.Hijack()
+				if err == nil {
+					_ = conn.Close()
+					return
+				}
+			}
+			panic("server cannot simulate early close")
+		}
+		n, _ := io.Copy(io.Discard, r.Body)
+		accepted.Add(n)
+		_, _ = fmt.Fprintf(w, "size=%d", n)
+	}))
+	defer srv.Close()
+
+	result, err := runUpload(context.Background(), srv.Client(), srv.URL+"/upload", 1, transferLimits{
+		duration: 300 * time.Millisecond,
+		maxBytes: 256 * 1024,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if attempts.Load() < 2 || accepted.Load() == 0 || result.bytes == 0 {
+		t.Fatalf("attempts=%d accepted=%d result=%d", attempts.Load(), accepted.Load(), result.bytes)
+	}
+}
+
 func TestGoogleFiberUploadCountsServerConfirmedBytes(t *testing.T) {
 	const requestBytes = int64(32 * 1024)
 	var observedMu sync.Mutex
