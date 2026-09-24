@@ -16,6 +16,8 @@ class GroupTabSyncContractTest {
         assertTrue(source.contains("val visibleGroupId = groupList.getOrNull(selectedGroupIndex)?.id"))
         assertTrue(source.contains("var selectedGroup = visibleGroupId"))
         assertTrue(source.contains("lastGroupTabTapAt"))
+        assertTrue(source.contains("suppressGroupLongPressForDoubleTapWindow"))
+        assertTrue(source.contains("GROUP_DOUBLE_TAP_LONG_PRESS_GUARD_MS"))
         assertTrue(source.contains("groupTabDoubleTapTarget("))
         assertTrue(source.contains("if (adapter.groupList.isEmpty()) return@setOnTouchListener true"))
         assertTrue(source.contains("event.rawX"))
@@ -26,5 +28,6 @@ class GroupTabSyncContractTest {
         assertTrue(source.contains("itemTouchHelper.startDrag(holder)"))
         assertTrue(source.contains("if (::itemTouchHelper.isInitialized && isEnabled"))
         assertTrue(source.contains("armManualDrag(view, this)"))
+        assertTrue(source.contains("showUpwardActionMenu("))
     }
 }

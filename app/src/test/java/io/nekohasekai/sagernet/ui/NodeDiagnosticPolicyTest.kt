@@ -6,11 +6,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NodeDiagnosticPolicyTest {
-    @Test fun latencyOnlyWorksWhileStopped() {
+    @Test fun latencyWorksInEveryServiceState() {
         assertTrue(nodeDiagnosticActions(BaseService.State.Stopped, 7, 7, 0).latencyEnabled)
-        assertFalse(nodeDiagnosticActions(BaseService.State.Connecting, 7, 7, 0).latencyEnabled)
-        assertFalse(nodeDiagnosticActions(BaseService.State.Connected, 7, 7, 7).latencyEnabled)
-        assertFalse(nodeDiagnosticActions(BaseService.State.Stopping, 7, 7, 0).latencyEnabled)
+        assertTrue(nodeDiagnosticActions(BaseService.State.Idle, 7, 7, 0).latencyEnabled)
+        assertTrue(nodeDiagnosticActions(BaseService.State.Connecting, 7, 7, 0).latencyEnabled)
+        assertTrue(nodeDiagnosticActions(BaseService.State.Connected, 7, 7, 7).latencyEnabled)
+        assertTrue(nodeDiagnosticActions(BaseService.State.Stopping, 7, 7, 0).latencyEnabled)
     }
 
     @Test fun qualityAndSpeedRequireConnectedSelectedActiveNode() {

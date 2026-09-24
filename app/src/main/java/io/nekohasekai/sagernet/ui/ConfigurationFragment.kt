@@ -429,6 +429,23 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     private fun service(): ISagerNetService? = (activity as? MainActivity)?.connection?.service
 
+    fun testNodeLatency(profile: ProxyEntity, mode: NodeLatencyMode = NodeLatencyMode.URL_TEST) {
+        runOnDefaultDispatcher {
+            profile.status = 0
+            profile.error = null
+            ProfileManager.postUpdate(profile)
+            try {
+                profile.ping = runNodeLatency(profile, mode)
+                profile.status = 1
+                profile.error = null
+            } catch (e: Exception) {
+                profile.status = 3
+                profile.error = e.readableMessage
+            }
+            ProfileManager.updateProfile(profile)
+        }
+    }
+
     fun startSpeedTestForProfile(profileId: Long, streams: Int) {
         if (DataStore.groupLayoutMode == 1) showSpeedTestDialog(profileId)
         runOnDefaultDispatcher {
@@ -731,6 +748,15 @@ class ConfigurationFragment @JvmOverloads constructor(
     private var lastGroupTabTapIndex = -1
 
     private var suppressNextGroupLongPress = false
+    private val GROUP_DOUBLE_TAP_LONG_PRESS_GUARD_MS = 700L
+
+    private fun suppressGroupLongPressForDoubleTapWindow() {
+        suppressNextGroupLongPress = true
+        tabLayout.removeCallbacks(clearGroupLongPressSuppression)
+        tabLayout.postDelayed(clearGroupLongPressSuppression, GROUP_DOUBLE_TAP_LONG_PRESS_GUARD_MS)
+    }
+
+    private val clearGroupLongPressSuppression = Runnable { suppressNextGroupLongPress = false }
 
     private fun installGroupTabInteractions(tab: TabLayout.Tab, position: Int) {
         tab.view.setOnLongClickListener {
@@ -743,13 +769,18 @@ class ConfigurationFragment @JvmOverloads constructor(
             true
         }
         tab.view.setOnTouchListener { _, event ->
-            if (event.actionMasked == MotionEvent.ACTION_UP) {
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                val now = SystemClock.elapsedRealtime()
+                if (lastGroupTabTapIndex == position && now - lastGroupTabTapAt in 1..350) {
+                    suppressGroupLongPressForDoubleTapWindow()
+                }
+                false
+            } else if (event.actionMasked == MotionEvent.ACTION_UP) {
                 val now = SystemClock.elapsedRealtime()
                 if (lastGroupTabTapIndex == position && now - lastGroupTabTapAt in 1..350) {
                     lastGroupTabTapAt = 0L
                     lastGroupTabTapIndex = -1
-                    suppressNextGroupLongPress = true
-                    tab.view.postDelayed({ suppressNextGroupLongPress = false }, 450L)
+                    suppressGroupLongPressForDoubleTapWindow()
                     if (adapter.groupList.isEmpty()) return@setOnTouchListener true
                     val targetIndex = groupTabDoubleTapTarget(
                         event.rawX,
@@ -3096,27 +3127,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                     true
                 }
                 lightningButton.setOnClickListener {
-                    val profile = entity
-                    if (!nodeDiagnosticActions(
-                            DataStore.serviceState,
-                            profile.id,
-                            DataStore.selectedProxy,
-                            DataStore.currentProfile,
-                        ).latencyEnabled
-                    ) return@setOnClickListener
-                    runOnDefaultDispatcher {
-                        profile.status = 0
-                        ProfileManager.postUpdate(profile)
-                        try {
-                            profile.ping = UrlTest().doTest(profile)
-                            profile.status = 1
-                            profile.error = null
-                        } catch (e: Exception) {
-                            profile.status = 3
-                            profile.error = e.readableMessage
-                        }
-                        ProfileManager.updateProfile(profile)
-                    }
+                    lightningButton.playGreenPulse()
+                    configuration?.testNodeLatency(entity, nodeLatencyMode(longPress = false))
+                }
+                lightningButton.setOnLongClickListener {
+                    lightningButton.playGreenPulse()
+                    configuration?.testNodeLatency(entity, nodeLatencyMode(longPress = true))
+                    true
                 }
                 editButton.setOnClickListener {
                     val proxyEntity = entity
@@ -3205,50 +3222,39 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             private fun showDoubleColumnMenu(anchor: View, proxyEntity: ProxyEntity) {
-                val popup = PopupMenu(requireContext(), anchor)
-                popup.menuInflater.inflate(R.menu.double_column_item_menu, popup.menu)
-                if (select) popup.menu.removeItem(R.id.action_delete)
                 val actions = nodeDiagnosticActions(
                     DataStore.serviceState,
                     proxyEntity.id,
                     DataStore.selectedProxy,
                     DataStore.currentProfile,
                 )
-                popup.menu.findItem(R.id.action_ip_quality).isVisible = actions.qualityVisible
-                popup.menu.findItem(R.id.action_speed_test).isVisible = actions.speedVisible
-                popup.setForceShowIcon(true)
-                popup.setOnMenuItemClickListener { menuItem ->
-                    when (menuItem.itemId) {
-                        R.id.action_ip_quality -> {
-                            (parentFragment as? ConfigurationFragment)
-                                ?.showIPQualityForProfile(proxyEntity.id)
-                            true
-                        }
-                        R.id.action_speed_test -> {
-                            (parentFragment as? ConfigurationFragment)
-                                ?.startSpeedTestForProfile(proxyEntity.id, nodeSpeedTestStreams(false))
-                            true
-                        }
-                        R.id.action_edit -> {
-                            anchor.context.startActivity(
-                                proxyEntity.settingIntent(
-                                    anchor.context, proxyGroup.type == GroupType.SUBSCRIPTION
-                                )
+                showUpwardActionMenu(
+                    anchor,
+                    listOf(
+                        UpwardAction(R.id.action_ip_quality, getString(R.string.profile_leaf_description),
+                            R.drawable.ic_profile_leaf_outline, actions.qualityVisible),
+                        UpwardAction(R.id.action_speed_test, getString(R.string.profile_speedometer_description),
+                            R.drawable.ic_profile_speedometer_outline, actions.speedVisible),
+                        UpwardAction(R.id.action_edit, getString(R.string.edit), R.drawable.ic_profile_edit_outline),
+                        UpwardAction(R.id.action_share, getString(R.string.share), R.drawable.ic_profile_share_outline),
+                        UpwardAction(R.id.action_delete, getString(R.string.delete),
+                            R.drawable.ic_profile_delete_outline, !select),
+                    ),
+                ) { actionId ->
+                    when (actionId) {
+                        R.id.action_ip_quality -> (parentFragment as? ConfigurationFragment)
+                            ?.showIPQualityForProfile(proxyEntity.id)
+                        R.id.action_speed_test -> (parentFragment as? ConfigurationFragment)
+                            ?.startSpeedTestForProfile(proxyEntity.id, nodeSpeedTestStreams(false))
+                        R.id.action_edit -> anchor.context.startActivity(
+                            proxyEntity.settingIntent(
+                                anchor.context, proxyGroup.type == GroupType.SUBSCRIPTION
                             )
-                            true
-                        }
-                        R.id.action_share -> {
-                            showShareMenu(anchor, proxyEntity)
-                            true
-                        }
-                        R.id.action_delete -> {
-                            removeProfile(proxyEntity)
-                            true
-                        }
-                        else -> false
+                        )
+                        R.id.action_share -> showShareMenu(anchor, proxyEntity)
+                        R.id.action_delete -> removeProfile(proxyEntity)
                     }
                 }
-                popup.show()
             }
 
             private fun applySelected(selected: Boolean) {
@@ -3390,6 +3396,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     DataStore.currentProfile,
                 )
                 lightningButton.isEnabled = actions.latencyEnabled
+                lightningButton.alpha = 1f
                 leafButton.isVisible = !isDoubleColumn && actions.qualityVisible
                 (leafButton as? android.widget.ImageButton)?.setColorFilter(
                     requireContext().getColour(when (pf.qualityTiers[proxyEntity.id]) {
@@ -3402,9 +3409,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 speedButton.isVisible = !isDoubleColumn && actions.speedVisible
                 lightningButton.isVisible = true
                 (lightningButton as? android.widget.ImageButton)?.setColorFilter(
-                    requireContext().getColour(
-                        if (actions.latencyEnabled) R.color.profile_card_icon else R.color.profile_card_secondary
-                    )
+                    requireContext().getColorAttr(android.R.attr.textColorPrimary)
                 )
                 val rates: Pair<Long, Long>? = pf.nodeRates[proxyEntity.id]
                 val tested: SpeedTestCardState? = pf.speedTestRows[proxyEntity.id]

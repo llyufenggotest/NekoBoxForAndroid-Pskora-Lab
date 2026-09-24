@@ -16,7 +16,6 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
-import androidx.appcompat.widget.PopupMenu
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.TrafficData
@@ -125,10 +124,9 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
             holder.downloadSpeed.visibility = if (speedVisible && holder.downloadSpeed.text.isNotEmpty()) View.VISIBLE else View.GONE
             holder.lightning.visibility = if (node != null) View.VISIBLE else View.GONE
             holder.lightning.isEnabled = ownerActions.latencyEnabled
+            holder.lightning.alpha = 1f
             (holder.lightning as? android.widget.ImageButton)?.setColorFilter(
-                requireContext().getColour(
-                    if (ownerActions.latencyEnabled) R.color.profile_card_icon else R.color.profile_card_secondary
-                )
+                requireContext().getColorAttr(android.R.attr.textColorPrimary)
             )
             holder.leaf.setOnClickListener {
                 (parentFragment as? ConfigurationFragment)?.showIPQualityForProfile(ownerId)
@@ -144,7 +142,15 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
                     ?.startSpeedTestForProfile(ownerId, nodeSpeedTestStreams(true))
                 true
             }
-            holder.lightning.setOnClickListener { node?.let { testSingleMember(it) } }
+            holder.lightning.setOnClickListener {
+                holder.lightning.playGreenPulse()
+                node?.let { testSingleMember(it, nodeLatencyMode(longPress = false)) }
+            }
+            holder.lightning.setOnLongClickListener {
+                holder.lightning.playGreenPulse()
+                node?.let { testSingleMember(it, nodeLatencyMode(longPress = true)) }
+                true
+            }
             listOf(R.id.edit, R.id.share, R.id.remove).forEach { id ->
                 holder.itemView.findViewById<View>(id).apply {
                     visibility = if (node != null && !requireArguments().getBoolean("select")) View.VISIBLE else View.GONE
@@ -225,13 +231,14 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
         if (cards.itemCount > 0) cards.notifyItemRangeChanged(0, cards.itemCount, Unit)
     }
 
-    private fun testSingleMember(profile: ProxyEntity) {
-        if (DataStore.serviceState != BaseService.State.Stopped &&
-            DataStore.serviceState != BaseService.State.Idle) return
-        val ticket = preferredTestResults.begin(profile.id, "URLTest")
+    private fun testSingleMember(profile: ProxyEntity, mode: NodeLatencyMode) {
+        val ticket = preferredTestResults.begin(
+            profile.id,
+            if (mode == NodeLatencyMode.TCP) "TCPing" else "URLTest",
+        )
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
             try {
-                profile.ping = io.nekohasekai.sagernet.bg.proto.UrlTest().doTest(profile)
+                profile.ping = runNodeLatency(profile, mode)
                 profile.status = 1
                 profile.error = null
             } catch (e: Exception) {
@@ -365,30 +372,32 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
         }
     }
     private fun showDoubleColumnMenu(anchor: View, node: ProxyEntity) {
-        PopupMenu(requireContext(), anchor).apply {
-            menuInflater.inflate(R.menu.double_column_item_menu, menu)
-            val ownerId = owner?.id ?: 0L
-            val active = node.id in activeMemberIds
-            val actions = nodeDiagnosticActions(
-                DataStore.serviceState, ownerId, DataStore.selectedProxy, DataStore.currentProfile,
-            )
-            menu.findItem(R.id.action_ip_quality).isVisible = active && actions.qualityVisible
-            menu.findItem(R.id.action_speed_test).isVisible = active && actions.speedVisible
-            setForceShowIcon(true)
-            setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    R.id.action_ip_quality -> (parentFragment as? ConfigurationFragment)
-                        ?.showIPQualityForProfile(ownerId)
-                    R.id.action_speed_test -> (parentFragment as? ConfigurationFragment)
-                        ?.startSpeedTestForProfile(ownerId, nodeSpeedTestStreams(false))
-                    R.id.action_edit -> sourceAction(node, R.id.edit)
-                    R.id.action_share -> sourceAction(node, R.id.share)
-                    R.id.action_delete -> sourceAction(node, R.id.remove)
-                    else -> return@setOnMenuItemClickListener false
-                }
-                true
+        val ownerId = owner?.id ?: 0L
+        val active = node.id in activeMemberIds
+        val actions = nodeDiagnosticActions(
+            DataStore.serviceState, ownerId, DataStore.selectedProxy, DataStore.currentProfile,
+        )
+        showUpwardActionMenu(
+            anchor,
+            listOf(
+                UpwardAction(R.id.action_ip_quality, getString(R.string.profile_leaf_description),
+                    R.drawable.ic_profile_leaf_outline, active && actions.qualityVisible),
+                UpwardAction(R.id.action_speed_test, getString(R.string.profile_speedometer_description),
+                    R.drawable.ic_profile_speedometer_outline, active && actions.speedVisible),
+                UpwardAction(R.id.action_edit, getString(R.string.edit), R.drawable.ic_profile_edit_outline),
+                UpwardAction(R.id.action_share, getString(R.string.share), R.drawable.ic_profile_share_outline),
+                UpwardAction(R.id.action_delete, getString(R.string.delete), R.drawable.ic_profile_delete_outline),
+            ),
+        ) { actionId ->
+            when (actionId) {
+                R.id.action_ip_quality -> (parentFragment as? ConfigurationFragment)
+                    ?.showIPQualityForProfile(ownerId)
+                R.id.action_speed_test -> (parentFragment as? ConfigurationFragment)
+                    ?.startSpeedTestForProfile(ownerId, nodeSpeedTestStreams(false))
+                R.id.action_edit -> sourceAction(node, R.id.edit)
+                R.id.action_share -> sourceAction(node, R.id.share)
+                R.id.action_delete -> sourceAction(node, R.id.remove)
             }
-            show()
         }
     }
 
