@@ -10,15 +10,15 @@ class PreferredTestResultsPriorityTest {
         val results = PreferredTestResults(clock = { now }, manualPriorityMillis = { 300_000L })
         results.replaceAutomatic("session", mapOf(7L to PreferredAutoSample(900L, 80)))
         val ticket = results.begin(7L, "URLTest")
-        assertEquals("URLTest · 测试中", results.label(7L))
+        assertEquals(null, results.label(7L))
 
         // A batch begun before manual completion may arrive later; it must not win.
         results.replaceAutomatic("session", mapOf(7L to PreferredAutoSample(950L, 30)))
         now = 1_100L
         results.complete(7L, ticket, 1, 42)
-        assertEquals("URLTest · 42 ms", results.label(7L))
+        assertEquals("42 ms", results.label(7L))
         results.replaceAutomatic("session", mapOf(7L to PreferredAutoSample(1_050L, 25)))
-        assertEquals("URLTest · 42 ms", results.label(7L))
+        assertEquals("42 ms", results.label(7L))
     }
 
     @Test fun newerPeriodicAutomaticTakesOverAfterOneInterval() {
@@ -30,7 +30,7 @@ class PreferredTestResultsPriorityTest {
 
         now += interval - 1
         results.replaceAutomatic("session", mapOf(7L to PreferredAutoSample(now, 20)))
-        assertEquals("TCPing · 42 ms", results.label(7L))
+        assertEquals("42 ms", results.label(7L))
 
         now += 1
         results.replaceAutomatic("session", mapOf(7L to PreferredAutoSample(now, 19)))
@@ -49,7 +49,7 @@ class PreferredTestResultsPriorityTest {
         results.complete(3L, second, 2, 0)
         now += 59_999L
         results.replaceAutomatic("session", mapOf(3L to PreferredAutoSample(now, 11)))
-        assertEquals("URLTest · 测试失败", results.label(3L))
+        assertEquals(null, results.label(3L))
         now += 1L
         results.replaceAutomatic("session", mapOf(3L to PreferredAutoSample(now, 10)))
         assertEquals("10 ms", results.label(3L))

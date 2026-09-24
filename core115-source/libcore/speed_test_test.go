@@ -1,11 +1,14 @@
 package libcore
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -146,6 +149,28 @@ func TestNormalizeSpeedTestStreams(t *testing.T) {
 	}
 }
 
+func TestTargetFromServerUsesBackendPayloadEndpoints(t *testing.T) {
+	speedtest, probe, err := targetFromServer("https://example.com/speedtest/upload.php", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if speedtest.downloadURL != "https://example.com/speedtest/random3000x3000.jpg" ||
+		speedtest.uploadURL != "https://example.com/speedtest/upload.php" ||
+		probe != "https://example.com/speedtest/latency.txt" {
+		t.Fatalf("speedtest target=%+v probe=%q", speedtest, probe)
+	}
+
+	ookla, probe, err := targetFromServer("http://fiber.example:8080/speedtest/upload.php", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ookla.downloadURL != "http://fiber.example:8080/download?size=25000000" ||
+		ookla.uploadURL != "http://fiber.example:8080/upload" ||
+		probe != "http://fiber.example:8080/ping" {
+		t.Fatalf("ookla target=%+v probe=%q", ookla, probe)
+	}
+}
+
 func TestRaceBackendsChoosesFirstSuccessfulProbeAndCancelsLoser(t *testing.T) {
 	loserCanceled := make(chan struct{})
 	backends := []speedBackend{
@@ -196,14 +221,14 @@ func TestRunTransferBoundsStreamsBytesAndReportsCurrentAndPeak(t *testing.T) {
 
 	recorder := &progressRecorder{}
 	limits := transferLimits{duration: 2 * time.Second, maxBytes: 256 * 1024, reportEvery: 10 * time.Millisecond}
-	result, err := runDownload(context.Background(), srv.Client(), srv.URL, 4, limits, recorder)
+	result, err := runDownload(context.Background(), srv.Client(), srv.URL, 8, limits, recorder)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result.bytes <= 0 || result.bytes > limits.maxBytes {
 		t.Fatalf("transferred %d bytes, cap %d", result.bytes, limits.maxBytes)
 	}
-	if peakActive.Load() > 4 || peakActive.Load() < 2 {
+	if peakActive.Load() > 8 || peakActive.Load() < 2 {
 		t.Fatalf("peak concurrent requests = %d", peakActive.Load())
 	}
 	recorder.mu.Lock()
@@ -217,6 +242,117 @@ func TestRunTransferBoundsStreamsBytesAndReportsCurrentAndPeak(t *testing.T) {
 			t.Fatalf("invalid current/peak progress: %#v after peak %f", p, previousPeak)
 		}
 		previousPeak = p.peak
+	}
+}
+
+func TestDownloadReadsOneLargeResponsePastUploadRequestSize(t *testing.T) {
+	const responseBytes = int64(2 * 1024 * 1024)
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		_, _ = io.CopyN(w, zeroReader{}, responseBytes)
+	}))
+	defer srv.Close()
+
+	limits := transferLimits{
+		duration:     time.Second,
+		maxBytes:     responseBytes,
+		requestBytes: 64 * 1024,
+	}
+	result, err := runDownload(context.Background(), srv.Client(), srv.URL, 1, limits, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.bytes != responseBytes {
+		t.Fatalf("downloaded %d bytes, want %d", result.bytes, responseBytes)
+	}
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("GET requests = %d, want 1; download was capped to requestBytes", got)
+	}
+}
+
+type liveProgressListener struct {
+	nonzero chan int64
+}
+
+func (l *liveProgressListener) OnSpeedTestProgress(_ string, _, _ float64, transferredBytes int64) {
+	if transferredBytes == 0 {
+		return
+	}
+	select {
+	case l.nonzero <- transferredBytes:
+	default:
+	}
+}
+func (*liveProgressListener) OnSpeedTestComplete(float64, float64) {}
+func (*liveProgressListener) OnSpeedTestError(string)              {}
+
+func TestDownloadReportsBytesWhileResponseIsStillStreaming(t *testing.T) {
+	responseFinished := make(chan struct{})
+	var finishOnce sync.Once
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		defer finishOnce.Do(func() { close(responseFinished) })
+		flusher := w.(http.Flusher)
+		chunk := make([]byte, 64*1024)
+		for range 8 {
+			_, _ = w.Write(chunk)
+			flusher.Flush()
+			time.Sleep(25 * time.Millisecond)
+		}
+	}))
+	defer srv.Close()
+
+	listener := &liveProgressListener{nonzero: make(chan int64, 1)}
+	done := make(chan error, 1)
+	go func() {
+		_, err := runDownload(context.Background(), srv.Client(), srv.URL, 1, transferLimits{
+			duration:    time.Second,
+			maxBytes:    8 * 64 * 1024,
+			reportEvery: 10 * time.Millisecond,
+		}, listener)
+		done <- err
+	}()
+
+	select {
+	case n := <-listener.nonzero:
+		if n <= 0 {
+			t.Fatalf("nonzero progress reported %d bytes", n)
+		}
+		select {
+		case <-responseFinished:
+			t.Fatal("first nonzero progress arrived only after the response completed")
+		default:
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("no live nonzero progress while response was streaming")
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDownloadAverageExcludesTimeBeforeFirstByte(t *testing.T) {
+	const chunkBytes = 256 * 1024
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		flusher := w.(http.Flusher)
+		for range 4 {
+			_, _ = w.Write(make([]byte, chunkBytes))
+			flusher.Flush()
+			time.Sleep(20 * time.Millisecond)
+		}
+	}))
+	defer srv.Close()
+
+	result, err := runDownload(context.Background(), srv.Client(), srv.URL, 1, transferLimits{
+		duration: time.Second,
+		maxBytes: 4 * chunkBytes,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.mbps < 8 {
+		t.Fatalf("average %.2f MB/s includes the 200ms wait before first byte", result.mbps)
 	}
 }
 
@@ -246,6 +382,7 @@ func TestUploadUsesRequestedStreamsAndCapsBodyBytes(t *testing.T) {
 		n, _ := io.Copy(io.Discard, r.Body)
 		bytes.Add(n)
 		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprintf(w, "size=%d", n)
 	}))
 	defer srv.Close()
 
@@ -259,6 +396,77 @@ func TestUploadUsesRequestedStreamsAndCapsBodyBytes(t *testing.T) {
 	}
 	if requests.Load() < 3 {
 		t.Fatalf("requests=%d, want at least one per stream", requests.Load())
+	}
+}
+
+func TestSpeedtestUploadUsesFormPayload(t *testing.T) {
+	const requestBytes = int64(32 * 1024)
+	var contentType string
+	var body []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		contentType = r.Header.Get("Content-Type")
+		body, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	result, err := runUpload(context.Background(), srv.Client(), srv.URL+"/upload.php", 1, transferLimits{
+		duration:     time.Second,
+		maxBytes:     requestBytes,
+		requestBytes: requestBytes,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contentType != "application/x-www-form-urlencoded" {
+		t.Fatalf("Content-Type = %q", contentType)
+	}
+	if !bytes.HasPrefix(body, []byte("content1=")) {
+		t.Fatalf("body does not use speedtest.net content1 form field: %q", body[:min(len(body), 32)])
+	}
+	if int64(len(body)) != requestBytes || result.bytes != requestBytes {
+		t.Fatalf("body=%d result=%d want=%d", len(body), result.bytes, requestBytes)
+	}
+}
+
+func TestGoogleFiberUploadCountsServerConfirmedBytes(t *testing.T) {
+	const requestBytes = int64(32 * 1024)
+	var observedMu sync.Mutex
+	var contentType, rawQuery string
+	var confirmedTotal atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		observedMu.Lock()
+		contentType = r.Header.Get("Content-Type")
+		rawQuery = r.URL.RawQuery
+		observedMu.Unlock()
+		n, _ := io.Copy(io.Discard, r.Body)
+		confirmed := n / 2
+		confirmedTotal.Add(confirmed)
+		_, _ = io.WriteString(w, "size="+fmt.Sprint(confirmed))
+	}))
+	defer srv.Close()
+
+	result, err := runUpload(context.Background(), srv.Client(), srv.URL+"/upload", 1, transferLimits{
+		duration:     100 * time.Millisecond,
+		maxBytes:     requestBytes,
+		requestBytes: requestBytes,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observedMu.Lock()
+	defer observedMu.Unlock()
+	if contentType != "application/octet-stream" {
+		t.Fatalf("Content-Type = %q", contentType)
+	}
+	if !strings.Contains(rawQuery, "nocache=") {
+		t.Fatalf("upload query = %q, want nocache", rawQuery)
+	}
+	if result.bytes != confirmedTotal.Load() {
+		t.Fatalf("counted %d bytes, server confirmed %d", result.bytes, confirmedTotal.Load())
+	}
+	if result.bytes >= requestBytes {
+		t.Fatalf("counted sent bytes instead of confirmed bytes: %d", result.bytes)
 	}
 }
 

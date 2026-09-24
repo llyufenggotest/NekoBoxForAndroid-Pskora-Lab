@@ -22,6 +22,12 @@ class NodeDiagnosticPolicyTest {
         assertFalse(inactive.speedVisible)
     }
 
+    @Test fun currentRuntimeNodeRemainsActiveWhenSelectionSnapshotLags() {
+        val active = nodeDiagnosticActions(BaseService.State.Connected, 7, 8, 7)
+        assertTrue(active.qualityVisible)
+        assertTrue(active.speedVisible)
+    }
+
     @Test fun preferredRuntimeLeafCanOwnConnectedActions() {
         val active = nodeDiagnosticActions(
             BaseService.State.Connected,

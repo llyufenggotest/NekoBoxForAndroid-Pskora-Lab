@@ -36,14 +36,15 @@ class ProfileCardQualityResourcesContractTest {
             "profile_address", "profile_type", "profile_status", "selected_indicator")
             .forEach { assertNotNull("missing existing id $it", byId[it]) }
 
-        listOf("profile_preferred_group", "profile_latency", "profile_upload_speed",
-            "profile_download_speed", "profile_leaf", "profile_speedometer",
-            "profile_lightning").forEach { assertNotNull("missing new id $it", byId[it]) }
+        listOf("profile_upload_speed", "profile_download_speed", "profile_leaf",
+            "profile_speedometer", "profile_lightning")
+            .forEach { assertNotNull("missing new id $it", byId[it]) }
 
-        assertEquals("@style/LabProfileMetadata", byId.getValue("profile_type").android("textAppearance"))
-        assertEquals("@style/LabProfileMetadata", byId.getValue("profile_latency").android("textAppearance"))
-        assertEquals("@string/profile_preferred_group_description", byId.getValue("profile_preferred_group").android("contentDescription"))
-        assertEquals("@string/profile_latency_description", byId.getValue("profile_latency").android("contentDescription"))
+        assertEquals("12sp", byId.getValue("profile_type").android("textSize"))
+        assertFalse(byId.containsKey("profile_preferred_group"))
+        assertFalse(byId.containsKey("profile_latency"))
+        assertFalse(byId.containsKey("profile_quality_controls"))
+        assertFalse(byId.containsKey("profile_traffic_row"))
     }
 
     @Test
@@ -53,27 +54,29 @@ class ProfileCardQualityResourcesContractTest {
             .associateBy { it.android("id").substringAfterLast('/') }
 
         listOf("edit", "share", "remove", "profile_leaf", "profile_speedometer", "profile_lightning")
-            .forEach { id ->
-                val view = byId.getValue(id)
-                assertEquals("$id touch width", "48dp", view.android("layout_width"))
-                assertEquals("$id touch height", "48dp", view.android("layout_height"))
-                assertTrue("$id needs a description", view.android("contentDescription").startsWith("@string/"))
-            }
-        listOf("edit", "remove").forEach { id -> assertEquals("14dp", byId.getValue(id).android("padding")) }
-        assertEquals("20dp", byId.getValue("shareIcon").android("layout_width"))
-        assertEquals("20dp", byId.getValue("shareIcon").android("layout_height"))
+            .forEach { id -> assertTrue("$id missing", byId.containsKey(id)) }
+        assertEquals("7dp", byId.getValue("edit").android("padding"))
+        assertEquals("7dp", byId.getValue("remove").android("padding"))
     }
 
     @Test
     fun metadataAndTrafficCanShrinkInsideTwoColumnCards() {
         val layout = text("src/main/res/layout/layout_profile.xml")
         assertTrue(layout.contains("android:id=\"@+id/profile_metadata_row\""))
-        assertTrue(layout.contains("android:id=\"@+id/profile_traffic_row\""))
+        assertFalse(layout.contains("android:id=\"@+id/profile_traffic_row\""))
         assertTrue(layout.contains("android:id=\"@+id/profile_upload_speed\""))
         assertTrue(layout.contains("android:id=\"@+id/profile_download_speed\""))
         assertTrue(layout.contains("android:ellipsize=\"end\""))
         assertTrue(layout.contains("android:layout_width=\"0dp\""))
         assertFalse(layout.contains("android:minWidth=\"360dp\""))
+        val topStart = layout.indexOf("android:id=\"@+id/container\"")
+        val leaf = layout.indexOf("android:id=\"@+id/profile_leaf\"")
+        val speed = layout.indexOf("android:id=\"@+id/profile_speedometer\"")
+        val edit = layout.indexOf("android:id=\"@+id/edit\"")
+        assertTrue(topStart in 0 until leaf && leaf < speed && speed < edit)
+        val lightning = layout.indexOf("android:id=\"@+id/profile_lightning\"")
+        val status = layout.indexOf("android:id=\"@+id/profile_status\"")
+        assertTrue(lightning > 0 && lightning < status)
     }
 
     @Test

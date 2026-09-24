@@ -78,15 +78,13 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
         override fun onBindViewHolder(holder: Card, position: Int) {
             val (node, source) = rows[position]
             holder.name.text = node?.displayName() ?: source
-            holder.type.text = node?.displayType().orEmpty()
-            holder.preferredGroup.text = source
-            holder.preferredGroup.visibility = if (node == null) View.GONE else View.VISIBLE
+            holder.type.text = node?.let { "${it.displayType()} · $source" }.orEmpty()
             holder.type.setTextColor(node?.let { requireContext().getProtocolColor(it.type) }
                 ?: requireContext().getColorAttr(android.R.attr.textColorSecondary))
             // status/ping are the persisted test of this exact source ID. Never use owner.ping
             // or invoke urlTest on opening this page. Errors stay compact, without endpoint detail.
-            holder.health.text = node?.let { preferredTestResults.label(it.id) ?:
-                ("历史 · " + preferredMemberLatency(it.status, it.ping)) }.orEmpty()
+            holder.health.text = node?.let { preferredTestResults.numericLabel(it.id, it.status, it.ping) }.orEmpty()
+            holder.health.contentDescription = holder.health.text
             holder.health.setTextColor(when (node?.let { preferredTestResults.tone(it.id, it.status) }) {
                 PreferredHealthTone.HEALTHY -> requireContext().getColour(R.color.material_green_500)
                 PreferredHealthTone.UNHEALTHY -> requireContext().getColour(R.color.material_red_500)
@@ -102,8 +100,6 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
             val isRuntimeMember = node?.id in activeMemberIds
             val qualityVisible = ownerActions.qualityVisible && isRuntimeMember
             val speedVisible = ownerActions.speedVisible && isRuntimeMember
-            holder.qualityControls.visibility =
-                if (qualityVisible || speedVisible || ownerActions.latencyEnabled) View.VISIBLE else View.GONE
             holder.leaf.visibility = if (qualityVisible) View.VISIBLE else View.GONE
             (holder.leaf as? android.widget.ImageButton)?.setColorFilter(
                 requireContext().getColour(when ((parentFragment as? ConfigurationFragment)?.qualityTier(ownerId)) {
@@ -114,7 +110,19 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
                 })
             )
             holder.speed.visibility = if (speedVisible) View.VISIBLE else View.GONE
-            holder.lightning.visibility = if (ownerActions.latencyEnabled && node != null) View.VISIBLE else View.GONE
+            val parent = parentFragment as? ConfigurationFragment
+            val rates = if (isRuntimeMember) parent?.nodeRatesFor(ownerId) else null
+            val speedText = if (isRuntimeMember) parent?.speedDisplayFor(ownerId) else null
+            holder.uploadSpeed.text = speedText?.first ?: rates?.first?.let {
+                "↑" + android.text.format.Formatter.formatFileSize(requireContext(), it) + "/s"
+            }.orEmpty()
+            holder.downloadSpeed.text = speedText?.second ?: rates?.second?.let {
+                "↓" + android.text.format.Formatter.formatFileSize(requireContext(), it) + "/s"
+            }.orEmpty()
+            holder.uploadSpeed.visibility = if (speedVisible && holder.uploadSpeed.text.isNotEmpty()) View.VISIBLE else View.GONE
+            holder.downloadSpeed.visibility = if (speedVisible && holder.downloadSpeed.text.isNotEmpty()) View.VISIBLE else View.GONE
+            holder.lightning.visibility = if (node != null) View.VISIBLE else View.GONE
+            holder.lightning.isEnabled = ownerActions.latencyEnabled
             holder.leaf.setOnClickListener {
                 (parentFragment as? ConfigurationFragment)?.showIPQualityForProfile(ownerId)
             }
@@ -148,9 +156,9 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
     private class Card(view: View) : RecyclerView.ViewHolder(view) {
         val name: TextView = view.findViewById(R.id.profile_name)
         val type: TextView = view.findViewById(R.id.profile_type)
-        val preferredGroup: TextView = view.findViewById(R.id.profile_preferred_group)
         val health: TextView = view.findViewById(R.id.profile_status)
-        val qualityControls: View = view.findViewById(R.id.profile_quality_controls)
+        val uploadSpeed: TextView = view.findViewById(R.id.profile_upload_speed)
+        val downloadSpeed: TextView = view.findViewById(R.id.profile_download_speed)
         val leaf: View = view.findViewById(R.id.profile_leaf)
         val speed: View = view.findViewById(R.id.profile_speedometer)
         val lightning: View = view.findViewById(R.id.profile_lightning)
@@ -172,11 +180,6 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
             (view.findViewById<TextView>(R.id.profile_address).parent as View).visibility = View.GONE
             type.maxLines = 1
             type.ellipsize = android.text.TextUtils.TruncateAt.END
-            // Let the source label shrink first, keeping the historical latency readable.
-            type.layoutParams = (type.layoutParams as LinearLayout.LayoutParams).apply {
-                width = 0
-                weight = 1f
-            }
             view.findViewById<View>(R.id.content_lin).isFocusable = false
         }
     }

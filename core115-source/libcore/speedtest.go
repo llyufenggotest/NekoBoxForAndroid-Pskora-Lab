@@ -3,12 +3,14 @@ package libcore
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,10 +21,12 @@ import (
 )
 
 const (
-	defaultSpeedTestTimeout   = 30 * time.Second
-	defaultTransferDuration   = 8 * time.Second
-	defaultTransferByteLimit  = int64(128 * 1000 * 1000)
-	defaultUploadRequestBytes = int64(512 * 1000)
+	defaultSpeedTestTimeout     = 30 * time.Second
+	defaultTransferDuration     = 8 * time.Second
+	defaultTransferByteLimit    = int64(128 * 1000 * 1000)
+	defaultSpeedtestUploadBytes = int64(1 << 20)
+	defaultOoklaUploadBytes     = int64(2 << 20)
+	downloadReadBufferBytes     = 256 * 1024
 )
 
 // SpeedTestListener is safe for gomobile bindings. Speeds use decimal MB/s.
@@ -192,7 +196,7 @@ func (b *BoxInstance) runSpeedTest(ctx context.Context, streams int, listener Sp
 	if err != nil {
 		return fmt.Errorf("select speed test backend: %w", err)
 	}
-	limits := transferLimits{duration: defaultTransferDuration, maxBytes: defaultTransferByteLimit, requestBytes: defaultUploadRequestBytes, reportEvery: 250 * time.Millisecond}
+	limits := transferLimits{duration: defaultTransferDuration, maxBytes: defaultTransferByteLimit, reportEvery: 250 * time.Millisecond}
 	download, err := runDownload(ctx, client, target.downloadURL, streams, limits, listener)
 	if err != nil {
 		return fmt.Errorf("download: %w", err)
@@ -319,12 +323,8 @@ func raceSpeedBackends(ctx context.Context, client *http.Client, backends []spee
 }
 
 func runDownload(ctx context.Context, client *http.Client, downloadURL string, streams int, limits transferLimits, listener SpeedTestListener) (transferResult, error) {
-	return runTransfer(ctx, "download", streams, limits, listener, func(ctx context.Context, allowance int64) (int64, error) {
-		separator := "?"
-		if strings.Contains(downloadURL, "?") {
-			separator = "&"
-		}
-		request, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s%snocache=%d", downloadURL, separator, time.Now().UnixNano()), nil)
+	return runTransfer(ctx, "download", streams, limits, listener, false, func(ctx context.Context, allowance int64, report func(int64) int64, _ func(time.Time)) (int64, error) {
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, addNoCache(downloadURL), nil)
 		if err != nil {
 			return 0, err
 		}
@@ -337,38 +337,112 @@ func runDownload(ctx context.Context, client *http.Client, downloadURL string, s
 		if response.StatusCode != http.StatusOK {
 			return 0, fmt.Errorf("HTTP %d", response.StatusCode)
 		}
-		return io.Copy(io.Discard, io.LimitReader(response.Body, allowance))
+		writer := &transferProgressWriter{report: report}
+		_, err = io.CopyBuffer(writer, io.LimitReader(response.Body, allowance), make([]byte, downloadReadBufferBytes))
+		if errors.Is(err, errTransferLimit) {
+			err = nil
+		}
+		return writer.bytes, err
 	})
 }
 
 func runUpload(ctx context.Context, client *http.Client, uploadURL string, streams int, limits transferLimits, listener SpeedTestListener) (transferResult, error) {
+	speedtestPayload := isSpeedtestUpload(uploadURL)
 	requestBytes := limits.requestBytes
 	if requestBytes <= 0 {
-		requestBytes = defaultUploadRequestBytes
+		if speedtestPayload {
+			requestBytes = defaultSpeedtestUploadBytes
+		} else {
+			requestBytes = defaultOoklaUploadBytes
+		}
 	}
 	payload := make([]byte, requestBytes)
-	return runTransfer(ctx, "upload", streams, limits, listener, func(ctx context.Context, allowance int64) (int64, error) {
+	if _, err := rand.Read(payload); err != nil {
+		return transferResult{}, fmt.Errorf("create upload payload: %w", err)
+	}
+	if speedtestPayload {
+		copy(payload, "content1=")
+	}
+	uploadLimits := limits
+	uploadLimits.requestBytes = requestBytes
+	return runTransfer(ctx, "upload", streams, uploadLimits, listener, true, func(ctx context.Context, allowance int64, report func(int64) int64, begin func(time.Time)) (int64, error) {
 		size := min(requestBytes, allowance)
-		request, err := http.NewRequestWithContext(ctx, http.MethodPost, uploadURL, bytes.NewReader(payload[:size]))
+		requestURL := uploadURL
+		if !speedtestPayload {
+			requestURL = addNoCache(requestURL)
+		}
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(payload[:size]))
 		if err != nil {
 			return 0, err
 		}
 		setSpeedTestHeaders(request)
-		request.Header.Set("Content-Type", "application/octet-stream")
+		if speedtestPayload {
+			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		} else {
+			request.Header.Set("Content-Type", "application/octet-stream")
+		}
+		requestStarted := time.Now()
 		response, err := client.Do(request)
 		if err != nil {
 			return 0, err
 		}
 		defer response.Body.Close()
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+		responseBody, readErr := io.ReadAll(io.LimitReader(response.Body, 4096))
+		if readErr != nil {
+			return 0, readErr
+		}
 		if response.StatusCode != http.StatusOK {
 			return 0, fmt.Errorf("HTTP %d", response.StatusCode)
 		}
-		return size, nil
+		confirmed := size
+		if !speedtestPayload {
+			text := strings.TrimSpace(string(responseBody))
+			if !strings.HasPrefix(text, "size=") {
+				return 0, fmt.Errorf("invalid upload response %q", text)
+			}
+			confirmed, err = strconv.ParseInt(strings.TrimPrefix(text, "size="), 10, 64)
+			if err != nil || confirmed < 0 || confirmed > size {
+				return 0, fmt.Errorf("invalid upload size %q", text)
+			}
+		}
+		begin(requestStarted)
+		return report(confirmed), nil
 	})
 }
 
-func runTransfer(parentCtx context.Context, phase string, streams int, limits transferLimits, listener SpeedTestListener, request func(context.Context, int64) (int64, error)) (transferResult, error) {
+var errTransferLimit = errors.New("transfer byte limit reached")
+
+type transferProgressWriter struct {
+	report func(int64) int64
+	bytes  int64
+}
+
+func (w *transferProgressWriter) Write(p []byte) (int, error) {
+	accepted := w.report(int64(len(p)))
+	w.bytes += accepted
+	if accepted < int64(len(p)) {
+		return int(accepted), errTransferLimit
+	}
+	return len(p), nil
+}
+
+func addNoCache(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	query := parsed.Query()
+	query.Set("nocache", strconv.FormatInt(time.Now().UnixNano(), 10))
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
+}
+
+func isSpeedtestUpload(rawURL string) bool {
+	parsed, err := url.Parse(rawURL)
+	return err == nil && strings.HasSuffix(parsed.Path, "/upload.php")
+}
+
+func runTransfer(parentCtx context.Context, phase string, streams int, limits transferLimits, listener SpeedTestListener, reserveRequests bool, request func(context.Context, int64, func(int64) int64, func(time.Time)) (int64, error)) (transferResult, error) {
 	streams = normalizeSpeedTestStreams(int32(streams))
 	if limits.duration <= 0 {
 		limits.duration = defaultTransferDuration
@@ -383,6 +457,37 @@ func runTransfer(parentCtx context.Context, phase string, streams int, limits tr
 	defer cancel()
 	started := time.Now()
 	var reserved, completed atomic.Int64
+	var firstByte, lastByte atomic.Int64
+	begin := func(start time.Time) {
+		startNano := start.UnixNano()
+		for {
+			first := firstByte.Load()
+			if first != 0 && first <= startNano {
+				return
+			}
+			if firstByte.CompareAndSwap(first, startNano) {
+				return
+			}
+		}
+	}
+	report := func(n int64) int64 {
+		if n <= 0 {
+			return 0
+		}
+		for {
+			total := completed.Load()
+			if total >= limits.maxBytes {
+				return 0
+			}
+			accepted := min(n, limits.maxBytes-total)
+			if completed.CompareAndSwap(total, total+accepted) {
+				now := time.Now().UnixNano()
+				begin(time.Unix(0, now))
+				lastByte.Store(now)
+				return accepted
+			}
+		}
+	}
 	var firstErr error
 	var firstErrOnce sync.Once
 	var workers sync.WaitGroup
@@ -391,20 +496,23 @@ func runTransfer(parentCtx context.Context, phase string, streams int, limits tr
 		go func() {
 			defer workers.Done()
 			for ctx.Err() == nil {
-				preferred := limits.requestBytes
-				if preferred <= 0 {
-					preferred = 64 * 1024
-				}
-				allowance := reserveTransferBytes(&reserved, limits.maxBytes, preferred)
-				if allowance == 0 {
+				if completed.Load() >= limits.maxBytes {
 					return
 				}
-				n, err := request(ctx, allowance)
-				if n < allowance {
-					reserved.Add(n - allowance)
+				allowance := limits.maxBytes - completed.Load()
+				if reserveRequests {
+					preferred := limits.requestBytes
+					if preferred <= 0 {
+						preferred = allowance
+					}
+					allowance = reserveTransferBytes(&reserved, limits.maxBytes, preferred)
+					if allowance == 0 {
+						return
+					}
 				}
-				if n > 0 {
-					completed.Add(n)
+				n, err := request(ctx, allowance, report, begin)
+				if reserveRequests && n < allowance {
+					reserved.Add(n - allowance)
 				}
 				if err != nil && ctx.Err() == nil {
 					firstErrOnce.Do(func() { firstErr = err })
@@ -426,7 +534,17 @@ func runTransfer(parentCtx context.Context, phase string, streams int, limits tr
 		case <-ticker.C:
 			now := time.Now()
 			total := completed.Load()
-			current := float64(total-lastBytes) / now.Sub(lastReport).Seconds() / 1e6
+			intervalStart := lastReport
+			if lastBytes == 0 {
+				if first := firstByte.Load(); first != 0 {
+					intervalStart = time.Unix(0, first)
+				}
+			}
+			intervalSeconds := now.Sub(intervalStart).Seconds()
+			current := 0.0
+			if intervalSeconds > 0 {
+				current = float64(total-lastBytes) / intervalSeconds / 1e6
+			}
 			if current > peak {
 				peak = current
 			}
@@ -438,8 +556,12 @@ func runTransfer(parentCtx context.Context, phase string, streams int, limits tr
 			if err := parentCtx.Err(); err != nil {
 				return transferResult{}, err
 			}
-			elapsed := time.Since(started).Seconds()
 			total := completed.Load()
+			elapsed := time.Since(started).Seconds()
+			first, last := firstByte.Load(), lastByte.Load()
+			if first != 0 && last > first {
+				elapsed = time.Duration(last - first).Seconds()
+			}
 			if elapsed <= 0 {
 				elapsed = 1e-9
 			}

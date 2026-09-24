@@ -17,9 +17,9 @@ internal fun nodeDiagnosticActions(
 ): NodeDiagnosticActions {
     val stopped = state == BaseService.State.Stopped || state == BaseService.State.Idle
     val connected = state == BaseService.State.Connected
-    val selected = rowProfileId > 0L && rowProfileId == selectedProfileId
-    val active = connected && selected &&
-        (rowProfileId == currentProfileId || rowProfileId == activePreferredLeafId)
+    val currentOwner = rowProfileId > 0L && rowProfileId == currentProfileId
+    val preferredLeaf = activePreferredLeafId > 0L && rowProfileId == activePreferredLeafId
+    val active = connected && (currentOwner || preferredLeaf)
     return NodeDiagnosticActions(
         latencyEnabled = stopped,
         qualityVisible = active,
