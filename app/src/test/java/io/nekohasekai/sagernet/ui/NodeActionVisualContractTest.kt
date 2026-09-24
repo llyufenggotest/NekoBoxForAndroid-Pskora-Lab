@@ -29,7 +29,7 @@ class NodeActionVisualContractTest {
 
     @Test fun latencyActionDoesNotRequireHistoricalPing() {
         val configuration = source("src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt")
-        val action = configuration.substringAfter("fun testNodeLatency(profile: ProxyEntity,")
+        val action = configuration.substringAfter("private fun testNodeLatency(profile: ProxyEntity,")
             .substringBefore("fun startSpeedTestForProfile")
         assertTrue(action.contains("runNodeLatency(profile, mode)"))
         assertFalse(action.contains("profile.ping >"))

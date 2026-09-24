@@ -429,7 +429,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     private fun service(): ISagerNetService? = (activity as? MainActivity)?.connection?.service
 
-    fun testNodeLatency(profile: ProxyEntity, mode: NodeLatencyMode = NodeLatencyMode.URL_TEST) {
+    private fun testNodeLatency(profile: ProxyEntity, mode: NodeLatencyMode = NodeLatencyMode.URL_TEST) {
         runOnDefaultDispatcher {
             profile.status = 0
             profile.error = null
