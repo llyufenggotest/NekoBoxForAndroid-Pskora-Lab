@@ -2,11 +2,15 @@ package io.nekohasekai.sagernet.ui
 
 import android.annotation.SuppressLint
 import android.content.DialogInterface
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.IBinder
 import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.text.SpannableStringBuilder
@@ -57,6 +61,7 @@ import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.TrafficData
 import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.bg.BaseService
+import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.bg.proto.TUN_NET_CLIENT_VERSION
 import io.nekohasekai.sagernet.bg.proto.UrlTest
 import io.nekohasekai.sagernet.database.DataStore
@@ -135,6 +140,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import moe.matsuri.nb4a.Protocols
 import moe.matsuri.nb4a.Protocols.getProtocolColor
 import moe.matsuri.nb4a.proxy.anytls.AnyTLSSettingsActivity
@@ -430,20 +437,47 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     private fun service(): ISagerNetService? = (activity as? MainActivity)?.connection?.service
 
-    private suspend fun awaitDiagnosticService(timeoutMillis: Long = 5_000L): ISagerNetService? {
-        service()?.let { return it }
-        val mainActivity = activity as? MainActivity ?: return null
-        withContext(Dispatchers.Main.immediate) {
-            mainActivity.reconnectServiceBinding()
-        }
-        return withTimeoutOrNull(timeoutMillis) {
-            var diagnosticService: ISagerNetService? = null
-            while (diagnosticService == null) {
-                delay(50)
-                diagnosticService = service()
+    private data class DiagnosticServiceBinding(
+        val service: ISagerNetService,
+        val release: () -> Unit,
+    )
+
+    private suspend fun bindDiagnosticService(): DiagnosticServiceBinding? {
+        val context = context?.applicationContext ?: return null
+        return suspendCancellableCoroutine { continuation ->
+            var bound = false
+            val connection = object : ServiceConnection {
+                override fun onServiceConnected(name: ComponentName?, binder: IBinder) {
+                    if (continuation.isActive) continuation.resume(
+                        DiagnosticServiceBinding(ISagerNetService.Stub.asInterface(binder)) {
+                            runCatching { context.unbindService(this) }
+                        }
+                    )
+                }
+
+                override fun onServiceDisconnected(name: ComponentName?) {
+                    if (continuation.isActive) continuation.resume(null)
+                }
+
+                override fun onNullBinding(name: ComponentName?) {
+                    if (continuation.isActive) continuation.resume(null)
+                }
             }
-            diagnosticService
+            continuation.invokeOnCancellation {
+                if (bound) runCatching { context.unbindService(connection) }
+            }
+            bound = context.bindService(
+                Intent(context, SagerConnection.serviceClass).setAction(io.nekohasekai.sagernet.Action.SERVICE),
+                connection,
+                Context.BIND_AUTO_CREATE,
+            )
+            if (!bound && continuation.isActive) continuation.resume(null)
         }
+    }
+
+    private suspend fun awaitDiagnosticService(timeoutMillis: Long = 5_000L): DiagnosticServiceBinding? {
+        service()?.let { return DiagnosticServiceBinding(it) {} }
+        return withTimeoutOrNull(timeoutMillis) { bindDiagnosticService() }
     }
     private val nodeLatencyTickets = ConcurrentHashMap<Long, Long>()
     private val nodeLatencySequence = AtomicLong()
@@ -553,8 +587,13 @@ class ConfigurationFragment @JvmOverloads constructor(
         viewLifecycleOwner.lifecycleScope.launch {
             val raw = withContext(Dispatchers.IO) {
                 runCatching {
-                    awaitDiagnosticService()?.queryIpQuality(profileId)
-                        ?: error("VPN 服务正在重新连接，请稍后重试")
+                    val binding = awaitDiagnosticService()
+                        ?: error("VPN 服务绑定失败，请稍后重试")
+                    try {
+                        binding.service.queryIpQuality(profileId)
+                    } finally {
+                        binding.release()
+                    }
                 }
             }
             if (!isAdded || !dialog.isShowing) return@launch
