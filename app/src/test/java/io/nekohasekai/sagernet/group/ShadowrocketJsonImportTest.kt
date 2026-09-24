@@ -6,7 +6,12 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(manifest = Config.NONE, sdk = [28])
 class ShadowrocketJsonImportTest {
     @Test fun shadowrocketVmessJsonImportsAsNativeBean() {
         val bean = RawUpdater.parseShadowrocketJson(JSONObject("""
