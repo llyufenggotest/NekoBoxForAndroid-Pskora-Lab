@@ -61,11 +61,13 @@ internal class PreferredTestResults(
         val automaticSample = automatic[id] ?: return true
         return automaticSample.sampleTime <= result.sampleTime || clock() < (priorityById[id] ?: result.sampleTime)
     }
-    @Synchronized fun label(id: Long): String? =
-        values[id]?.takeIf { manualOwns(id, it) }
-            ?.takeIf { it.status == 1 && it.ping >= 0 }
-            ?.let { "${it.ping} ms" }
-            ?: automatic[id]?.let { "${it.ping} ms" }
+    @Synchronized fun label(id: Long): String? {
+        val manual = values[id]?.takeIf { manualOwns(id, it) }
+        if (manual != null) {
+            return manual.takeIf { it.status == 1 && it.ping >= 0 }?.let { "${it.ping} ms" }
+        }
+        return automatic[id]?.let { "${it.ping} ms" }
+    }
 
     @Synchronized fun numericLabel(id: Long, persistedStatus: Int, persistedPing: Int): String =
         effectiveLatency(id, persistedStatus, persistedPing)?.let { "$it ms" }.orEmpty()
