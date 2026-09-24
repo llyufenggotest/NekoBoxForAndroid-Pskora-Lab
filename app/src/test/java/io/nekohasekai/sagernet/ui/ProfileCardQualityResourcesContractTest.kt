@@ -48,22 +48,27 @@ class ProfileCardQualityResourcesContractTest {
     }
 
     @Test
-    fun compactActionsKeepAccessibleTouchTargetsAndSmallerGlyphs() {
+    fun compactActionsUseSmallerSingleColumnGlyphs() {
         val nodes = elements("src/main/res/layout/layout_profile.xml")
         val byId = nodes.filter { it.android("id").isNotEmpty() }
             .associateBy { it.android("id").substringAfterLast('/') }
 
         listOf("edit", "share", "remove", "profile_leaf", "profile_speedometer", "profile_lightning")
             .forEach { id -> assertTrue("$id missing", byId.containsKey(id)) }
-        assertEquals("8dp", byId.getValue("edit").android("padding"))
-        assertEquals("8dp", byId.getValue("remove").android("padding"))
+        listOf("edit", "share", "remove").forEach { id ->
+            assertEquals("36dp", byId.getValue(id).android("layout_width"))
+            assertEquals("36dp", byId.getValue(id).android("layout_height"))
+        }
+        assertEquals("9dp", byId.getValue("edit").android("padding"))
+        assertEquals("9dp", byId.getValue("share_layer").android("padding"))
+        assertEquals("9dp", byId.getValue("remove").android("padding"))
         assertEquals("6dp", byId.getValue("profile_leaf").android("padding"))
         assertEquals("6dp", byId.getValue("profile_speedometer").android("padding"))
         assertEquals("@drawable/bg_speed_test_press_feedback",
             byId.getValue("profile_speedometer").android("background"))
-        assertEquals("24dp", byId.getValue("profile_lightning").android("layout_width"))
-        assertEquals("24dp", byId.getValue("profile_lightning").android("layout_height"))
-        assertEquals("1dp", byId.getValue("profile_lightning").android("padding"))
+        assertEquals("20dp", byId.getValue("profile_lightning").android("layout_width"))
+        assertEquals("20dp", byId.getValue("profile_lightning").android("layout_height"))
+        assertEquals("2dp", byId.getValue("profile_lightning").android("padding"))
     }
 
     @Test
