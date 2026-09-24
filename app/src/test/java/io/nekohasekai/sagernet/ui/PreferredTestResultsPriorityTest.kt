@@ -11,7 +11,7 @@ class PreferredTestResultsPriorityTest {
         results.replaceAutomatic("session", mapOf(7L to PreferredAutoSample(900L, 80)))
         val ticket = results.begin(7L, "URLTest")
         assertEquals(null, results.label(7L))
-        assertEquals("64 ms", results.numericLabel(7L, persistedStatus = 1, persistedPing = 64))
+        assertEquals("80 ms", results.numericLabel(7L, persistedStatus = 1, persistedPing = 64))
 
         // A batch begun before manual completion may arrive later; it must not win.
         results.replaceAutomatic("session", mapOf(7L to PreferredAutoSample(950L, 30)))

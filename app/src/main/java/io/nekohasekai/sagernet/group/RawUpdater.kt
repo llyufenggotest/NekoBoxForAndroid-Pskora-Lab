@@ -44,6 +44,53 @@ import androidx.core.net.toUri
 @Suppress("EXPERIMENTAL_API_USAGE")
 object RawUpdater : GroupUpdater() {
 
+    internal fun parseShadowrocketJson(json: JSONObject): AbstractBean? {
+        val kind = json.optString("type").lowercase()
+        if (kind !in setOf("vmess", "vless", "trojan")) return null
+        // Shadowrocket exports use host/port/title; do not intercept sing-box outbounds.
+        if (!json.has("host") || !json.has("port") ||
+            !(json.has("title") || json.has("created") || json.has("updated") || json.has("weight"))) return null
+        val host = json.optString("host").takeIf { it.isNotBlank() } ?: return null
+        val port = json.optString("port").toIntOrNull()
+            ?: json.optInt("server_port").takeIf { it > 0 } ?: return null
+        val title = json.optString("title").ifBlank { json.optString("remarks") }
+        val credential = json.optString("password")
+        if (credential.isBlank()) return null
+        if (kind == "trojan") return TrojanBean().apply {
+            name = title
+            serverAddress = host
+            serverPort = port
+            password = credential
+            security = if (json.optBoolean("tls", true)) "tls" else ""
+            sni = json.optString("peer")
+            allowInsecure = json.optBoolean("allowInsecure", false)
+            initializeDefaultValues()
+        }
+        return VMessBean().apply {
+            name = title
+            serverAddress = host
+            serverPort = port
+            uuid = credential
+            alterId = if (kind == "vless") -1 else json.optString("alterId").toIntOrNull() ?: 0
+            encryption = if (kind == "vless") "" else json.optString("method").ifBlank { "auto" }
+            type = when (json.optString("obfs").lowercase()) {
+                "websocket", "ws" -> "ws"
+                "grpc" -> "grpc"
+                "http", "h2" -> "http"
+                else -> "tcp"
+            }
+            path = json.optString("path")
+            host = json.optString("obfsParam")
+            security = if (json.optBoolean("tls", false) || json.optInt("xtls") > 0 ||
+                json.optString("publicKey").isNotBlank()) "tls" else "none"
+            sni = json.optString("peer")
+            utlsFingerprint = json.optString("tlsProfile")
+            realityPubKey = json.optString("publicKey")
+            realityShortId = json.optString("shortId")
+            initializeDefaultValues()
+        }
+    }
+
     internal data class SingBoxTrojanFields(
         val tag: String,
         val server: String,
@@ -1119,6 +1166,7 @@ object RawUpdater : GroupUpdater() {
         val proxies = ArrayList<AbstractBean>()
 
         if (json is JSONObject) {
+            parseShadowrocketJson(json)?.let { return listOf(it) }
             when {
                 json.has("server") && (json.has("up") || json.has("up_mbps")) -> {
                     return listOf(json.parseHysteria1Json())

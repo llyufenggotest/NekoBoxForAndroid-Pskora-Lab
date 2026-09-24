@@ -23,8 +23,8 @@ class NodeActionVisualContractTest {
         val preferred = source("src/main/java/io/nekohasekai/sagernet/ui/PreferredGroupFragment.kt")
         assertTrue(configuration.contains("lightningButton.alpha = 1f"))
         assertTrue(preferred.contains("holder.lightning.alpha = 1f"))
-        assertTrue(configuration.contains("getColorAttr(android.R.attr.textColorPrimary)"))
-        assertTrue(preferred.contains("getColorAttr(android.R.attr.textColorPrimary)"))
+        assertTrue(configuration.contains("getColorAttr(android.R.attr.textColorSecondary)"))
+        assertTrue(preferred.contains("getColorAttr(android.R.attr.textColorSecondary)"))
     }
 
     @Test fun latencyActionDoesNotRequireHistoricalPing() {

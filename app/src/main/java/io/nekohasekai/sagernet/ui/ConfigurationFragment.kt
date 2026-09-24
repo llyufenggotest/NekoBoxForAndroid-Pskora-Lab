@@ -3420,7 +3420,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 speedButton.isVisible = !isDoubleColumn && actions.speedVisible
                 lightningButton.isVisible = true
                 (lightningButton as? android.widget.ImageButton)?.setColorFilter(
-                    requireContext().getColorAttr(android.R.attr.textColorPrimary)
+                    requireContext().getColorAttr(android.R.attr.textColorSecondary)
                 )
                 val rates: Pair<Long, Long>? = pf.nodeRates[proxyEntity.id]
                 val tested: SpeedTestCardState? = pf.speedTestRows[proxyEntity.id]

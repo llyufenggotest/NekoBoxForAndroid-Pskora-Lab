@@ -108,7 +108,7 @@
                     android:focusable="true"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
-                    android:padding="10dp"
+                    android:padding="8dp"
                     android:visibility="gone"
                     app:srcCompat="@drawable/ic_profile_speedometer_outline"
                     app:tint="@color/profile_card_icon" />

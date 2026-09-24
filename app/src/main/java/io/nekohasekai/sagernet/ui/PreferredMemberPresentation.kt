@@ -63,7 +63,7 @@ internal class PreferredTestResults(
         return true
     }
     private fun manualOwns(id: Long, result: Result): Boolean {
-        if (result.status == 0) return true
+        if (result.status == 0) return automatic[id] != null
         val automaticSample = automatic[id] ?: return true
         return automaticSample.sampleTime <= result.sampleTime || clock() < (priorityById[id] ?: result.sampleTime)
     }
@@ -82,7 +82,11 @@ internal class PreferredTestResults(
     private fun effectiveLatency(id: Long, persistedStatus: Int, persistedPing: Int): Int? {
         val persisted = persistedPing.takeIf { persistedStatus == 1 && it >= 0 }
         val manual = values[id]?.takeIf { manualOwns(id, it) }
-        if (manual != null) return manual.ping.takeIf { manual.status == 1 && it >= 0 } ?: persisted
+        if (manual != null) return when (manual.status) {
+            0 -> automatic[id]?.ping
+            1 -> manual.ping.takeIf { it >= 0 }
+            else -> persisted
+        }
         return automatic[id]?.ping ?: persisted
     }
     @Synchronized fun healthyLatency(id: Long, persistedStatus: Int, persistedPing: Int): Int? =

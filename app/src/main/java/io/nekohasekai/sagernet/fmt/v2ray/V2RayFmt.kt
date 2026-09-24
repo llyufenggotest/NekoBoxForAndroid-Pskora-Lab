@@ -357,7 +357,7 @@ private fun tryResolveVmess4Kitsunebi(server: String): VMessBean {
     // vmess://YXV0bzo1YWY1ZDBlYy02ZWEwLTNjNDMtOTNkYi1jYTMwMDg1MDNiZGJAMTgzLjIzMi41Ni4xNjE6MTIwMg
     // ?remarks=*%F0%9F%87%AF%F0%9F%87%B5JP%20-355%20TG@moon365free&obfsParam=%7B%22Host%22:%22183.232.56.161%22%7D&path=/v2ray&obfs=websocket&alterId=0
 
-    var result = server.replace("vmess://", "")
+    var result = server.substringAfter("://")
     val indexSplit = result.indexOf("?")
     if (indexSplit > 0) {
         result = result.substring(0, indexSplit)
@@ -374,32 +374,39 @@ private fun tryResolveVmess4Kitsunebi(server: String): VMessBean {
         throw IllegalStateException("invalid kitsunebi format")
     }
 
+    val isVless = server.startsWith("vless://", ignoreCase = true)
     return VMessBean().apply {
         serverAddress = arr22[0]
         serverPort = NGUtil.parseInt(arr22[1])
         uuid = arr21[1]
-        encryption = arr21[0]
+        if (isVless) {
+            alterId = -1
+            encryption = ""
+        } else {
+            encryption = arr21[0]
+        }
         if (indexSplit < 0) return@apply
 
         val url = ("https://localhost/path?" + server.substringAfter("?")).toHttpUrl()
         url.queryParameter("remarks")?.apply { name = this }
-        url.queryParameter("alterId")?.apply { alterId = this.toInt() }
+        if (!isVless) url.queryParameter("alterId")?.toIntOrNull()?.let { alterId = it }
         url.queryParameter("path")?.apply { path = this }
-        url.queryParameter("tls")?.apply { security = "tls" }
+        if (url.queryParameter("tls") in listOf("1", "true")) security = "tls"
         url.queryParameter("allowInsecure")
             ?.apply { if (this == "1" || this == "true") allowInsecure = true }
         url.queryParameter("obfs")?.apply {
             type = this.replace("websocket", "ws").replace("none", "tcp")
             if (type == "ws") {
-                url.queryParameter("obfsParam")?.apply {
-                    if (this.startsWith("{")) {
-                        host = JSONObject(this).getStr("Host")
-                    } else if (security == "tls") {
-                        sni = this
-                    }
+                url.queryParameter("obfsParam")?.takeIf { it.isNotBlank() }?.apply {
+                    host = if (startsWith("{")) JSONObject(this).getStr("Host").orEmpty() else this
                 }
             }
         }
+        url.queryParameter("peer")?.takeIf { it.isNotBlank() }?.let { sni = it }
+        url.queryParameter("fingerprint")?.takeIf { it.isNotBlank() }?.let { utlsFingerprint = it }
+        url.queryParameter("pbk")?.takeIf { it.isNotBlank() }?.let { realityPubKey = it }
+        url.queryParameter("sid")?.takeIf { it.isNotBlank() }?.let { realityShortId = it }
+        if (isVless && realityPubKey.isNotBlank()) security = "tls"
     }
 }
 

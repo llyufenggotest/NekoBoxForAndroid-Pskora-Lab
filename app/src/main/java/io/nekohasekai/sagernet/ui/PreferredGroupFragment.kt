@@ -126,7 +126,7 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
             holder.lightning.isEnabled = ownerActions.latencyEnabled
             holder.lightning.alpha = 1f
             (holder.lightning as? android.widget.ImageButton)?.setColorFilter(
-                requireContext().getColorAttr(android.R.attr.textColorPrimary)
+                requireContext().getColorAttr(android.R.attr.textColorSecondary)
             )
             holder.leaf.setOnClickListener {
                 (parentFragment as? ConfigurationFragment)?.showIPQualityForProfile(ownerId)
