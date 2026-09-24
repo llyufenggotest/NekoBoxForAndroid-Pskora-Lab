@@ -125,14 +125,23 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
             holder.downloadSpeed.visibility = if (speedVisible && holder.downloadSpeed.text.isNotEmpty()) View.VISIBLE else View.GONE
             holder.lightning.visibility = if (node != null) View.VISIBLE else View.GONE
             holder.lightning.isEnabled = ownerActions.latencyEnabled
+            (holder.lightning as? android.widget.ImageButton)?.setColorFilter(
+                requireContext().getColour(
+                    if (ownerActions.latencyEnabled) R.color.profile_card_icon else R.color.profile_card_secondary
+                )
+            )
             holder.leaf.setOnClickListener {
                 (parentFragment as? ConfigurationFragment)?.showIPQualityForProfile(ownerId)
             }
             holder.speed.setOnClickListener {
-                (parentFragment as? ConfigurationFragment)?.startSpeedTestForProfile(ownerId, 1)
+                holder.speed.playGreenPulse()
+                (parentFragment as? ConfigurationFragment)
+                    ?.startSpeedTestForProfile(ownerId, nodeSpeedTestStreams(false))
             }
             holder.speed.setOnLongClickListener {
-                (parentFragment as? ConfigurationFragment)?.startSpeedTestForProfile(ownerId, 8)
+                holder.speed.playGreenPulse()
+                (parentFragment as? ConfigurationFragment)
+                    ?.startSpeedTestForProfile(ownerId, nodeSpeedTestStreams(true))
                 true
             }
             holder.lightning.setOnClickListener { node?.let { testSingleMember(it) } }
@@ -149,6 +158,13 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
             )
             holder.menu.setOnClickListener { anchor ->
                 node?.let { showDoubleColumnMenu(anchor, it) }
+            }
+            holder.menu.setOnLongClickListener {
+                if (!speedVisible) return@setOnLongClickListener false
+                holder.menu.playGreenPulse()
+                (parentFragment as? ConfigurationFragment)
+                    ?.startSpeedTestForProfile(ownerId, nodeSpeedTestStreams(true))
+                true
             }
             holder.itemView.contentDescription = if (node == null) source else
                 "${node.displayName()}，${holder.type.text}，${holder.health.text}；使用整组自动优选"
@@ -364,7 +380,7 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
                     R.id.action_ip_quality -> (parentFragment as? ConfigurationFragment)
                         ?.showIPQualityForProfile(ownerId)
                     R.id.action_speed_test -> (parentFragment as? ConfigurationFragment)
-                        ?.startSpeedTestForProfile(ownerId, 1)
+                        ?.startSpeedTestForProfile(ownerId, nodeSpeedTestStreams(false))
                     R.id.action_edit -> sourceAction(node, R.id.edit)
                     R.id.action_share -> sourceAction(node, R.id.share)
                     R.id.action_delete -> sourceAction(node, R.id.remove)

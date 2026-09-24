@@ -16,7 +16,15 @@ class GroupTabSyncContractTest {
         assertTrue(source.contains("val visibleGroupId = groupList.getOrNull(selectedGroupIndex)?.id"))
         assertTrue(source.contains("var selectedGroup = visibleGroupId"))
         assertTrue(source.contains("lastGroupTabTapAt"))
-        assertTrue(source.contains("groupPager.setCurrentItem(0, false)"))
-        assertTrue(source.contains("tabLayout.setScrollPosition(0, 0f, true)"))
+        assertTrue(source.contains("groupTabDoubleTapTarget("))
+        assertTrue(source.contains("if (adapter.groupList.isEmpty()) return@setOnTouchListener true"))
+        assertTrue(source.contains("event.rawX"))
+        assertTrue(source.contains("resources.displayMetrics.widthPixels"))
+        assertTrue(source.contains("groupPager.setCurrentItem(targetIndex, false)"))
+        assertTrue(source.contains("tabLayout.setScrollPosition(targetIndex, 0f, true)"))
+        assertTrue(source.contains("override fun isLongPressDragEnabled(): Boolean = false"))
+        assertTrue(source.contains("itemTouchHelper.startDrag(holder)"))
+        assertTrue(source.contains("if (::itemTouchHelper.isInitialized && isEnabled"))
+        assertTrue(source.contains("armManualDrag(view, this)"))
     }
 }

@@ -221,6 +221,7 @@ class MainActivity : ThemedActivity(),
         }
 
         binding.fab.setOnClickListener {
+            binding.fab.playGreenPulse()
             if (DataStore.serviceState.canStop) stopDashboardConnection() else requestDashboardConnection()
         }
         binding.stats.setOnClickListener { if (DataStore.serviceState.connected) binding.stats.testConnection() }

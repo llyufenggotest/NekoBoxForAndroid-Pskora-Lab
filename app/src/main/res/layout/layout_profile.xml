@@ -103,7 +103,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="top"
-                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:background="@drawable/bg_speed_test_press_feedback"
                     android:contentDescription="@string/profile_speedometer_description"
                     android:focusable="true"
                     android:minWidth="0dp"
@@ -251,14 +251,14 @@
 
                 <androidx.appcompat.widget.AppCompatImageButton
                     android:id="@+id/profile_lightning"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
                     android:layout_marginStart="6dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/profile_lightning_description"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
-                    android:padding="2dp"
+                    android:padding="1dp"
                     app:srcCompat="@drawable/ic_profile_lightning_outline"
                     app:tint="@color/profile_card_icon" />
 

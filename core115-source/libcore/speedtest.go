@@ -120,7 +120,7 @@ func normalizeSpeedTestStreams(streams int32) int {
 	return int(streams)
 }
 
-// StartSpeedTest starts a routed test. A tap should pass 1; a long press should pass 8.
+// UI contract: a normal tap requests 8 streams; a long press requests 1.
 func (b *BoxInstance) StartSpeedTest(streams int32, listener SpeedTestListener) error {
 	if b == nil {
 		return errors.New("speed test requires a running box")

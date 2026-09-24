@@ -750,9 +750,15 @@ class ConfigurationFragment @JvmOverloads constructor(
                     lastGroupTabTapIndex = -1
                     suppressNextGroupLongPress = true
                     tab.view.postDelayed({ suppressNextGroupLongPress = false }, 450L)
-                    DataStore.selectedGroup = adapter.groupList.firstOrNull()?.id ?: DataStore.selectedGroup
-                    groupPager.setCurrentItem(0, false)
-                    tabLayout.post { tabLayout.setScrollPosition(0, 0f, true) }
+                    if (adapter.groupList.isEmpty()) return@setOnTouchListener true
+                    val targetIndex = groupTabDoubleTapTarget(
+                        event.rawX,
+                        resources.displayMetrics.widthPixels,
+                        adapter.groupList.lastIndex,
+                    )
+                    DataStore.selectedGroup = adapter.groupList[targetIndex].id
+                    groupPager.setCurrentItem(targetIndex, false)
+                    tabLayout.post { tabLayout.setScrollPosition(targetIndex, 0f, true) }
                     true
                 } else {
                     lastGroupTabTapAt = now
@@ -2255,6 +2261,19 @@ class ConfigurationFragment @JvmOverloads constructor(
         private val alwaysShowAddress: Boolean
             get() = (parentFragment as? ConfigurationFragment)?.alwaysShowAddress == true
 
+        private fun armManualDrag(view: View, holder: RecyclerView.ViewHolder) {
+            if (select) {
+                view.setOnLongClickListener(null)
+                return
+            }
+            view.setOnLongClickListener {
+                if (::itemTouchHelper.isInitialized && isEnabled && adapter?.isGlobalSearch != true) {
+                    itemTouchHelper.startDrag(holder)
+                    true
+                } else false
+            }
+        }
+
         private fun setupItemTouchHelper() {
             if (select) return
             
@@ -2263,6 +2282,8 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
             
             itemTouchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(0, 0) {
+                override fun isLongPressDragEnabled(): Boolean = false
+
                 override fun getMovementFlags(
                     recyclerView: RecyclerView,
                     viewHolder: RecyclerView.ViewHolder
@@ -2325,6 +2346,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             })
             itemTouchHelper.attachToRecyclerView(configurationListView)
         }
+
         lateinit var configurationListView: RecyclerView
 
         val select by lazy {
@@ -3065,10 +3087,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val configuration = parentFragment as? ConfigurationFragment
                 leafButton.setOnClickListener { configuration?.showIPQualityForProfile(entity.id) }
                 speedButton.setOnClickListener {
-                    configuration?.startSpeedTestForProfile(entity.id, 1)
+                    speedButton.playGreenPulse()
+                    configuration?.startSpeedTestForProfile(entity.id, nodeSpeedTestStreams(false))
                 }
                 speedButton.setOnLongClickListener {
-                    configuration?.startSpeedTestForProfile(entity.id, 8)
+                    speedButton.playGreenPulse()
+                    configuration?.startSpeedTestForProfile(entity.id, nodeSpeedTestStreams(true))
                     true
                 }
                 lightningButton.setOnClickListener {
@@ -3108,6 +3132,20 @@ class ConfigurationFragment @JvmOverloads constructor(
                 doubleColumnMenuButton.setOnClickListener {
                     showDoubleColumnMenu(it, entity)
                 }
+                doubleColumnMenuButton.setOnLongClickListener {
+                    val canSpeedTest = nodeDiagnosticActions(
+                        DataStore.serviceState,
+                        entity.id,
+                        DataStore.selectedProxy,
+                        DataStore.currentProfile,
+                    ).speedVisible
+                    if (!canSpeedTest) return@setOnLongClickListener false
+                    doubleColumnMenuButton.playGreenPulse()
+                    (parentFragment as? ConfigurationFragment)
+                        ?.startSpeedTestForProfile(entity.id, nodeSpeedTestStreams(true))
+                    true
+                }
+                armManualDrag(view, this)
                 shareLayout.setOnClickListener {
                     val proxyEntity = entity
                     if (!select && proxyEntity.type != ProxyEntity.TYPE_CHAIN) {
@@ -3188,7 +3226,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         }
                         R.id.action_speed_test -> {
                             (parentFragment as? ConfigurationFragment)
-                                ?.startSpeedTestForProfile(proxyEntity.id, 1)
+                                ?.startSpeedTestForProfile(proxyEntity.id, nodeSpeedTestStreams(false))
                             true
                         }
                         R.id.action_edit -> {
@@ -3363,6 +3401,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                 )
                 speedButton.isVisible = !isDoubleColumn && actions.speedVisible
                 lightningButton.isVisible = true
+                (lightningButton as? android.widget.ImageButton)?.setColorFilter(
+                    requireContext().getColour(
+                        if (actions.latencyEnabled) R.color.profile_card_icon else R.color.profile_card_secondary
+                    )
+                )
                 val rates: Pair<Long, Long>? = pf.nodeRates[proxyEntity.id]
                 val tested: SpeedTestCardState? = pf.speedTestRows[proxyEntity.id]
                 if (tested != null) {

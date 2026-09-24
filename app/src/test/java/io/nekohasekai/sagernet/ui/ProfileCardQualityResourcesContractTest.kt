@@ -59,6 +59,11 @@ class ProfileCardQualityResourcesContractTest {
         assertEquals("8dp", byId.getValue("remove").android("padding"))
         assertEquals("6dp", byId.getValue("profile_leaf").android("padding"))
         assertEquals("6dp", byId.getValue("profile_speedometer").android("padding"))
+        assertEquals("@drawable/bg_speed_test_press_feedback",
+            byId.getValue("profile_speedometer").android("background"))
+        assertEquals("24dp", byId.getValue("profile_lightning").android("layout_width"))
+        assertEquals("24dp", byId.getValue("profile_lightning").android("layout_height"))
+        assertEquals("1dp", byId.getValue("profile_lightning").android("padding"))
     }
 
     @Test
@@ -101,6 +106,9 @@ class ProfileCardQualityResourcesContractTest {
         val dialog = text("src/main/res/drawable/bg_ip_quality_dialog.xml")
         assertTrue(dialog.contains("android:radius=\"24dp\""))
         assertTrue(dialog.contains("@color/ip_quality_dialog_surface"))
+        val speedFeedback = text("src/main/res/drawable/bg_speed_test_press_feedback.xml")
+        assertTrue(speedFeedback.contains("android:state_pressed=\"true\""))
+        assertTrue(speedFeedback.contains("#994CAF50"))
 
         val styles = text("src/main/res/values/lab_styles.xml")
         assertTrue(styles.contains("name=\"LabProfileMetadata\""))
