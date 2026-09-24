@@ -45,7 +45,7 @@ var activeIPQualityEndpoints = ipQualityEndpoints{
 	dbIP:        "https://api.db-ip.com/v2/free/%s",
 }
 
-var newIPQualityHTTPClient = boxapi.CreateProxyHttpClient
+var newIPQualityHTTPClient = boxapi.CreateProxyHttpClientIPv4
 
 type ipPureSession struct {
 	mutex      sync.Mutex
