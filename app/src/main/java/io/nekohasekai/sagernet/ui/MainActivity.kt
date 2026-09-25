@@ -46,6 +46,7 @@ import io.nekohasekai.sagernet.databinding.LayoutMainBinding
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.KryoConverters
 import io.nekohasekai.sagernet.fmt.PluginEntry
+import io.nekohasekai.sagernet.fmt.oppa.parseOppaProvider
 import io.nekohasekai.sagernet.group.GroupInterfaceAdapter
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.group.RawUpdater
@@ -364,8 +365,8 @@ class MainActivity : ThemedActivity(),
         }
 
         val name = group.name.takeIf { !it.isNullOrBlank() }
-            ?: group.subscription?.link?.takeIf { it.startsWith("oppa://") }
-                ?.let { runCatching { parseOppaProvider(it).name }.getOrNull() }
+            ?: group.subscription?.link?.takeIf { link -> link.startsWith("oppa://") }
+                ?.let { link -> runCatching { parseOppaProvider(link).name }.getOrNull() }
             ?: group.subscription?.link?.let { RawUpdater.fetchSubscriptionName(it) }
             ?: group.subscription?.link
             ?: group.subscription?.token

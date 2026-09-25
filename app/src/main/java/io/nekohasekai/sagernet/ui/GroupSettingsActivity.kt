@@ -148,7 +148,7 @@ class GroupSettingsActivity(
                 ProfileManager.createProfiles(group.id, proxies)
                 onMainDispatcher { finish() }
             } catch (e: Exception) {
-                onMainDispatcher { Toast.makeText(this, e.readableMessage, Toast.LENGTH_LONG).show() }
+                onMainDispatcher { Toast.makeText(this@GroupSettingsActivity, e.readableMessage, Toast.LENGTH_LONG).show() }
             }
         }
     }
