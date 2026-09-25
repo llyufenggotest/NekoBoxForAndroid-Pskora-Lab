@@ -323,6 +323,8 @@
     <string name="subscription">订阅</string>
     <string name="subscription_settings">订阅设置</string>
     <string name="group_type">分组类型</string>
+    <string name="group_jump_top">置顶</string>
+    <string name="group_jump_end">末尾</string>
     <string name="subscription_type">订阅类型</string>
     <string name="delete_group_prompt">您确定要删除该分组吗 \?</string>
     <string name="force_resolve">强制解析</string>

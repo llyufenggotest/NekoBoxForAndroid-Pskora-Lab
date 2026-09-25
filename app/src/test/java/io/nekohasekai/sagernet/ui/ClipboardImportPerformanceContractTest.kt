@@ -70,6 +70,8 @@ class ClipboardImportPerformanceContractTest {
         assertTrue(settings.contains("pendingFileProxies.isNotEmpty()"))
         assertTrue(settings.contains("editingId == 0L && DataStore.groupType == GroupType.BASIC"))
         assertTrue(settings.contains("selectedType != GroupType.BASIC"))
+        assertTrue(settings.contains("setOnPreferenceClickListener"))
+        assertFalse(settings.contains("selectedType == GroupType.BASIC &&"))
     }
 
     @Test
@@ -80,5 +82,19 @@ class ClipboardImportPerformanceContractTest {
         assertTrue(main.contains("connect.launch(null)"))
         assertTrue(store.contains("GroupUpdater.executeUpdate"))
         assertTrue(store.contains("PreferredGroupResolver"))
+    }
+
+    @Test
+    fun groupJumpButtonsAreOutlinedAndSupportBothListImplementations() {
+        val layout = File("src/main/res/layout/layout_group_list.xml").readText()
+        val main = source("io/nekohasekai/sagernet/ui/ConfigurationFragment.kt")
+        val preferred = source("io/nekohasekai/sagernet/ui/PreferredGroupFragment.kt")
+        assertTrue(layout.contains("Widget.MaterialComponents.Button.OutlinedButton"))
+        assertTrue(layout.contains("group_jump_top"))
+        assertTrue(layout.contains("group_jump_end"))
+        assertTrue(main.contains("smoothScrollToPosition(0)"))
+        assertTrue(main.contains("smoothScrollToPosition(Int.MAX_VALUE)"))
+        assertTrue(preferred.contains("fun scrollToTop()"))
+        assertTrue(preferred.contains("fun scrollToEnd()"))
     }
 }

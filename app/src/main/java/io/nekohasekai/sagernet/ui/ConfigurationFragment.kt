@@ -1185,6 +1185,14 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         groupPager = view.findViewById(R.id.group_pager)
         tabLayout = view.findViewById(R.id.group_tab)
+        view.findViewById<View>(R.id.group_jump_top)?.setOnClickListener {
+            getCurrentGroupFragment()?.configurationListView?.smoothScrollToPosition(0)
+            preferredGroupFragments[DataStore.selectedGroup]?.scrollToTop()
+        }
+        view.findViewById<View>(R.id.group_jump_end)?.setOnClickListener {
+            getCurrentGroupFragment()?.configurationListView?.smoothScrollToPosition(Int.MAX_VALUE)
+            preferredGroupFragments[DataStore.selectedGroup]?.scrollToEnd()
+        }
         adapter = GroupPagerAdapter()
         ProfileManager.addListener(adapter)
         GroupManager.addListener(adapter)

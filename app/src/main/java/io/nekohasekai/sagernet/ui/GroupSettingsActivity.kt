@@ -249,9 +249,6 @@ class GroupSettingsActivity(
             if (selectedType != GroupType.BASIC) {
                 pendingFileName = ""
                 pendingFileProxies = emptyList()
-            } else if (DataStore.editingId == 0L && !filePickerLaunched) {
-                filePickerLaunched = true
-                importFile.launch("*/*")
             }
             true
         }
@@ -422,11 +419,6 @@ class GroupSettingsActivity(
                     supportFragmentManager.beginTransaction()
                         .replace(R.id.settings, MyPreferenceFragmentCompat())
                         .commit()
-                    if (editingId == 0L && DataStore.groupType == GroupType.BASIC && !filePickerLaunched) {
-                        filePickerLaunched = true
-                        importFile.launch("*/*")
-                    }
-
                     DataStore.dirty = false
                     DataStore.profileCacheStore.registerChangeListener(this@GroupSettingsActivity)
                 }

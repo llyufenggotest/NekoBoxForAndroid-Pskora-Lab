@@ -292,6 +292,8 @@
     <string name="action_export">Export</string>
     <string name="action_import">Import from Clipboard</string>
     <string name="action_import_file">Import from file</string>
+    <string name="group_jump_top">Top</string>
+    <string name="group_jump_end">End</string>
     <string name="action_export_msg">Successfully export!</string>
     <string name="action_export_err">Failed to export.</string>
     <string name="action_import_msg">Successfully import!</string>

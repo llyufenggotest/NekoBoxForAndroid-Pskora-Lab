@@ -29,6 +29,56 @@
                 app:layout_scrollFlags="scroll|enterAlways">
                 <View android:layout_width="match_parent" android:layout_height="72dp" />
 
+                <LinearLayout
+                    android:id="@+id/group_jump_controls"
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginStart="@dimen/lab_content_inset"
+                    android:layout_marginEnd="@dimen/lab_content_inset"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/group_jump_top"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="5dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/group_jump_top"
+                        android:text="@string/group_jump_top"
+                        android:textColor="?colorPrimary"
+                        android:textSize="12sp"
+                        app:backgroundTint="@android:color/transparent"
+                        app:cornerRadius="18dp"
+                        app:icon="@drawable/ic_group_action_top_outline"
+                        app:iconGravity="textStart"
+                        app:iconPadding="4dp"
+                        app:iconTint="?colorPrimary"
+                        app:strokeColor="?colorPrimary"
+                        app:strokeWidth="1dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/group_jump_end"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="5dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/group_jump_end"
+                        android:text="@string/group_jump_end"
+                        android:textColor="?colorPrimary"
+                        android:textSize="12sp"
+                        app:backgroundTint="@android:color/transparent"
+                        app:cornerRadius="18dp"
+                        app:icon="@drawable/ic_group_action_bottom_outline"
+                        app:iconGravity="textStart"
+                        app:iconPadding="4dp"
+                        app:iconTint="?colorPrimary"
+                        app:strokeColor="?colorPrimary"
+                        app:strokeWidth="1dp" />
+                </LinearLayout>
+
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/dashboard_test_card"
                     android:layout_width="match_parent"
