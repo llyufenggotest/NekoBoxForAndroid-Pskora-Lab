@@ -39,6 +39,8 @@ import org.yaml.snakeyaml.TypeDescription
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.error.YAMLException
 import java.io.StringReader
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import androidx.core.net.toUri
 
 @Suppress("EXPERIMENTAL_API_USAGE")
@@ -58,7 +60,9 @@ object RawUpdater : GroupUpdater() {
             }.execute()
             val content = Util.getStringBox(response.contentString)
             parseBodyProfileTitle(content).ifBlank {
-                Util.decodeFilename(Util.getStringBox(response.getHeader("content-disposition")))
+                decodeProfileTitle(Util.getStringBox(response.getHeader("profile-title")))
+            }.ifBlank {
+                parseContentDisposition(Util.getStringBox(response.getHeader("content-disposition")))
             }.takeIf { it.isNotBlank() }
         } catch (e: Exception) {
             Logs.d("Fetch subscription name failed: ${e.readableMessage}")
@@ -213,7 +217,10 @@ object RawUpdater : GroupUpdater() {
             if (proxyGroup.name?.startsWith("Subscription #") == true) {
                 var remoteName = parseBodyProfileTitle(content)
                 if (remoteName.isBlank()) {
-                    remoteName = Util.decodeFilename(Util.getStringBox(response.getHeader("content-disposition")))
+                    remoteName = decodeProfileTitle(Util.getStringBox(response.getHeader("profile-title")))
+                }
+                if (remoteName.isBlank()) {
+                    remoteName = parseContentDisposition(Util.getStringBox(response.getHeader("content-disposition")))
                 }
                 if (remoteName.isNotBlank()) {
                     proxyGroup.name = remoteName
@@ -448,6 +455,28 @@ object RawUpdater : GroupUpdater() {
             }.getOrDefault("").trim()
         }
         return title
+    }
+
+    internal fun parseContentDisposition(header: String): String {
+        if (header.isBlank()) return ""
+        val rfc5987 = Regex("filename\\*=([^']*)''([^;]+)", RegexOption.IGNORE_CASE).find(header)
+        if (rfc5987 != null) {
+            val charset = rfc5987.groupValues[1].ifBlank { StandardCharsets.UTF_8.name() }
+            return runCatching { URLDecoder.decode(rfc5987.groupValues[2].trim(), charset) }
+                .getOrDefault(rfc5987.groupValues[2].trim())
+                .removeSuffix(".yaml")
+                .removeSuffix(".yml")
+                .trim()
+        }
+        return Regex("filename\\s*=\\s*\"?([^\";]+)\"?", RegexOption.IGNORE_CASE)
+            .find(header)?.groupValues?.get(1)?.trim()
+            ?.removeSuffix(".yaml")?.removeSuffix(".yml").orEmpty()
+    }
+
+    internal fun decodeProfileTitle(header: String): String {
+        if (header.isBlank()) return ""
+        return runCatching { URLDecoder.decode(header.trim(), StandardCharsets.UTF_8.name()) }
+            .getOrDefault(header.trim())
     }
 
     @Suppress("UNCHECKED_CAST")

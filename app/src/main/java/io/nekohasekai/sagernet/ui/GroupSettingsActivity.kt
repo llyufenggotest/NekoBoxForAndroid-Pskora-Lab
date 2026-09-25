@@ -118,6 +118,21 @@ class GroupSettingsActivity(
     private var isFromFile = false
     private var filePickerLaunched = false
 
+    private fun fillSubscriptionName(link: String, groupName: EditTextPreference) {
+        if (!link.startsWith("http")) return
+        if (DataStore.groupName.isNotBlank() && DataStore.groupName != "My group") return
+        runOnDefaultDispatcher {
+            val remoteName = RawUpdater.fetchSubscriptionName(link) ?: return@runOnDefaultDispatcher
+            onMainDispatcher {
+                if (DataStore.subscriptionLink == link &&
+                    (DataStore.groupName.isBlank() || DataStore.groupName == "My group")) {
+                    DataStore.groupName = remoteName
+                    groupName.text = remoteName
+                }
+            }
+        }
+    }
+
     private val importFile = registerForActivityResult(ActivityResultContracts.GetContent()) { file ->
         if (file == null) return@registerForActivityResult
         runOnDefaultDispatcher {
@@ -225,6 +240,7 @@ class GroupSettingsActivity(
             true
         }
 
+        val groupName = findPreference<EditTextPreference>(Key.GROUP_NAME)!!
         findPreference<EditTextPreference>(Key.SUBSCRIPTION_LINK)?.setOnPreferenceChangeListener { _, newValue ->
             val link = newValue.toString().trim()
             if (link.startsWith("oppa://")) {
@@ -236,9 +252,13 @@ class GroupSettingsActivity(
                     DataStore.groupName = provider.name
                     findPreference<EditTextPreference>(Key.GROUP_NAME)?.text = provider.name
                 }
+            } else {
+                fillSubscriptionName(link, groupName)
             }
             true
         }
+
+        if (isFromClipboard) fillSubscriptionName(DataStore.subscriptionLink, groupName)
 
         val subscriptionAutoUpdate =
             findPreference<SwitchPreference>(Key.SUBSCRIPTION_AUTO_UPDATE)!!

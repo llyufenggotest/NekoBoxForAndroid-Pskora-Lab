@@ -48,6 +48,16 @@ class ClipboardImportPerformanceContractTest {
     }
 
     @Test
+    fun clipboardSubscriptionNameIsAppliedInsideTheEditor() {
+        val fragment = source("io/nekohasekai/sagernet/ui/ConfigurationFragment.kt")
+        val settings = source("io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt")
+        assertTrue(fragment.contains("RawUpdater.fetchSubscriptionName(subscriptionLink)"))
+        assertTrue(fragment.contains("EXTRA_GROUP_NAME, guessed"))
+        assertTrue(settings.contains("fillSubscriptionName(DataStore.subscriptionLink, groupName)"))
+        assertTrue(settings.contains("groupName.text = remoteName"))
+    }
+
+    @Test
     fun groupFileImportUsesTheGroupEditorEntryPoint() {
         val fragment = source("io/nekohasekai/sagernet/ui/ConfigurationFragment.kt")
         val settings = source("io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt")

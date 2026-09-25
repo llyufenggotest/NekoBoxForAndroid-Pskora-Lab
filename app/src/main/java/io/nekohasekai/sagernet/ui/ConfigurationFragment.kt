@@ -1436,15 +1436,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                             } else null
                             val airportName = oppaProviderName
                                 ?: subscriptionUri.getQueryParameter("name")?.takeIf { it.isNotBlank() }
-
-                            val group = ProxyGroup(type = GroupType.SUBSCRIPTION)
-                            val subscription = SubscriptionBean()
-                            group.subscription = subscription
-                            subscription.link = subscriptionLink
-                            subscription.autoUpdate = false
-                            group.name = airportName ?: ""
                             runOnDefaultDispatcher {
-                                val guessed = if (subscriptionLink.startsWith("http")) {
+                                val guessed = airportName ?: if (subscriptionLink.startsWith("http")) {
                                     RawUpdater.fetchSubscriptionName(subscriptionLink)
                                 } else null
                                 onMainDispatcher {
