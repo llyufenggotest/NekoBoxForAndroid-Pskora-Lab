@@ -222,17 +222,24 @@ func queryIPQuality(client *http.Client, endpoints ipQualityEndpoints) (ipQualit
 	}
 	if endpoints.ipv4Discovery != "" {
 		var discoveredIPv4 string
-		if err := getIPQualityText(ctx, client, endpoints.ipv4Discovery, &discoveredIPv4); err == nil {
-			discoveredIPv4 = strings.TrimSpace(discoveredIPv4)
-			if parsed := net.ParseIP(discoveredIPv4); parsed != nil && parsed.To4() != nil {
-				official.IP = discoveredIPv4
-				official.ASN = nil
-				official.ASOrganization = ""
-				official.IsBroadcast = nil
-				official.IsResidential = nil
-				official.FraudScore = nil
-			}
+		if err := getIPQualityText(ctx, client, endpoints.ipv4Discovery, &discoveredIPv4); err != nil {
+			return ipQualityResult{}, fmt.Errorf("IPv4 discovery failed: %w", err)
 		}
+		parsedIPv4 := net.ParseIP(strings.TrimSpace(discoveredIPv4))
+		if parsedIPv4 == nil || parsedIPv4.To4() == nil {
+			return ipQualityResult{}, errors.New("IPv4 discovery failed: response has no IPv4 address")
+		}
+		discoveredIPv4 = parsedIPv4.To4().String()
+		officialIP := net.ParseIP(strings.TrimSpace(official.IP))
+		sameIP := officialIP != nil && officialIP.To4() != nil && officialIP.To4().String() == discoveredIPv4
+		if !sameIP {
+			official.ASN = nil
+			official.ASOrganization = ""
+			official.IsBroadcast = nil
+			official.IsResidential = nil
+			official.FraudScore = nil
+		}
+		official.IP = discoveredIPv4
 	}
 	if official.IP == "" {
 		return ipQualityResult{}, errors.New("IPPure query failed: response has no IP")

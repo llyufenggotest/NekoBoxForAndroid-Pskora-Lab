@@ -139,6 +139,43 @@ func TestIPQualityPrefersExplicitIPv4DiscoveryOverMyIPIPv6(t *testing.T) {
 	}
 }
 
+func TestIPQualityPreservesOfficialMetadataWhenDiscoveryMatches(t *testing.T) {
+	server := newIPQualityServer(t, map[string]serverReply{
+		"/ipv4":        {body: "203.0.113.9\n"},
+		"/official":    {body: `{"ip":"203.0.113.9","asn":64496,"asOrganization":"Example Transit","fraudScore":31,"isBroadcast":false,"isResidential":true}`},
+		"/ip2location": {body: `{}`},
+		"/ipwhois":     {body: `{}`},
+		"/dbip":        {body: `{}`},
+	})
+	defer server.Close()
+
+	endpoints := testIPQualityEndpoints(server.URL)
+	endpoints.ipv4Discovery = server.URL + "/ipv4"
+	endpoints.basic, endpoints.risk, endpoints.botClass = "", "", ""
+	result, err := queryIPQuality(server.Client(), endpoints)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ASN != "AS64496 Example Transit" || result.Score != 31 || result.IPAttribute != "residential" {
+		t.Fatalf("matching discovery discarded official data: %+v", result)
+	}
+}
+
+func TestIPQualityRejectsInvalidExplicitIPv4Discovery(t *testing.T) {
+	server := newIPQualityServer(t, map[string]serverReply{
+		"/ipv4":     {body: "2001:db8::9\n"},
+		"/official": {body: `{"ip":"2001:db8::9","asn":64496}`},
+	})
+	defer server.Close()
+
+	endpoints := testIPQualityEndpoints(server.URL)
+	endpoints.ipv4Discovery = server.URL + "/ipv4"
+	_, err := queryIPQuality(server.Client(), endpoints)
+	if err == nil || !strings.Contains(err.Error(), "no IPv4 address") {
+		t.Fatalf("invalid discovery error = %v", err)
+	}
+}
+
 func TestIPQualityUsesRichIPPureDataWhenMyIPResponseOmitsScore(t *testing.T) {
 	server := newIPQualityServer(t, map[string]serverReply{
 		"/official":           {body: `{"ip":"198.51.100.9","asn":64496,"isBroadcast":false,"isResidential":false}`},
