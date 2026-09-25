@@ -2,6 +2,16 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/action_scroll_top"
+        android:icon="@drawable/ic_group_action_top_outline"
+        android:title="@string/group_jump_top"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_scroll_end"
+        android:icon="@drawable/ic_group_action_bottom_outline"
+        android:title="@string/group_jump_end"
+        app:showAsAction="always" />
+    <item
         android:id="@+id/action_update_all"
         android:icon="@drawable/ic_group_update_all_outline"
         android:title="@string/update_all_subscription"

@@ -130,6 +130,15 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
     override fun onMenuItemClick(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.action_scroll_top -> {
+                groupListView.smoothScrollToPosition(0)
+            }
+
+            R.id.action_scroll_end -> {
+                val last = (groupAdapter.itemCount - 1).coerceAtLeast(0)
+                groupListView.smoothScrollToPosition(last)
+            }
+
             R.id.action_new_group -> {
                 startActivity(Intent(context, GroupSettingsActivity::class.java))
             }

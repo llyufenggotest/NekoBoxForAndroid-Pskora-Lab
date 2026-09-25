@@ -85,16 +85,16 @@ class ClipboardImportPerformanceContractTest {
     }
 
     @Test
-    fun groupJumpButtonsAreOutlinedAndSupportBothListImplementations() {
-        val layout = File("src/main/res/layout/layout_group_list.xml").readText()
-        val main = source("io/nekohasekai/sagernet/ui/ConfigurationFragment.kt")
-        val preferred = source("io/nekohasekai/sagernet/ui/PreferredGroupFragment.kt")
-        assertTrue(layout.contains("Widget.MaterialComponents.Button.OutlinedButton"))
-        assertTrue(layout.contains("group_jump_top"))
-        assertTrue(layout.contains("group_jump_end"))
-        assertTrue(main.contains("smoothScrollToPosition(0)"))
-        assertTrue(main.contains("smoothScrollToPosition(Int.MAX_VALUE)"))
-        assertTrue(preferred.contains("fun scrollToTop()"))
-        assertTrue(preferred.contains("fun scrollToEnd()"))
+    fun groupScreenExposesIconOnlyScrollShortcuts() {
+        val menu = File("src/main/res/menu/add_group_menu.xml").readText()
+        val groupFragment = source("io/nekohasekai/sagernet/ui/GroupFragment.kt")
+        val dashboard = File("src/main/res/layout/layout_group_list.xml").readText()
+        assertTrue(menu.contains("action_scroll_top"))
+        assertTrue(menu.contains("action_scroll_end"))
+        assertTrue(groupFragment.contains("groupListView.smoothScrollToPosition(0)"))
+        assertTrue(groupFragment.contains("groupAdapter.itemCount - 1"))
+        // The shortcuts belong to the 分组 management screen, never the home dashboard.
+        assertFalse(dashboard.contains("group_jump_top"))
+        assertFalse(dashboard.contains("group_jump_end"))
     }
 }

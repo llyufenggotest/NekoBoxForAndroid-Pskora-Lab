@@ -276,9 +276,6 @@ class PreferredGroupFragment : Fragment(), ProfileManager.Listener, GroupManager
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
-    fun scrollToTop() { list?.smoothScrollToPosition(0) }
-    fun scrollToEnd() { list?.smoothScrollToPosition((cards.itemCount - 1).coerceAtLeast(0)) }
-
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View =
         LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
