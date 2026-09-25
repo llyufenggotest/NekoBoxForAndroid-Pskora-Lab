@@ -68,7 +68,7 @@ class ClipboardImportPerformanceContractTest {
         assertTrue(settings.contains("groupFilePicker"))
         assertTrue(settings.contains("DataStore.groupName = pendingFileName"))
         assertTrue(settings.contains("pendingFileProxies.isNotEmpty()"))
-        assertTrue(settings.contains("editingId == 0L && DataStore.groupType == GroupType.BASIC"))
+        assertFalse(settings.contains("editingId == 0L && DataStore.groupType == GroupType.BASIC && !filePickerLaunched"))
         assertTrue(settings.contains("selectedType != GroupType.BASIC"))
         assertTrue(settings.contains("setOnPreferenceClickListener"))
         assertFalse(settings.contains("selectedType == GroupType.BASIC &&"))
