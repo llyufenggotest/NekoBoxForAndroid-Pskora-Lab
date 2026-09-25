@@ -678,6 +678,10 @@ func (s *Box) Router() adapter.Router {
 	return s.router
 }
 
+func (s *Box) DNSRouter() adapter.DNSRouter {
+	return s.dnsRouter
+}
+
 func (s *Box) Inbound() adapter.InboundManager {
 	return s.inbound
 }
