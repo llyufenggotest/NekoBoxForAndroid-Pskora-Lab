@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"libcore/boxapi"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -26,8 +27,10 @@ const (
 )
 
 type ipQualityEndpoints struct {
-	official    string
-	basic       string
+	ipv4Discovery string
+	official      string
+	basic         string
+
 	risk        string
 	botClass    string
 	ip2Location string
@@ -36,13 +39,14 @@ type ipQualityEndpoints struct {
 }
 
 var activeIPQualityEndpoints = ipQualityEndpoints{
-	official:    "https://my.ippure.com/v1/info",
-	basic:       "https://api.123169.xyz/api/info/ip-basic/%s",
-	risk:        "https://api.123169.xyz/api/info/ip-risk/%s",
-	botClass:    "https://api.123169.xyz/api/info/asn/botclass/%s",
-	ip2Location: "https://api.ip2location.io/?ip=%s",
-	ipWhoIs:     "https://ipwho.is/%s",
-	dbIP:        "https://api.db-ip.com/v2/free/%s",
+	ipv4Discovery: "https://ipv4.icanhazip.com",
+	official:      "https://my.ippure.com/v1/info",
+	basic:         "https://api.123169.xyz/api/info/ip-basic/%s",
+	risk:          "https://api.123169.xyz/api/info/ip-risk/%s",
+	botClass:      "https://api.123169.xyz/api/info/asn/botclass/%s",
+	ip2Location:   "https://api.ip2location.io/?ip=%s",
+	ipWhoIs:       "https://ipwho.is/%s",
+	dbIP:          "https://api.db-ip.com/v2/free/%s",
 }
 
 var newIPQualityHTTPClient = boxapi.CreateProxyHttpClientIPv4
@@ -216,6 +220,20 @@ func queryIPQuality(client *http.Client, endpoints ipQualityEndpoints) (ipQualit
 	if err := getIPQualityJSON(ctx, client, endpoints.official, &official); err != nil {
 		return ipQualityResult{}, fmt.Errorf("IPPure query failed: %w", err)
 	}
+	if endpoints.ipv4Discovery != "" {
+		var discoveredIPv4 string
+		if err := getIPQualityText(ctx, client, endpoints.ipv4Discovery, &discoveredIPv4); err == nil {
+			discoveredIPv4 = strings.TrimSpace(discoveredIPv4)
+			if parsed := net.ParseIP(discoveredIPv4); parsed != nil && parsed.To4() != nil {
+				official.IP = discoveredIPv4
+				official.ASN = nil
+				official.ASOrganization = ""
+				official.IsBroadcast = nil
+				official.IsResidential = nil
+				official.FraudScore = nil
+			}
+		}
+	}
 	if official.IP == "" {
 		return ipQualityResult{}, errors.New("IPPure query failed: response has no IP")
 	}
@@ -343,6 +361,29 @@ func queryIPQuality(client *http.Client, endpoints ipQualityEndpoints) (ipQualit
 		result.Errors = nil
 	}
 	return result, nil
+}
+
+func getIPQualityText(ctx context.Context, client *http.Client, endpoint string, target *string) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return errors.New("invalid source URL")
+	}
+	request.Header.Set("Accept", "text/plain")
+	request.Header.Set("User-Agent", "NekoBox-IPQuality/1.0")
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("HTTP status %d", response.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(response.Body, 256))
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
+	*target = string(body)
+	return nil
 }
 
 func getIPQualityJSON(ctx context.Context, client *http.Client, endpoint string, target any) error {

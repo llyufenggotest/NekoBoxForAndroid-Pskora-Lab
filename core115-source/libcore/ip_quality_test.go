@@ -115,6 +115,30 @@ func TestIPQualityKeepsPartialResultsWhenSourceFails(t *testing.T) {
 	}
 }
 
+func TestIPQualityPrefersExplicitIPv4DiscoveryOverMyIPIPv6(t *testing.T) {
+	server := newIPQualityServer(t, map[string]serverReply{
+		"/ipv4":              {body: "203.0.113.9\n"},
+		"/official":          {body: `{"ip":"2001:db8::9","asn":64496}`},
+		"/basic/203.0.113.9": {body: `{"ok":true,"data":{"ip":"203.0.113.9","asn":{"number":64496,"organization":"Example Transit","type":"hosting"}}}`},
+		"/risk/203.0.113.9":  {body: `{"ok":true,"data":{"risk_score":39}}`},
+		"/bot/64496":         {body: `{"ok":true,"data":{"bot":37.4,"human":62.6}}`},
+		"/ip2location":       {body: `{}`},
+		"/ipwhois":           {body: `{}`},
+		"/dbip":              {body: `{}`},
+	})
+	defer server.Close()
+
+	endpoints := testIPQualityEndpoints(server.URL)
+	endpoints.ipv4Discovery = server.URL + "/ipv4"
+	result, err := queryIPQuality(server.Client(), endpoints)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.IP != "203.0.113.9" || result.Score != 39 {
+		t.Fatalf("explicit IPv4 discovery was not authoritative: %+v", result)
+	}
+}
+
 func TestIPQualityUsesRichIPPureDataWhenMyIPResponseOmitsScore(t *testing.T) {
 	server := newIPQualityServer(t, map[string]serverReply{
 		"/official":           {body: `{"ip":"198.51.100.9","asn":64496,"isBroadcast":false,"isResidential":false}`},
@@ -262,7 +286,7 @@ func newIPQualityServer(t *testing.T, replies map[string]serverReply) *httptest.
 			http.NotFound(w, r)
 			return
 		}
-		if r.Header.Get("Accept") != "application/json" {
+		if r.URL.Path != "/ipv4" && r.Header.Get("Accept") != "application/json" {
 			t.Errorf("Accept = %q", r.Header.Get("Accept"))
 		}
 		status := reply.status
