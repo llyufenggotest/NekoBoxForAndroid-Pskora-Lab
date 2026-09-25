@@ -24,6 +24,9 @@ func TestIPPureSessionSignsRetryWithIssuedKey(t *testing.T) {
 	var calls int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
+		if r.Header.Get("Origin") != "https://ippure.com" || r.Header.Get("Referer") != "https://ippure.com/" {
+			t.Fatalf("missing IPPure browser-origin headers: Origin=%q Referer=%q", r.Header.Get("Origin"), r.Header.Get("Referer"))
+		}
 		if calls == 1 {
 			w.Header().Set("x-k", key)
 			w.Header().Set("x-t", strconv.FormatInt(time.Now().UnixMilli(), 10))

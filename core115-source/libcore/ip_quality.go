@@ -66,7 +66,9 @@ func (s *ipPureSession) getJSON(ctx context.Context, client *http.Client, endpoi
 			return errors.New("invalid source URL")
 		}
 		request.Header.Set("Accept", "application/json")
-		request.Header.Set("User-Agent", "NekoBox-IPQuality/1.0")
+		request.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36")
+		request.Header.Set("Origin", "https://ippure.com")
+		request.Header.Set("Referer", "https://ippure.com/")
 		if s.key != "" {
 			timestamp := time.Now().UnixMilli() + s.timeOffset
 			payload := strings.Join([]string{request.Method, request.URL.String(), "", strconv.FormatInt(timestamp, 10)}, "-")
