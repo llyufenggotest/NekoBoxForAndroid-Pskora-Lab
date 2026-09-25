@@ -1443,14 +1443,17 @@ class ConfigurationFragment @JvmOverloads constructor(
                             subscription.link = subscriptionLink
                             subscription.autoUpdate = false
                             group.name = airportName ?: ""
-                            onMainDispatcher {
-                                startActivity(Intent(requireContext(), GroupSettingsActivity::class.java).apply {
-                                    putExtra(GroupSettingsActivity.EXTRA_FROM_CLIPBOARD, true)
-                                    putExtra(GroupSettingsActivity.EXTRA_GROUP_SUBSCRIPTION_LINK, subscriptionLink)
-                                    if (airportName != null) {
-                                        putExtra(GroupSettingsActivity.EXTRA_GROUP_NAME, airportName)
-                                    }
-                                })
+                            runOnDefaultDispatcher {
+                                val guessed = if (subscriptionLink.startsWith("http")) {
+                                    RawUpdater.fetchSubscriptionName(subscriptionLink)
+                                } else null
+                                onMainDispatcher {
+                                    startActivity(Intent(requireContext(), GroupSettingsActivity::class.java).apply {
+                                        putExtra(GroupSettingsActivity.EXTRA_FROM_CLIPBOARD, true)
+                                        putExtra(GroupSettingsActivity.EXTRA_GROUP_SUBSCRIPTION_LINK, subscriptionLink)
+                                        if (!guessed.isNullOrBlank()) putExtra(GroupSettingsActivity.EXTRA_GROUP_NAME, guessed)
+                                    })
+                                }
                             }
                         }
                     } catch (e: Exception) {
@@ -1463,7 +1466,9 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             R.id.action_import_file -> {
-                startFilesForResult(importFile, "*/*")
+                startActivity(Intent(requireContext(), GroupSettingsActivity::class.java).apply {
+                    putExtra(GroupSettingsActivity.EXTRA_FROM_FILE, true)
+                })
             }
 
             R.id.action_new_preferred -> {

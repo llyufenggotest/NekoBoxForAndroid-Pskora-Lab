@@ -6,6 +6,7 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
 import android.os.Parcelable
+import android.provider.OpenableColumns
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -25,15 +26,18 @@ import io.nekohasekai.sagernet.SubscriptionFilterMode
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.group.GroupUpdater
+import io.nekohasekai.sagernet.group.RawUpdater
 import io.nekohasekai.sagernet.fmt.oppa.parseOppaProvider
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
+import io.nekohasekai.sagernet.ktx.readableMessage
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.widget.ListListener
 import io.nekohasekai.sagernet.widget.OutboundPreference
 import kotlinx.parcelize.Parcelize
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
+import java.util.zip.ZipInputStream
 
 @Suppress("UNCHECKED_CAST")
 class GroupSettingsActivity(
@@ -111,6 +115,43 @@ class GroupSettingsActivity(
     }
 
     private var isFromClipboard = false
+    private var isFromFile = false
+    private var filePickerLaunched = false
+
+    private val importFile = registerForActivityResult(ActivityResultContracts.GetContent()) { file ->
+        if (file == null) return@registerForActivityResult
+        runOnDefaultDispatcher {
+            try {
+                val fileName = contentResolver.query(file, null, null, null, null)?.use { cursor ->
+                    cursor.moveToFirst()
+                    cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf { it >= 0 }
+                        ?.let(cursor::getString)
+                }.orEmpty()
+                val proxies = if (fileName.endsWith(".zip", true)) {
+                    val result = mutableListOf<io.nekohasekai.sagernet.fmt.AbstractBean>()
+                    ZipInputStream(contentResolver.openInputStream(file)!!).use { zip ->
+                        while (true) {
+                            val entry = zip.nextEntry ?: break
+                            if (!entry.isDirectory) RawUpdater.parseRaw(zip.bufferedReader().readText(), entry.name)?.let(result::addAll)
+                            zip.closeEntry()
+                        }
+                    }
+                    result
+                } else {
+                    val text = contentResolver.openInputStream(file)!!.bufferedReader().use { it.readText() }
+                    RawUpdater.parseRaw(text, fileName).orEmpty()
+                }
+                require(proxies.isNotEmpty()) { getString(R.string.no_proxies_found_in_file) }
+                val group = GroupManager.createGroup(
+                    ProxyGroup(name = fileName.substringBeforeLast('.').ifBlank { "Imported" }, type = GroupType.BASIC),
+                )
+                ProfileManager.createProfiles(group.id, proxies)
+                onMainDispatcher { finish() }
+            } catch (e: Exception) {
+                onMainDispatcher { Toast.makeText(this, e.readableMessage, Toast.LENGTH_LONG).show() }
+            }
+        }
+    }
 
     fun needSave(): Boolean {
         return DataStore.dirty
@@ -287,6 +328,7 @@ class GroupSettingsActivity(
     companion object {
         const val EXTRA_GROUP_ID = "id"
         const val EXTRA_FROM_CLIPBOARD = "fromClipboard"
+        const val EXTRA_FROM_FILE = "fromFile"
         const val EXTRA_GROUP_SUBSCRIPTION_LINK = "subscription_link"
         const val EXTRA_GROUP_NAME = "group_name"
     }
@@ -304,6 +346,7 @@ class GroupSettingsActivity(
         if (savedInstanceState == null) {
             val editingId = intent.getLongExtra(EXTRA_GROUP_ID, 0L)
             isFromClipboard = intent.getBooleanExtra(EXTRA_FROM_CLIPBOARD, false)
+            isFromFile = intent.getBooleanExtra(EXTRA_FROM_FILE, false)
             val subscriptionLink = intent.getStringExtra(EXTRA_GROUP_SUBSCRIPTION_LINK)
             val importedGroupName = intent.getStringExtra(EXTRA_GROUP_NAME)
             DataStore.editingId = editingId
@@ -336,6 +379,10 @@ class GroupSettingsActivity(
                     supportFragmentManager.beginTransaction()
                         .replace(R.id.settings, MyPreferenceFragmentCompat())
                         .commit()
+                    if (isFromFile && !filePickerLaunched) {
+                        filePickerLaunched = true
+                        importFile.launch("*/*")
+                    }
 
                     DataStore.dirty = false
                     DataStore.profileCacheStore.registerChangeListener(this@GroupSettingsActivity)

@@ -1,13 +1,50 @@
 package io.nekohasekai.sagernet.database
 
 import io.nekohasekai.sagernet.GroupType
+import io.nekohasekai.sagernet.group.GroupUpdater
 import moe.matsuri.nb4a.proxy.config.ConfigBean
+import moe.matsuri.nb4a.proxy.config.PreferredGroupResolver
 import moe.matsuri.nb4a.proxy.config.validatePreferredSave
 import moe.matsuri.nb4a.proxy.config.preferredSpec
 import java.util.concurrent.Callable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 
 /** Independent groups own only a managed container. Candidate IDs always belong to their sources. */
 object PreferredGroupStore {
+    /** Re-read dynamic source groups before a preferred container is connected. */
+    suspend fun syncSources(groupId: Long): Boolean {
+        val sourceIds = withContext(Dispatchers.IO) {
+            val owner = container(groupId) ?: return@withContext emptyList<Long>()
+            owner.configBean?.preferredSourceGroupIds.orEmpty()
+        }
+        if (sourceIds.isEmpty()) return true
+        val groups = withContext(Dispatchers.IO) {
+            sourceIds.mapNotNull { SagerDatabase.groupDao.getById(it) }
+                .filter { it.type == GroupType.SUBSCRIPTION && it.subscription != null }
+        }
+        withContext(Dispatchers.IO) {
+            groups.forEach { group ->
+                if (GroupUpdater.updating.contains(group.id)) {
+                    withTimeoutOrNull(15_000L) {
+                        while (GroupUpdater.updating.contains(group.id)) delay(50L)
+                    }
+                } else {
+                    GroupUpdater.executeUpdate(group, byUser = false)
+                }
+            }
+        }
+        return withContext(Dispatchers.IO) {
+            val owner = container(groupId) ?: return@withContext false
+            runCatching {
+                PreferredGroupResolver(
+                    SagerDatabase.proxyDao.getAll(), SagerDatabase.groupDao.allGroups(),
+                ).validate(owner)
+            }.isSuccess
+        }
+    }
     fun container(groupId: Long): ProxyEntity? =
         SagerDatabase.proxyDao.getByGroup(groupId).singleOrNull { it.configBean?.type == 2 }
 

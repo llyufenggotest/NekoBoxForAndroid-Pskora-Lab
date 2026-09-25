@@ -40,6 +40,7 @@ import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.database.SubscriptionBean
+import io.nekohasekai.sagernet.database.PreferredGroupStore
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.databinding.LayoutMainBinding
 import io.nekohasekai.sagernet.fmt.AbstractBean
@@ -47,6 +48,7 @@ import io.nekohasekai.sagernet.fmt.KryoConverters
 import io.nekohasekai.sagernet.fmt.PluginEntry
 import io.nekohasekai.sagernet.group.GroupInterfaceAdapter
 import io.nekohasekai.sagernet.group.GroupUpdater
+import io.nekohasekai.sagernet.group.RawUpdater
 import io.nekohasekai.sagernet.ktx.alert
 import io.nekohasekai.sagernet.ktx.isPlay
 import io.nekohasekai.sagernet.ktx.isPreview
@@ -361,8 +363,12 @@ class MainActivity : ThemedActivity(),
             }
         }
 
-        val name = group.name.takeIf { !it.isNullOrBlank() } ?: group.subscription?.link
-        ?: group.subscription?.token
+        val name = group.name.takeIf { !it.isNullOrBlank() }
+            ?: group.subscription?.link?.takeIf { it.startsWith("oppa://") }
+                ?.let { runCatching { parseOppaProvider(it).name }.getOrNull() }
+            ?: group.subscription?.link?.let { RawUpdater.fetchSubscriptionName(it) }
+            ?: group.subscription?.link
+            ?: group.subscription?.token
         if (name.isNullOrBlank()) return
 
         group.name = group.name.takeIf { !it.isNullOrBlank() }
@@ -519,10 +525,21 @@ class MainActivity : ThemedActivity(),
     }
 
     fun requestDashboardConnection() {
-        dashboardHealth.reset()
-        renderVpnMetrics()
-        refreshConfigurationProfileState()
-        connect.launch(null)
+        val selected = DataStore.selectedProxy
+        lifecycleScope.launch {
+            val preferredGroupId = withContext(Dispatchers.IO) {
+                ProfileManager.getProfile(selected)?.takeIf { it.configBean?.type == 2 }?.groupId
+            }
+            if (preferredGroupId != null && !PreferredGroupStore.syncSources(preferredGroupId)) {
+                snackbar("优选分组引用已失效，请先编辑优选分组").show()
+                return@launch
+            }
+            if (selected != DataStore.selectedProxy) return@launch
+            dashboardHealth.reset()
+            renderVpnMetrics()
+            refreshConfigurationProfileState()
+            connect.launch(null)
+        }
     }
 
     fun stopDashboardConnection() {

@@ -46,4 +46,24 @@ class ClipboardImportPerformanceContractTest {
         assertFalse(clipboardBranch.contains("withTimeoutOrNull(5_000L)"))
         assertFalse(clipboardBranch.contains("fetchAirportName(subscriptionLink)"))
     }
+
+    @Test
+    fun groupFileImportUsesTheGroupEditorEntryPoint() {
+        val fragment = source("io/nekohasekai/sagernet/ui/ConfigurationFragment.kt")
+        val settings = source("io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt")
+        assertTrue(fragment.contains("EXTRA_FROM_FILE"))
+        assertTrue(settings.contains("ActivityResultContracts.GetContent"))
+        assertTrue(settings.contains("RawUpdater.parseRaw"))
+        assertTrue(settings.contains("ProfileManager.createProfiles"))
+    }
+
+    @Test
+    fun preferredConnectionRefreshesDynamicSourcesBeforeVpnStart() {
+        val main = source("io/nekohasekai/sagernet/ui/MainActivity.kt")
+        val store = source("io/nekohasekai/sagernet/database/PreferredGroupStore.kt")
+        assertTrue(main.contains("PreferredGroupStore.syncSources"))
+        assertTrue(main.contains("connect.launch(null)"))
+        assertTrue(store.contains("GroupUpdater.executeUpdate"))
+        assertTrue(store.contains("PreferredGroupResolver"))
+    }
 }

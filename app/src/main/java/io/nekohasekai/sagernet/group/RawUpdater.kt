@@ -44,6 +44,30 @@ import androidx.core.net.toUri
 @Suppress("EXPERIMENTAL_API_USAGE")
 object RawUpdater : GroupUpdater() {
 
+    suspend fun fetchSubscriptionName(link: String): String? {
+        if (!link.startsWith("http")) return null
+        val client = Libcore.newHttpClient().apply {
+            trySocks5(DataStore.mixedPort, DataStore.mixedInboundUser, DataStore.mixedInboundPass)
+            tryH3Direct()
+        }
+        return try {
+            val response = client.newRequest().apply {
+                if (DataStore.allowInsecureOnRequest) allowInsecure()
+                setURL(link)
+                setUserAgent(USER_AGENT)
+            }.execute()
+            val content = Util.getStringBox(response.contentString)
+            parseBodyProfileTitle(content).ifBlank {
+                Util.decodeFilename(Util.getStringBox(response.getHeader("content-disposition")))
+            }.takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            Logs.d("Fetch subscription name failed: ${e.readableMessage}")
+            null
+        } finally {
+            client.close()
+        }
+    }
+
     internal fun parseShadowrocketJson(json: JSONObject): AbstractBean? {
         val kind = json.optString("type").lowercase()
         if (kind !in setOf("vmess", "vless", "trojan")) return null
