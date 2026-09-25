@@ -40,6 +40,13 @@
         app:key="groupLandingProxy"
         app:title="@string/landing_proxy"
         app:useSimpleSummaryProvider="true" />
+
+    <Preference
+        app:icon="@drawable/ic_baseline_link_24"
+        app:key="groupFilePicker"
+        app:title="@string/action_import_file"
+        app:summary="选择配置文件并自动读取文件名"
+        app:useSimpleSummaryProvider="true" />
     
     <EditTextPreference
         app:icon="@drawable/ic_baseline_manage_search_24"

@@ -65,6 +65,11 @@ class ClipboardImportPerformanceContractTest {
         assertTrue(settings.contains("ActivityResultContracts.GetContent"))
         assertTrue(settings.contains("RawUpdater.parseRaw"))
         assertTrue(settings.contains("ProfileManager.createProfiles"))
+        assertTrue(settings.contains("groupFilePicker"))
+        assertTrue(settings.contains("DataStore.groupName = pendingFileName"))
+        assertTrue(settings.contains("pendingFileProxies.isNotEmpty()"))
+        assertTrue(settings.contains("editingId == 0L && DataStore.groupType == GroupType.BASIC"))
+        assertTrue(settings.contains("selectedType != GroupType.BASIC"))
     }
 
     @Test

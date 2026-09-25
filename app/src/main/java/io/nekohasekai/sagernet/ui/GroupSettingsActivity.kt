@@ -25,6 +25,7 @@ import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.SubscriptionFilterMode
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
+import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.group.RawUpdater
 import io.nekohasekai.sagernet.fmt.oppa.parseOppaProvider
@@ -117,6 +118,9 @@ class GroupSettingsActivity(
     private var isFromClipboard = false
     private var isFromFile = false
     private var filePickerLaunched = false
+    private var pendingFileName = ""
+    private var pendingFileProxies: List<AbstractBean> = emptyList()
+    private lateinit var groupNamePreference: EditTextPreference
 
     private fun fillSubscriptionName(link: String, groupName: EditTextPreference) {
         if (!link.startsWith("http")) return
@@ -157,11 +161,14 @@ class GroupSettingsActivity(
                     RawUpdater.parseRaw(text, fileName).orEmpty()
                 }
                 require(proxies.isNotEmpty()) { getString(R.string.no_proxies_found_in_file) }
-                val group = GroupManager.createGroup(
-                    ProxyGroup(name = fileName.substringBeforeLast('.').ifBlank { "Imported" }, type = GroupType.BASIC),
-                )
-                ProfileManager.createProfiles(group.id, proxies)
-                onMainDispatcher { finish() }
+                pendingFileName = fileName.substringBeforeLast('.').ifBlank { "Imported" }
+                pendingFileProxies = proxies
+                onMainDispatcher {
+                    DataStore.groupType = GroupType.BASIC
+                    DataStore.groupName = pendingFileName
+                    DataStore.dirty = true
+                    if (::groupNamePreference.isInitialized) groupNamePreference.text = pendingFileName
+                }
             } catch (e: Exception) {
                 onMainDispatcher { Toast.makeText(this@GroupSettingsActivity, e.readableMessage, Toast.LENGTH_LONG).show() }
             }
@@ -233,14 +240,30 @@ class GroupSettingsActivity(
             groupSubscription.isVisible = isSubscription
             subscriptionUpdate.isVisible = isSubscription
             legacyGroupDns.isVisible = !isSubscription
+            findPreference<Preference>("groupFilePicker")?.isVisible = !isSubscription
         }
         updateGroupType()
         groupType.setOnPreferenceChangeListener { _, newValue ->
-            updateGroupType((newValue as String).toInt())
+            val selectedType = (newValue as String).toInt()
+            updateGroupType(selectedType)
+            if (selectedType != GroupType.BASIC) {
+                pendingFileName = ""
+                pendingFileProxies = emptyList()
+            } else if (DataStore.editingId == 0L && !filePickerLaunched) {
+                filePickerLaunched = true
+                importFile.launch("*/*")
+            }
+            true
+        }
+
+        findPreference<Preference>("groupFilePicker")?.setOnPreferenceClickListener {
+            filePickerLaunched = true
+            importFile.launch("*/*")
             true
         }
 
         val groupName = findPreference<EditTextPreference>(Key.GROUP_NAME)!!
+        groupNamePreference = groupName
         findPreference<EditTextPreference>(Key.SUBSCRIPTION_LINK)?.setOnPreferenceChangeListener { _, newValue ->
             val link = newValue.toString().trim()
             if (link.startsWith("oppa://")) {
@@ -399,7 +422,7 @@ class GroupSettingsActivity(
                     supportFragmentManager.beginTransaction()
                         .replace(R.id.settings, MyPreferenceFragmentCompat())
                         .commit()
-                    if (isFromFile && !filePickerLaunched) {
+                    if (editingId == 0L && DataStore.groupType == GroupType.BASIC && !filePickerLaunched) {
                         filePickerLaunched = true
                         importFile.launch("*/*")
                     }
@@ -415,7 +438,9 @@ class GroupSettingsActivity(
         val editingId = DataStore.editingId
         if (editingId == 0L) {
             val newGroup = GroupManager.createGroup(ProxyGroup().apply { serialize() })
-            if (isFromClipboard && newGroup.type == GroupType.SUBSCRIPTION && !newGroup.subscription?.link.isNullOrEmpty()) {
+            if (pendingFileProxies.isNotEmpty() && newGroup.type == GroupType.BASIC) {
+                ProfileManager.createProfiles(newGroup.id, pendingFileProxies)
+            } else if (isFromClipboard && newGroup.type == GroupType.SUBSCRIPTION && !newGroup.subscription?.link.isNullOrEmpty()) {
                 GroupUpdater.startUpdate(newGroup, true)
             }
         } else if (needSave()) {
