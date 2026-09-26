@@ -14,32 +14,35 @@ import kotlinx.coroutines.withContext
 
 /** Independent groups own only a managed container. Candidate IDs always belong to their sources. */
 object PreferredGroupStore {
-    /** Re-read dynamic source groups before a preferred container is connected. */
+    /** Re-read dynamic source groups, then prune dead references, before a preferred
+     *  container is connected. Healing runs even without source groups so hand-picked
+     *  members that were deleted are cleaned instead of blocking the connection. */
     suspend fun syncSources(groupId: Long): Boolean {
         val sourceIds = withContext(Dispatchers.IO) {
             val owner = container(groupId) ?: return@withContext emptyList<Long>()
             owner.configBean?.preferredSourceGroupIds.orEmpty()
         }
-        if (sourceIds.isEmpty()) return true
-        val groups = withContext(Dispatchers.IO) {
-            sourceIds.mapNotNull { SagerDatabase.groupDao.getById(it) }
-                .filter { it.type == GroupType.SUBSCRIPTION && it.subscription != null }
-        }
-        withContext(Dispatchers.IO) {
-            groups.forEach { group ->
-                if (GroupUpdater.updating.contains(group.id)) {
-                    withTimeoutOrNull(15_000L) {
-                        while (GroupUpdater.updating.contains(group.id)) delay(50L)
+        if (sourceIds.isNotEmpty()) {
+            val groups = withContext(Dispatchers.IO) {
+                sourceIds.mapNotNull { SagerDatabase.groupDao.getById(it) }
+                    .filter { it.type == GroupType.SUBSCRIPTION && it.subscription != null }
+            }
+            withContext(Dispatchers.IO) {
+                groups.forEach { group ->
+                    if (GroupUpdater.updating.contains(group.id)) {
+                        withTimeoutOrNull(15_000L) {
+                            while (GroupUpdater.updating.contains(group.id)) delay(50L)
+                        }
+                    } else {
+                        GroupUpdater.executeUpdate(group, byUser = false)
                     }
-                } else {
-                    GroupUpdater.executeUpdate(group, byUser = false)
                 }
             }
         }
         return withContext(Dispatchers.IO) {
             SagerDatabase.instance.runInTransaction(Callable {
-                val owner = container(groupId) ?: return@Callable false
-                val bean = owner.configBean ?: return@Callable false
+                val owner = container(groupId) ?: return@Callable true
+                val bean = owner.configBean ?: return@Callable true
                 val existingIds = SagerDatabase.proxyDao.getAll().map { it.id }.toHashSet()
                 val existingGroupIds = SagerDatabase.groupDao.allGroups().map { it.id }.toHashSet()
                 val spec = bean.preferredSpec()
@@ -52,7 +55,7 @@ object PreferredGroupStore {
                     owner.putBean(cleaned)
                     SagerDatabase.proxyDao.updateProxy(owner)
                 }
-                val healed = container(groupId) ?: return@Callable false
+                val healed = container(groupId) ?: return@Callable true
                 runCatching {
                     PreferredGroupResolver(
                         SagerDatabase.proxyDao.getAll(), SagerDatabase.groupDao.allGroups(),
