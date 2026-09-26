@@ -532,7 +532,7 @@ class MainActivity : ThemedActivity(),
                 ProfileManager.getProfile(selected)?.takeIf { it.configBean?.type == 2 }?.groupId
             }
             if (preferredGroupId != null && !PreferredGroupStore.syncSources(preferredGroupId)) {
-                snackbar("优选分组引用已失效，请先编辑优选分组").show()
+                snackbar("优选分组已无可用节点，请重新编辑引用").show()
                 return@launch
             }
             if (selected != DataStore.selectedProxy) return@launch

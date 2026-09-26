@@ -53,6 +53,31 @@ class PreferredGroupResolverTest {
         rejects { PreferredGroupResolver(listOf(dynamic, entity(1)), groups().take(1)).validate(dynamic) }
     }
 
+    @Test fun pruneDropsDeletedMemberSourceAndExcludedReferencesButKeepsValidOnes() {
+        val spec = PreferredGroupSpec(
+            memberIds = listOf(1, 2, 3),
+            sourceGroupIds = listOf(2, 9),
+            intervalSeconds = 120,
+            excludedMemberIds = listOf(3, 8),
+        )
+        val pruned = spec.pruned(existingIds = setOf(1L, 3L), existingGroupIds = setOf(2L))
+        assertEquals(listOf(1L, 3L), pruned.memberIds)
+        assertEquals(listOf(2L), pruned.sourceGroupIds)
+        assertEquals(listOf(3L), pruned.excludedMemberIds)
+        assertEquals(120, pruned.intervalSeconds)
+        assertEquals(pruned, pruned.pruned(setOf(1L, 3L), setOf(2L)))
+    }
+
+    @Test fun prunedContainerValidatesAfterExplicitMemberDeletionWhenValidRemains() {
+        val owner = preferred(members = listOf(1, 2))
+        rejects { resolver(owner, entity(1)).validate(owner) }
+        val pruned = owner.configBean!!.preferredSpec().pruned(setOf(1L), setOf(1L, 2L))
+        owner.configBean!!.preferredMemberIds = pruned.memberIds
+        owner.putBean(owner.configBean!!)
+        resolver(owner, entity(1)).validate(owner)
+        assertEquals(listOf(1L), resolver(owner, entity(1)).members(owner).map { it.id })
+    }
+
     @Test fun nestedPreferredIsExplicitlyRejectedWithoutDroppingMembers() {
         val root = preferred(members = listOf(11, 12))
         val left = preferred(11, listOf(1)); val right = preferred(12, listOf(1)); val leaf = entity(1)

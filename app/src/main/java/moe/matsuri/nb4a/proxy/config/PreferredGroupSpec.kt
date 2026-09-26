@@ -19,6 +19,15 @@ data class PreferredGroupSpec(
         return copy(memberIds = memberIds.filterNot { it == id },
             excludedMemberIds = (excludedMemberIds + id).distinct())
     }
+
+    /** Drop references to deleted profiles/source groups so a background sync can heal the
+     *  container in place instead of blocking connect on a dangling reference. */
+    fun pruned(existingIds: Set<Long>, existingGroupIds: Set<Long>): PreferredGroupSpec =
+        copy(
+            memberIds = memberIds.filter { it > 0 && it in existingIds },
+            sourceGroupIds = sourceGroupIds.filter { it > 0 && it in existingGroupIds },
+            excludedMemberIds = excludedMemberIds.filter { it in existingIds },
+        )
     fun validate(existingIds: Set<Long>, existingGroupIds: Set<Long>, ownerGroupId: Long? = null): List<Long> {
         require(memberIds.isNotEmpty() || sourceGroupIds.isNotEmpty()) { "优选分组至少需要一个节点或来源分组" }
         require(memberIds.all { it > 0 && it in existingIds }) { "优选分组引用了已删除或无效节点" }

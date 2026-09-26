@@ -37,12 +37,28 @@ object PreferredGroupStore {
             }
         }
         return withContext(Dispatchers.IO) {
-            val owner = container(groupId) ?: return@withContext false
-            runCatching {
-                PreferredGroupResolver(
-                    SagerDatabase.proxyDao.getAll(), SagerDatabase.groupDao.allGroups(),
-                ).validate(owner)
-            }.isSuccess
+            SagerDatabase.instance.runInTransaction(Callable {
+                val owner = container(groupId) ?: return@Callable false
+                val bean = owner.configBean ?: return@Callable false
+                val existingIds = SagerDatabase.proxyDao.getAll().map { it.id }.toHashSet()
+                val existingGroupIds = SagerDatabase.groupDao.allGroups().map { it.id }.toHashSet()
+                val spec = bean.preferredSpec()
+                val pruned = spec.pruned(existingIds, existingGroupIds)
+                if (pruned != spec) {
+                    val cleaned = bean.clone()
+                    cleaned.preferredMemberIds = pruned.memberIds
+                    cleaned.preferredSourceGroupIds = pruned.sourceGroupIds
+                    cleaned.preferredExcludedMemberIds = pruned.excludedMemberIds
+                    owner.putBean(cleaned)
+                    SagerDatabase.proxyDao.updateProxy(owner)
+                }
+                val healed = container(groupId) ?: return@Callable false
+                runCatching {
+                    PreferredGroupResolver(
+                        SagerDatabase.proxyDao.getAll(), SagerDatabase.groupDao.allGroups(),
+                    ).validate(healed)
+                }.isSuccess
+            })
         }
     }
     fun container(groupId: Long): ProxyEntity? =
