@@ -17,6 +17,7 @@ import (
 	"github.com/sagernet/sing-box/common/dialer"
 	"github.com/sagernet/sing-box/common/expiringmap"
 	boxTLS "github.com/sagernet/sing-box/common/tls"
+	"github.com/sagernet/sing-box/component/oixdnsauth"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
@@ -74,6 +75,38 @@ type oixECHDialer struct {
 	config boxTLS.Config
 }
 
+type oixManagedDialer struct {
+	N.Dialer
+}
+
+func (d *oixManagedDialer) managedDestination(destination M.Socksaddr) (M.Socksaddr, error) {
+	if !destination.IsDomain() {
+		return destination, nil
+	}
+	host, err := oixdnsauth.Host(destination.Fqdn, time.Now().Unix())
+	if err != nil {
+		return M.Socksaddr{}, err
+	}
+	destination.Fqdn = host
+	return destination, nil
+}
+
+func (d *oixManagedDialer) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
+	managed, err := d.managedDestination(destination)
+	if err != nil {
+		return nil, err
+	}
+	return d.Dialer.DialContext(ctx, network, managed)
+}
+
+func (d *oixManagedDialer) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.PacketConn, error) {
+	managed, err := d.managedDestination(destination)
+	if err != nil {
+		return nil, err
+	}
+	return d.Dialer.ListenPacket(ctx, managed)
+}
+
 func (d *oixECHDialer) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
 	if N.NetworkName(network) != N.NetworkTCP {
 		return nil, os.ErrInvalid
@@ -105,6 +138,7 @@ func (d *oixECHDialer) ListenPacket(context.Context, M.Socksaddr) (net.PacketCon
 
 func buildSnellOutboundTransport(ctx context.Context, logger logger.ContextLogger, base N.Dialer, server M.Socksaddr, options option.SnellObfsClientOptions) (N.Dialer, error) {
 	if options.ObfsMode == "oix-ech-tls" || options.OIXECH {
+		base = &oixManagedDialer{Dialer: base}
 		configBytes, err := base64.StdEncoding.DecodeString(strings.TrimSpace(options.OIXConfig))
 		if err != nil {
 			return nil, fmt.Errorf("snell: invalid OIX ECH config base64: %w", err)

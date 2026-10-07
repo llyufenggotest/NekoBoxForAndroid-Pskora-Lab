@@ -28,6 +28,11 @@ jobs:
         with:
           go-version: '1.26.5'
           cache: false
+      - name: Prepare private Oix DNS-Auth build input
+        shell: bash
+        env:
+          OIX_DNS_AUTH_SEED: ${{ secrets.OIX_DNS_AUTH_SEED }}
+        run: python scripts/prepare_oix_dns_auth.py
       - name: Pin and build native source
         shell: bash
         run: |
