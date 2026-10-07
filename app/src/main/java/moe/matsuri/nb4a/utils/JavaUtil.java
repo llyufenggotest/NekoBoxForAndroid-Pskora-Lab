@@ -146,7 +146,7 @@ public class JavaUtil {
     @SuppressLint("PrivateApi")
     public static String getProcessName() {
         if (Build.VERSION.SDK_INT >= 28)
-            return Application.getProcessName();
+            return Application.getProcessName() != null ? Application.getProcessName() : BuildConfig.APPLICATION_ID;
 
         // Using the same technique as Application.getProcessName() for older devices
         // Using reflection since ActivityThread is an internal API

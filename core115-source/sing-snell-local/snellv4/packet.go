@@ -20,7 +20,8 @@ const maxUDPRequestHeaderLen = 1 + 1 + 255 + 2
 
 type clientPacketConn struct {
 	net.Conn
-	client *Client
+	client           *Client
+	identityExporter []byte
 
 	writeAccess sync.Mutex
 	writer      *writer
@@ -47,8 +48,9 @@ func (c *clientPacketConn) writeRequest() error {
 		return nil
 	}
 	recordWriter := &writer{
-		upstream: c.Conn,
-		psk:      c.client.psk,
+		upstream:         c.Conn,
+		psk:              c.client.psk,
+		identityExporter: append([]byte(nil), c.identityExporter...),
 	}
 	requestPayload := snell.Request{Command: snell.CommandUDP, ClientID: c.client.userKey}
 	request := buf.NewSize(requestPayload.Len())

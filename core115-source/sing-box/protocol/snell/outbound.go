@@ -53,6 +53,13 @@ type Outbound struct {
 	quicProxyMode bool
 	quicDestCache *expiringmap.Map[quicDestCacheKey, uint64]
 	quicDestSeq   atomic.Uint64
+	warmContext   context.Context
+	preconnect    int
+	warmAccess    sync.Mutex
+	warmCancel    context.CancelFunc
+	warmDone      chan struct{}
+	warmStarted   bool
+	warmClosed    bool
 }
 
 var _ adapter.InterfaceUpdateListener = (*Outbound)(nil)
@@ -138,6 +145,11 @@ func (d *oixECHDialer) ListenPacket(context.Context, M.Socksaddr) (net.PacketCon
 
 func buildSnellOutboundTransport(ctx context.Context, logger logger.ContextLogger, base N.Dialer, server M.Socksaddr, options option.SnellObfsClientOptions) (N.Dialer, error) {
 	if options.ObfsMode == "oix-ech-tls" || options.OIXECH {
+		if err := validateSnellOIXSecurity(options); err != nil {
+			return nil, err
+		}
+		// OIXPath is retained subscription metadata, not an HTTP/WS request path:
+		// this transport sends raw Snell identity frames directly inside ECH-TLS.
 		base = &oixManagedDialer{Dialer: base}
 		configBytes, err := base64.StdEncoding.DecodeString(strings.TrimSpace(options.OIXConfig))
 		if err != nil {
@@ -196,10 +208,23 @@ func snellIdentityExporter(conn net.Conn) ([]byte, error) {
 	return exporter.ExportKeyingMaterial(snellv4.IdentityExporterLabel, nil, snellv4.IdentityExporterLength)
 }
 
+func validateSnellOIXSecurity(options option.SnellObfsClientOptions) error {
+	// Match the accepted Mihomo baseline: exporter identity is mandatory.
+	// Omission preserves old native profiles; explicit false must not be ignored.
+	if options.OIXIdentity != nil && !*options.OIXIdentity {
+		return E.New("snell: OIX identity cannot be disabled with ECH-TLS")
+	}
+	if options.OIXSkipCertVerify {
+		return E.New("snell: OIX ECH-TLS requires certificate verification (oix_skip_cert_verify must be false)")
+	}
+	return nil
+}
+
 func validateSnellOIXOptions(version int, options option.SnellObfsClientOptions) error {
 	enabled := options.ObfsMode == "oix-ech-tls" || options.OIXECH
 	hasMetadata := options.OIXIdentityVersion != 0 || options.OIXALPN != "" || options.OIXLegacyFallback ||
-		options.OIXPreconnect != 0 || options.OIXSNI != "" || options.OIXConfig != ""
+		options.OIXPreconnect != 0 || options.OIXSNI != "" || options.OIXConfig != "" ||
+		options.OIXIdentity != nil || options.OIXPath != "" || options.OIXSkipCertVerify
 	if !enabled {
 		if hasMetadata {
 			return E.New("snell: OIX options require obfs_mode oix-ech-tls and oix_ech true")
@@ -208,6 +233,9 @@ func validateSnellOIXOptions(version int, options option.SnellObfsClientOptions)
 	}
 	if options.ObfsMode != "oix-ech-tls" || !options.OIXECH {
 		return E.New("snell: OIX requires both obfs_mode oix-ech-tls and oix_ech true")
+	}
+	if err := validateSnellOIXSecurity(options); err != nil {
+		return err
 	}
 	if version != 4 {
 		return E.New("snell: OIX ECH-TLS requires version 4")
@@ -221,8 +249,8 @@ func validateSnellOIXOptions(version int, options option.SnellObfsClientOptions)
 	if options.OIXLegacyFallback {
 		return E.New("snell: OIX legacy fallback is unsupported")
 	}
-	if options.OIXPreconnect != 0 {
-		return E.New("snell: OIX preconnect is unsupported")
+	if options.OIXPreconnect < 0 || options.OIXPreconnect > 4 {
+		return E.New("snell: OIX preconnect must be between 0 and 4")
 	}
 	if strings.TrimSpace(options.OIXSNI) == "" {
 		return E.New("snell: OIX ECH-TLS requires sni")
@@ -271,6 +299,11 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		return nil, err
 	}
 	tcpDialer, err := buildSnellTransport(ctx, logger, outboundDialer, serverAddr, options.ObfsOptions)
+	// Preconnected OIX sessions must be retained for the first real request.
+	// Ordinary Snell and OIX with preconnect=0 keep their configured reuse.
+	if obfsMode == "oix-ech-tls" && options.ObfsOptions.OIXPreconnect > 0 {
+		options.Reuse = true
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -320,6 +353,8 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		dialer:        outboundDialer,
 		tcpDialer:     tcpDialer,
 		client:        client,
+		warmContext:   ctx,
+		preconnect:    options.ObfsOptions.OIXPreconnect,
 		legacy:        legacyClient,
 		serverAddr:    serverAddr,
 		psk:           []byte(options.PSK),
@@ -414,13 +449,62 @@ func (h *Outbound) ListenPacket(ctx context.Context, destination M.Socksaddr) (n
 	return h.dialUDPOverTCP(ctx)
 }
 
+func (h *Outbound) Start(stage adapter.StartStage) error {
+	if stage != adapter.StartStateStarted || h.preconnect == 0 {
+		return nil
+	}
+	h.warmAccess.Lock()
+	defer h.warmAccess.Unlock()
+	if h.warmClosed {
+		return net.ErrClosed
+	}
+	if h.warmStarted {
+		return nil
+	}
+	warmer, ok := h.client.(interface {
+		Warm(context.Context, int) error
+	})
+	if !ok {
+		return E.New("snell: preconnect client is unavailable")
+	}
+	ctx, cancel := context.WithTimeout(h.warmContext, 10*time.Second)
+	h.warmCancel = cancel
+	h.warmDone = make(chan struct{})
+	h.warmStarted = true
+	go func() {
+		defer close(h.warmDone)
+		defer cancel()
+		if err := warmer.Warm(ctx, h.preconnect); err != nil && ctx.Err() == nil {
+			h.logger.WarnContext(ctx, "OIX preconnect: ", err)
+		}
+	}()
+	return nil
+}
+
+func (h *Outbound) cancelWarm() {
+	h.warmAccess.Lock()
+	if h.warmCancel != nil {
+		h.warmCancel()
+	}
+	done := h.warmDone
+	h.warmAccess.Unlock()
+	if done != nil {
+		<-done
+	}
+}
+
 func (h *Outbound) InterfaceUpdated(ctx context.Context) {
+	h.cancelWarm()
 	if h.client != nil {
 		h.client.Reset()
 	}
 }
 
 func (h *Outbound) Close() error {
+	h.warmAccess.Lock()
+	h.warmClosed = true
+	h.warmAccess.Unlock()
+	h.cancelWarm()
 	if h.quicDestCache != nil {
 		h.quicDestCache.Close()
 	}

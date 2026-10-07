@@ -31,6 +31,12 @@ public class SnellBean extends AbstractBean {
     public Integer oixPreconnect;
     public String oixSni;
     public String oixConfig;
+    // Effective editor value plus source presence: absence uses exporter identity.
+    public Boolean identity;
+    public boolean identityPresent;
+    public String oixPath;
+    public Boolean oixSkipCertVerify;
+    public Boolean tcpFastOpen;
 
     @Override
     public void initializeDefaultValues() {
@@ -51,13 +57,17 @@ public class SnellBean extends AbstractBean {
         if (oixPreconnect == null) oixPreconnect = 0;
         if (oixSni == null) oixSni = "";
         if (oixConfig == null) oixConfig = "";
+        if (identity == null) identity = true;
+        if (oixPath == null) oixPath = "";
+        if (oixSkipCertVerify == null) oixSkipCertVerify = false;
+        if (tcpFastOpen == null) tcpFastOpen = false;
 
         super.initializeDefaultValues();
     }
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(5); // version
+        output.writeInt(6); // append-only Bean format; reads formats 1-5
         super.serialize(output);
         output.writeString(psk);
         output.writeInt(version);
@@ -75,6 +85,13 @@ public class SnellBean extends AbstractBean {
         output.writeInt(oixPreconnect);
         output.writeString(oixSni);
         output.writeString(oixConfig);
+        output.writeBoolean(identity);
+        output.writeString(oixPath);
+        output.writeBoolean(oixSkipCertVerify);
+        output.writeBoolean(tcpFastOpen);
+        // Format 6 is unreleased; append presence without altering formats 1-5.
+        // A direct editor/API assignment of false is always explicit.
+        output.writeBoolean(identityPresent || Boolean.FALSE.equals(identity));
     }
 
     @Override
@@ -104,6 +121,13 @@ public class SnellBean extends AbstractBean {
             oixPreconnect = input.readInt();
             oixSni = input.readString();
             oixConfig = input.readString();
+        }
+        if (version >= 6) {
+            identity = input.readBoolean();
+            oixPath = input.readString();
+            oixSkipCertVerify = input.readBoolean();
+            tcpFastOpen = input.readBoolean();
+            identityPresent = input.readBoolean();
         }
         initializeDefaultValues();
     }

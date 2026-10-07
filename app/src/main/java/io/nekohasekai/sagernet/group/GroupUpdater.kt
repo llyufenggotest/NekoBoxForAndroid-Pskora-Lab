@@ -6,6 +6,7 @@ import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.database.SubscriptionBean
 import io.nekohasekai.sagernet.fmt.AbstractBean
+import io.nekohasekai.sagernet.fmt.usesOixManagedDns
 import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.naive.NaiveBean
@@ -55,7 +56,7 @@ abstract class GroupUpdater {
                 is NaiveBean -> continue
             }
 
-            if (profile.serverAddress.isIpAddress()) continue
+            if (profile.serverAddress.isIpAddress() || usesOixManagedDns(profile)) continue
 
             lookupJobs.add(GlobalScope.launch(lookupPool) {
                 try {
@@ -92,6 +93,7 @@ abstract class GroupUpdater {
     protected fun rewriteAddress(
         bean: AbstractBean, addresses: List<InetAddress>, ipv6First: Boolean
     ) {
+        if (usesOixManagedDns(bean)) return
         val address = addresses.sortedBy { (it is Inet4Address) xor ipv6First }[0].hostAddress
 
         with(bean) {

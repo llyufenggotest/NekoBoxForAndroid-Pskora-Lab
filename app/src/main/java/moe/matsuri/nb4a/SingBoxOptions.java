@@ -4887,6 +4887,9 @@ public class SingBoxOptions {
         public Integer oix_preconnect;
         public String oix_sni;
         public String oix_config;
+        public Boolean oix_identity;
+        public String oix_path;
+        public Boolean oix_skip_cert_verify;
 
     }
     

@@ -727,8 +727,14 @@
     <string name="snell_oix_ech_config_summary">Base64 ECHConfigList</string>
     <string name="snell_oix_alpn">OIX ALPN</string>
     <string name="snell_oix_identity_version">OIX Identity Version</string>
+    <string name="snell_oix_legacy_fallback">OIX Legacy Fallback</string>
+    <string name="snell_oix_preconnect">OIX Preconnect</string>
 
     <string name="core_alpha_title">Preview core</string>
     <string name="core_alpha_notice">This core is an Alpha preview and may have compatibility issues.</string>
     <string name="build_information">Build information</string>
+    <string name="snell_oix_identity">OIX Identity</string>
+    <string name="snell_oix_path">OIX Path</string>
+    <string name="snell_oix_skip_cert_verify">Skip TLS certificate verification (unsafe)</string>
+    <string name="snell_tcp_fast_open">TCP Fast Open</string>
 </resources>

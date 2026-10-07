@@ -44,6 +44,14 @@ jobs:
           chmod +x core115-source/libcore/init.sh core115-source/libcore/build.sh
           (cd core115-source/libcore && ./init.sh && ./build.sh)
           test -s app/libs/libcore.aar
+      - name: Verify private Oix input in every native artifact
+        shell: bash
+        env:
+          OIX_DNS_AUTH_SEED: ${{ secrets.OIX_DNS_AUTH_SEED }}
+        run: |
+          python scripts/test_verify_oix_native.py
+          python scripts/verify_oix_native.py --aar app/libs/libcore.aar
+          (cd core115-source/libcore && go test -tags with_utls ../sing-box/component/oixdnsauth ../sing-box/protocol/snell github.com/sagernet/sing-snell/...)
       - name: Native provenance Pure and geo gates
         shell: bash
         run: |

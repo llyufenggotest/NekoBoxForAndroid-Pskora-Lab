@@ -481,6 +481,8 @@ object RawUpdater : GroupUpdater() {
 
     @Suppress("UNCHECKED_CAST")
     suspend fun parseRaw(text: String, fileName: String = ""): List<AbstractBean>? {
+        // Files commonly carry a UTF-8 BOM; normalize before format detection.
+        if (text.startsWith("\uFEFF")) return parseRaw(text.removePrefix("\uFEFF"), fileName)
 
         val proxies = mutableListOf<AbstractBean>()
 

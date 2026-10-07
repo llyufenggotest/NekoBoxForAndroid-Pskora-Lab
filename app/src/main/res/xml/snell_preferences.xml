@@ -91,6 +91,20 @@
             app:title="@string/snell_oix_identity_version" />
 
         <SwitchPreference
+            app:key="oixLegacyFallback"
+            app:title="@string/snell_oix_legacy_fallback" />
+
+        <EditTextPreference
+            app:key="oixPreconnect"
+            app:title="@string/snell_oix_preconnect"
+            app:useSimpleSummaryProvider="true" />
+
+        <SwitchPreference app:key="identity" app:title="@string/snell_oix_identity" app:defaultValue="false" />
+        <EditTextPreference app:key="oixPath" app:title="@string/snell_oix_path" />
+        <SwitchPreference app:key="oixSkipCertVerify" app:title="@string/snell_oix_skip_cert_verify" app:defaultValue="false" />
+        <SwitchPreference app:key="tcpFastOpen" app:title="@string/snell_tcp_fast_open" app:defaultValue="false" />
+
+        <SwitchPreference
             app:key="oixEchTls"
             app:title="@string/snell_oix_enabled" />
 

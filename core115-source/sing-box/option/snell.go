@@ -213,6 +213,14 @@ type SnellObfsClientOptions struct {
 	OIXPreconnect      int    `json:"oix_preconnect,omitempty"`
 	OIXSNI             string `json:"oix_sni,omitempty"`
 	OIXConfig          string `json:"oix_config,omitempty"`
+
+	// Nil preserves older OIX profiles, which always used exporter identity.
+	// Explicit false is not equivalent to omission and must fail closed.
+	OIXIdentity *bool `json:"oix_identity,omitempty"`
+	// Subscription metadata only: raw ECH-TLS has no HTTP request or WS path.
+	OIXPath string `json:"oix_path,omitempty"`
+	// Recognized for lossless import, but true is rejected by the strict transport.
+	OIXSkipCertVerify bool `json:"oix_skip_cert_verify,omitempty"`
 }
 
 type SnellV6Options struct {

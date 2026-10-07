@@ -1,6 +1,7 @@
 package snellv4
 
 import (
+	"context"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -26,8 +27,12 @@ type Client struct {
 	dialer           N.Dialer
 	server           M.Socksaddr
 
-	pool      reuse.Pool[*reuseSession]
-	closeIdle atomic.Bool
+	pool       reuse.Pool[*reuseSession]
+	closeIdle  atomic.Bool
+	warmAccess sync.Mutex
+	warmCancel context.CancelFunc
+	warmDone   chan struct{}
+	warmClosed bool
 }
 
 type ClientOptions struct {
@@ -114,7 +119,11 @@ func (c *Client) DialEarlyConn(conn net.Conn, destination M.Socksaddr) net.Conn 
 }
 
 func (c *Client) DialPacketConn(conn net.Conn) (N.NetPacketConn, error) {
-	return bufio.NewNetPacketConn(&clientPacketConn{Conn: c.obfs.ClientConn(conn), client: c}), nil
+	exporter, err := c.exporterForConn(conn)
+	if err != nil {
+		return nil, err
+	}
+	return bufio.NewNetPacketConn(&clientPacketConn{Conn: c.obfs.ClientConn(conn), client: c, identityExporter: exporter}), nil
 }
 
 var _ snell.Method = (*Client)(nil)

@@ -28,7 +28,7 @@ class SnellOixFmtTest {
         ))
 
         assertTrue(bean.oixEchTls)
-        assertEquals("oix-ech-tls", bean.obfsMode)
+        assertEquals("", bean.obfsMode)
         assertEquals("inner.example", bean.oixSni)
         assertEquals("AQID", bean.oixConfig)
         assertEquals(2, bean.oixIdentityVersion)

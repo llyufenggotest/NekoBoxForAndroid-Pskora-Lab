@@ -112,8 +112,14 @@ func TestValidateSnellOIXOptions(t *testing.T) {
 	bad.OIXLegacyFallback = true
 	require.ErrorContains(t, validateSnellOIXOptions(4, bad), "legacy fallback is unsupported")
 	bad = valid
-	bad.OIXPreconnect = 1
-	require.ErrorContains(t, validateSnellOIXOptions(4, bad), "preconnect is unsupported")
+	for count := 0; count <= 4; count++ {
+		bad.OIXPreconnect = count
+		require.NoError(t, validateSnellOIXOptions(4, bad))
+	}
+	for _, count := range []int{-1, 5} {
+		bad.OIXPreconnect = count
+		require.ErrorContains(t, validateSnellOIXOptions(4, bad), "between 0 and 4")
+	}
 }
 
 func TestSnellOIXTransportFactoryBuildsStrictECHDialer(t *testing.T) {

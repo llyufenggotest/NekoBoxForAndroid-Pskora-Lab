@@ -8,6 +8,7 @@ fun buildSingBoxOutboundSnellBean(bean: SnellBean): SingBoxOptions.Outbound_Snel
         server = bean.serverAddress
         server_port = bean.serverPort
         psk = bean.psk
+        tcp_fast_open = bean.tcpFastOpen
         if (!bean.userKey.isNullOrBlank()) {
             userkey = bean.userKey
         }
@@ -36,7 +37,11 @@ fun buildSingBoxOutboundSnellBean(bean: SnellBean): SingBoxOptions.Outbound_Snel
             oix_preconnect = bean.oixPreconnect
             oix_sni = bean.oixSni
             oix_config = bean.oixConfig
-        } else if (bean.obfsMode != null && bean.obfsMode.isNotBlank()) {
+            // Absence must retain native exporter identity, never become explicit false.
+            oix_identity = bean.identity ?: true
+            oix_path = bean.oixPath
+            oix_skip_cert_verify = bean.oixSkipCertVerify
+        } else if (bean.obfsMode != null && bean.obfsMode.isNotBlank() && !isOixEchTlsMode(bean.obfsMode)) {
             obfs_mode = if (bean.version != null && bean.version >= 4 && bean.obfsMode == "tls") "" else bean.obfsMode
             if (obfs_mode.isNotBlank() && bean.obfsHost != null && bean.obfsHost.isNotBlank()) {
                 obfs_host = bean.obfsHost

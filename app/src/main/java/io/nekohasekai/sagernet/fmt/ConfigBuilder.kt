@@ -79,9 +79,7 @@ class ConfigBuildResult(
     data class IndexEntity(var chain: LinkedHashMap<Int, ProxyEntity>)
 }
 
-private fun sanitizeDnsEntry(value: String): String {
-    return value.filterNot { it.isISOControl() }.trim()
-}
+
 
 private fun parseDnsHosts(value: String): Map<String, List<String>> {
     val hosts = linkedMapOf<String, MutableList<String>>()
@@ -98,18 +96,9 @@ private fun parseDnsHosts(value: String): Map<String, List<String>> {
     return hosts.mapValues { (_, addresses) -> addresses.distinct() }
 }
 
-private fun serverHostOf(bean: AbstractBean): String? {
-    val fallback = bean.serverAddress?.takeIf { it.isNotBlank() }
-    if (bean is ConfigBean) {
-        return try {
-            val map = gson.fromJson(bean.config, mutableMapOf<String, Any>().javaClass)
-            map["server"]?.toString()?.takeIf { it.isNotBlank() } ?: fallback
-        } catch (_: Exception) {
-            fallback
-        }
-    }
-    return fallback
-}
+
+
+
 
 fun buildConfig(
     proxy: ProxyEntity,
@@ -188,12 +177,9 @@ fun buildConfig(
     val buildSelector = !forTest && group?.isSelector == true && !forExport
     val userDNSRuleList = mutableListOf<DNSRule_DefaultOptions>()
     val domainListDNSDirectForce = mutableListOf<String>()
-    val nodeDomainList = mutableListOf<String>()
+
     val bypassDNSBeans = hashSetOf<AbstractBean>()
-    val perGroupResolver = HashMap<Long, String>()
-    val perGroupServerHosts = HashMap<Long, MutableSet<String>>()
-    val hostResolvers = HashMap<String, MutableSet<String>>()
-    val nonCustomFinalHosts = hashSetOf<String>()
+
     val groupCache = HashMap<Long, ProxyGroup?>()
     val isVPN = DataStore.serviceMode == Key.MODE_VPN
     val deviceInboundTag = if (isVPN && DataStore.enableHevTun) TAG_MIXED else "tun-in"
@@ -362,42 +348,7 @@ fun buildConfig(
                     tagOut = "g-" + proxyEntity.id
                     bypassDNSBeans += proxyEntity.requireBean()
 
-                    if (!forTest) {
-                        val ownerGid = entity.groupId
-                        val ownerGroup = groupCache.getOrPut(ownerGid) {
-                            SagerDatabase.groupDao.getById(ownerGid)
-                        }
-                        val resolver = ownerGroup
-                            ?.takeIf { it.type == GroupType.SUBSCRIPTION }
-                            ?.subscription?.serverDnsResolver
-                            ?.let { sanitizeDnsEntry(it) }
-                            ?.takeIf { it.isNotBlank() }
-                            ?: ownerGroup?.customDirectDns?.let { sanitizeDnsEntry(it) }?.takeIf { it.isNotBlank() }
 
-                        if (resolver != null) {
-                            perGroupResolver[ownerGid] = resolver
-                            profileList.forEach { hop ->
-                                val host = serverHostOf(hop.requireBean())
-                                if (host != null && !host.isIpAddress()) {
-                                    if (hop.groupId == ownerGid) {
-                                        perGroupResolver[ownerGid] = resolver
-                                        perGroupServerHosts.getOrPut(ownerGid) { mutableSetOf() }
-                                            .add(host)
-                                        hostResolvers.getOrPut(host) { mutableSetOf() }.add(resolver)
-                                    } else {
-                                        nonCustomFinalHosts.add(host)
-                                    }
-                                }
-                            }
-                        } else {
-                            profileList.forEach { hop ->
-                                val host = serverHostOf(hop.requireBean())
-                                if (host != null && !host.isIpAddress()) {
-                                    nonCustomFinalHosts.add(host)
-                                }
-                            }
-                        }
-                    }
                 }
 
                 if (index == 0) {
@@ -533,7 +484,7 @@ fun buildConfig(
                         // don't loopback
                         if (defaultServerDomainStrategy != "" && !serverAddress.isIpAddress()) {
                             domainListDNSDirectForce.add("full:$serverAddress")
-                            nodeDomainList.add("full:$serverAddress")
+
                         }
                     }
                     _hack_config_map["domain_strategy"] =
@@ -541,8 +492,50 @@ fun buildConfig(
 
                     _hack_config_map["tag"] = tagOut
 
+                    // Server-only resolver: no domain rules or destination DNS changes.
+                    // IP endpoint + explicit direct detour avoids bootstrapping via Oix.
+                    val ownerGid = proxyEntity.groupId
+                    val ownerGroup = groupCache.getOrPut(ownerGid) {
+                        SagerDatabase.groupDao.getById(ownerGid)
+                    }
+                    val resolver = serverDnsResolverFor(bean, ownerGroup)
+                    if (resolver != null && !usesOixManagedDns(bean)) {
+                        val resolverTag = "dns-sub-$ownerGid"
+                        if (dns.servers.none { it.tag == resolverTag }) {
+                            dns.servers.add(DNSServerOptions().apply {
+                                tag = resolverTag
+                                address = resolver
+                                detour = TAG_DIRECT
+                                address_resolver = "dns-direct"
+                                strategy = autoDnsDomainStrategy(defaultServerDomainStrategy)
+                            })
+                        }
+                        _hack_config_map["domain_resolver"] = mapOf(
+                            "server" to resolverTag,
+                            "strategy" to autoDnsDomainStrategy(defaultServerDomainStrategy).orEmpty(),
+                        )
+                    }
+                    if (usesOixManagedDns(bean)) {
+                        if (dns.servers.none { it.tag == OIX_MANAGED_DNS_TAG }) {
+                            dns.servers.add(DNSServerOptions().apply {
+                                tag = OIX_MANAGED_DNS_TAG
+                                address = "tcp://124.221.68.73:1053"
+                                detour = TAG_DIRECT
+                            })
+                        }
+                        _hack_config_map["domain_resolver"] = mapOf(
+                            "server" to OIX_MANAGED_DNS_TAG,
+                            "strategy" to autoDnsDomainStrategy(defaultServerDomainStrategy).orEmpty(),
+                        )
+                    }
+
                     _hack_custom_config = bean.customOutboundJson
                 }
+
+                // The loopback SOCKS listener is not the plugin's remote server.
+                val mappingResolver = if (proxyEntity.needExternal()) {
+                    currentOutbound._hack_config_map.remove("domain_resolver")
+                } else null
 
                 // External proxy need a dokodemo-door inbound to forward the traffic
                 // For external proxy software, their traffic must goes to v2ray-core to use protected fd.
@@ -578,8 +571,36 @@ fun buildConfig(
 
                             pastInboundTag = tag
 
-                            // no chain rule and not outbound, so need to set to direct
-                            if (index == profileList.lastIndex) {
+                            // Direct outbounds cannot detour in core115. For a chained mapping,
+                            // resolve in-place, then let the original next-hop route keep its detour.
+                            if (mappingResolver != null && index != profileList.lastIndex) {
+                                route.rules.add(Rule_DefaultOptions().apply {
+                                    inbound = listOf(tag)
+                                    _hack_config_map["action"] = "resolve"
+                                    @Suppress("UNCHECKED_CAST")
+                                    val resolverOptions = mappingResolver as Map<String, Any>
+                                    _hack_config_map.putAll(resolverOptions)
+                                })
+                            } else if (mappingResolver != null) {
+                                val mappingOutboundTag = readableTag("$tag-resolve")
+                                val mappingOutbound = Outbound().apply {
+                                    type = "direct"
+                                    this.tag = mappingOutboundTag
+                                    _hack_config_map["domain_resolver"] = mappingResolver
+                                    _hack_config_map["domain_strategy"] = defaultServerDomainStrategy
+                                    if (index == profileList.lastIndex && DataStore.enableTLSFragment) {
+                                        _hack_config_map["fragment"] = Fragment().apply {
+                                            length = DataStore.fragmentLength
+                                            interval = DataStore.fragmentInterval
+                                        }.asMap()
+                                    }
+                                }
+                                outbounds.add(mappingOutbound)
+                                route.rules.add(Rule_DefaultOptions().apply {
+                                    inbound = listOf(tag)
+                                    outbound = mappingOutbound.tag
+                                })
+                            } else if (index == profileList.lastIndex) {
                                 if (DataStore.enableTLSFragment) {
                                     route.rules.add(Rule_DefaultOptions().apply {
                                         network = listOf("tcp")
@@ -925,9 +946,7 @@ fun buildConfig(
             outbounds.add(fragmentOutbound)
         }
 
-        fun isExclusiveCustomHost(host: String): Boolean {
-            return hostResolvers[host]?.size == 1 && !nonCustomFinalHosts.contains(host)
-        }
+
 
         // Bypass Lookup for the first profile
         bypassDNSBeans.forEach {
@@ -942,10 +961,8 @@ fun buildConfig(
             }
 
             if (!serverAddr.isIpAddress()) {
-                if (!isExclusiveCustomHost(serverAddr)) {
-                    domainListDNSDirectForce.add("full:${serverAddr}")
-                }
-                nodeDomainList.add("full:${serverAddr}")
+                domainListDNSDirectForce.add("full:${serverAddr}")
+
             }
         }
 
@@ -982,16 +999,7 @@ fun buildConfig(
             })
         }
 
-        val legacyDns = group?.customDirectDns?.takeIf { group.type != GroupType.SUBSCRIPTION }
-        if (!legacyDns.isNullOrBlank()) {
-            dns.servers.add(DNSServerOptions().apply {
-                address = legacyDns
-                tag = "dns-airport"
-                detour = TAG_DIRECT
-                address_resolver = "dns-local"
-                strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("dns-direct"))
-            })
-        }
+
 
         remoteDns.firstOrNull().let {
             // Always use direct DNS for urlTest
@@ -1080,35 +1088,10 @@ fun buildConfig(
                     server = "dns-direct"
                 })
             }
-            perGroupResolver.forEach { (gid, resolver) ->
-                val hosts = perGroupServerHosts[gid]
-                    ?.filter { it.isNotBlank() && isExclusiveCustomHost(it) }
-                    ?.map { "full:$it" }
-                if (hosts.isNullOrEmpty()) return@forEach
 
-                val serverTag = "dns-sub-$gid"
-                dns.servers.add(DNSServerOptions().apply {
-                    address = resolver
-                    tag = serverTag
-                    detour = TAG_DIRECT
-                    if (!resolver.isIpAddress()) {
-                        address_resolver = "dns-direct"
-                    }
-                    strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("server"))
-                })
-                dns.rules.add(0, DNSRule_DefaultOptions().apply {
-                    makeSingBoxRule(hosts)
-                    server = serverTag
-                })
-            }
         }
 
-        if (!legacyDns.isNullOrBlank() && nodeDomainList.isNotEmpty()) {
-            (dns.rules as MutableList).add(0, DNSRule_DefaultOptions().apply {
-                makeSingBoxRule(nodeDomainList.toHashSet().toList())
-                server = "dns-airport"
-            })
-        }
+
 
         if (!forTest) _hack_custom_config = DataStore.globalCustomConfig
     }.let {

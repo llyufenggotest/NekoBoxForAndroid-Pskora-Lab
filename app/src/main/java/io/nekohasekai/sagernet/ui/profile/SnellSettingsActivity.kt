@@ -37,6 +37,12 @@ class SnellSettingsActivity : ProfileSettingsActivity<SnellBean>() {
     private val oixAlpn = pbm.add(PreferenceBinding(Type.Text, "oixAlpn"))
     private val oixSni = pbm.add(PreferenceBinding(Type.Text, "oixSni"))
     private val oixConfig = pbm.add(PreferenceBinding(Type.Text, "oixConfig"))
+    private val identity = pbm.add(PreferenceBinding(Type.Bool, "identity"))
+    private val oixPath = pbm.add(PreferenceBinding(Type.Text, "oixPath"))
+    private val oixSkipCertVerify = pbm.add(PreferenceBinding(Type.Bool, "oixSkipCertVerify"))
+    private val tcpFastOpen = pbm.add(PreferenceBinding(Type.Bool, "tcpFastOpen"))
+    private val oixLegacyFallback = pbm.add(PreferenceBinding(Type.Bool, "oixLegacyFallback"))
+    private val oixPreconnect = pbm.add(PreferenceBinding(Type.TextToInt, "oixPreconnect"))
 
     override fun SnellBean.init() {
         pbm.writeToCacheAll(this)
@@ -90,7 +96,7 @@ class SnellSettingsActivity : ProfileSettingsActivity<SnellBean>() {
         val oixEnabledPref = findPreference<Preference>("oixEchTls")!!
         oixEnabledPref.setOnPreferenceChangeListener { _, newValue ->
             DataStore.profileCacheStore.putBoolean("oixEchTls", newValue as Boolean)
-            updateOixFields(this, initialVersion)
+            updateOixFields(this, versionPref.value?.toIntOrNull() ?: 4)
             true
         }
         updateOixFields(this, initialVersion)
@@ -99,10 +105,16 @@ class SnellSettingsActivity : ProfileSettingsActivity<SnellBean>() {
     private fun updateOixFields(fragment: PreferenceFragmentCompat, version: Int) {
         val enabled = DataStore.profileCacheStore.getBoolean("oixEchTls", false)
         val visible = version == 4 && enabled
+        fragment.findPreference<Preference>("identity")?.isVisible = visible
+        fragment.findPreference<Preference>("oixPath")?.isVisible = visible
+        fragment.findPreference<Preference>("oixSkipCertVerify")?.isVisible = visible
         fragment.findPreference<Preference>("oixSni")?.isVisible = visible
         fragment.findPreference<Preference>("oixConfig")?.isVisible = visible
         fragment.findPreference<Preference>("oixAlpn")?.isVisible = visible
         fragment.findPreference<Preference>("oixIdentityVersion")?.isVisible = visible
+        fragment.findPreference<Preference>("oixLegacyFallback")?.isVisible = visible
+        fragment.findPreference<Preference>("oixPreconnect")?.isVisible = visible
+        fragment.findPreference<Preference>("oixEchTls")?.isEnabled = version == 4
     }
 
 

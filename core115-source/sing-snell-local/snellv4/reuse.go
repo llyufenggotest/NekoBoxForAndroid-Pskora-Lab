@@ -110,7 +110,18 @@ func (c *Client) CloseIdleConnections() {
 }
 
 func (c *Client) Close() error {
-	return c.pool.Close()
+	c.warmAccess.Lock()
+	c.warmClosed = true
+	if c.warmCancel != nil {
+		c.warmCancel()
+	}
+	done := c.warmDone
+	c.warmAccess.Unlock()
+	err := c.pool.Close()
+	if done != nil {
+		<-done
+	}
+	return err
 }
 
 type reuseSession struct {
