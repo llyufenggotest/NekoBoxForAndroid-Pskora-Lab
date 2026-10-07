@@ -4,9 +4,7 @@ import io.nekohasekai.sagernet.GroupType
 import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.fmt.snell.SnellBean
 
-internal const val OIX_MANAGED_DNS_TAG = "dns-oix-managed"
-internal const val OIX_MANAGED_DNS_ADDRESS = "tcp://124.221.68.73:1053"
-
+/** Identity guard for signed names during subscription forceResolve, not a DNS override. */
 internal fun usesOixManagedDns(bean: AbstractBean): Boolean {
     if (bean !is SnellBean || bean.oixEchTls != true || bean.version == 6) return false
     val host = bean.serverAddress?.removeSuffix(".") ?: return false
@@ -21,6 +19,7 @@ internal fun groupServerDnsResolver(group: ProxyGroup?): String? {
         ?: clean(group?.customDirectDns)
 }
 
-/** Oix signed names must never go to an ordinary resolver. Other nodes use their own group only. */
+/** Explicit leaf-group configuration only; blank leaves normal core/system DNS in control. */
+@Suppress("UNUSED_PARAMETER")
 internal fun serverDnsResolverFor(bean: AbstractBean, group: ProxyGroup?): String? =
-    if (usesOixManagedDns(bean)) OIX_MANAGED_DNS_ADDRESS else groupServerDnsResolver(group)
+    groupServerDnsResolver(group)

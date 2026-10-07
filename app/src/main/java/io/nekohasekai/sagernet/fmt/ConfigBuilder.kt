@@ -499,7 +499,7 @@ fun buildConfig(
                         SagerDatabase.groupDao.getById(ownerGid)
                     }
                     val resolver = serverDnsResolverFor(bean, ownerGroup)
-                    if (resolver != null && !usesOixManagedDns(bean)) {
+                    if (resolver != null) {
                         val resolverTag = "dns-sub-$ownerGid"
                         if (dns.servers.none { it.tag == resolverTag }) {
                             dns.servers.add(DNSServerOptions().apply {
@@ -512,19 +512,6 @@ fun buildConfig(
                         }
                         _hack_config_map["domain_resolver"] = mapOf(
                             "server" to resolverTag,
-                            "strategy" to autoDnsDomainStrategy(defaultServerDomainStrategy).orEmpty(),
-                        )
-                    }
-                    if (usesOixManagedDns(bean)) {
-                        if (dns.servers.none { it.tag == OIX_MANAGED_DNS_TAG }) {
-                            dns.servers.add(DNSServerOptions().apply {
-                                tag = OIX_MANAGED_DNS_TAG
-                                address = "tcp://124.221.68.73:1053"
-                                detour = TAG_DIRECT
-                            })
-                        }
-                        _hack_config_map["domain_resolver"] = mapOf(
-                            "server" to OIX_MANAGED_DNS_TAG,
                             "strategy" to autoDnsDomainStrategy(defaultServerDomainStrategy).orEmpty(),
                         )
                     }

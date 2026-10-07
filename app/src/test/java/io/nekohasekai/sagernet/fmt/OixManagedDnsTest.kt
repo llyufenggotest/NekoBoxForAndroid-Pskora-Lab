@@ -52,39 +52,89 @@ class OixManagedDnsTest {
         return JsonParser.parseString(text).asJsonObject
     }
 
-    private fun assertDedicated(root: JsonObject, forTest: Boolean = true) {
+    @Test fun oixUsesGroupResolverAndNeverBuiltInFallback() {
+        val bean = snell("synthetic.cloud-nodes.com", true)
+        val owner = io.nekohasekai.sagernet.database.ProxyGroup(
+            id = 701, name = "synthetic-group", customDirectDns = " tcp://192.0.2.71:1053 "
+        )
+        assertEquals("tcp://192.0.2.71:1053", serverDnsResolverFor(bean, owner))
+        io.nekohasekai.sagernet.database.SagerDatabase.groupDao.createGroup(owner)
+        val proxy = ProxyEntity().apply { id = 920; groupId = owner.id; putBean(bean) }
+        val root = JsonParser.parseString(buildConfig(proxy, forTest = true).config).asJsonObject
         val outbound = root.getAsJsonArray("outbounds").first { it.asJsonObject.get("type").asString == "snell" }.asJsonObject
-        assertEquals("dns-oix-managed", outbound.getAsJsonObject("domain_resolver").get("server").asString)
+        assertEquals("dns-sub-701", outbound.getAsJsonObject("domain_resolver").get("server").asString)
         val dns = root.getAsJsonObject("dns")
-        val server = dns.getAsJsonArray("servers").single { it.asJsonObject.get("tag").asString == "dns-oix-managed" }.asJsonObject
-        assertEquals("tcp://124.221.68.73:1053", server.get("address").asString)
-        assertEquals(TAG_DIRECT, server.get("detour").asString)
-        assertFalse(server.has("address_resolver"))
-        assertEquals(if (forTest) "dns-direct" else "dns-remote", dns.get("final").asString)
-        assertFalse(dns.getAsJsonArray("rules").any { it.asJsonObject.get("server")?.asString == "dns-oix-managed" })
-        if (!forTest) assertEquals("https://1.1.1.1/dns-query", dns.getAsJsonArray("servers").single { it.asJsonObject.get("tag").asString == "dns-remote" }.asJsonObject.get("address").asString)
-        assertEquals("https://8.8.8.8/dns-query", dns.getAsJsonArray("servers").single { it.asJsonObject.get("tag").asString == "dns-direct" }.asJsonObject.get("address").asString)
-        val direct = root.getAsJsonArray("outbounds").single { it.asJsonObject.get("tag").asString == TAG_DIRECT }.asJsonObject
-        assertEquals("direct", direct.get("type").asString)
-        assertFalse(direct.has("detour"))
+        assertEquals("tcp://192.0.2.71:1053", dns.getAsJsonArray("servers").single {
+            it.asJsonObject.get("tag").asString == "dns-sub-701"
+        }.asJsonObject.get("address").asString)
+        assertFalse(dns.getAsJsonArray("rules").any { it.asJsonObject.get("server")?.asString == "dns-sub-701" })
+        assertFalse(root.toString().contains("dns-oix-managed"))
+        assertFalse(root.toString().contains("124.221.68.73"))
+        owner.customDirectDns = " \n\t "
+        assertNull(serverDnsResolverFor(bean, owner))
+        assertNull(serverDnsResolverFor(bean, null))
+        io.nekohasekai.sagernet.database.SagerDatabase.groupDao.updateGroup(owner)
+        val blank = JsonParser.parseString(buildConfig(proxy, forTest = true).config).asJsonObject
+        assertFalse(blank.getAsJsonArray("outbounds").any { it.asJsonObject.has("domain_resolver") })
+        assertFalse(blank.toString().contains("dns-sub-701"))
     }
 
-    @Test fun realBuildConfigUsesDirectManagedResolverAndPreservesStandardNodes() {
-        // URLTest path avoids Android-only java.net.Socket reflection on host JVM.
+    @Test fun blankGroupDnsPreservesNormalDnsAndStandardNodes() {
         val managed = generated(snell("synthetic.cloud-nodes.com", true))
-        assertDedicated(managed)
-        val ordinaryDns = generated(snell("synthetic.cloud-nodes.com", false)).getAsJsonObject("dns")
-        val managedDns = managed.getAsJsonObject("dns").deepCopy()
-        managedDns.getAsJsonArray("servers").remove(managedDns.getAsJsonArray("servers").single {
-            it.asJsonObject.get("tag").asString == "dns-oix-managed"
-        })
-        assertEquals("Global DNS unchanged except independent server", ordinaryDns, managedDns)
-        dnsNamesAreCaseInsensitiveAndRootedNamesAreSupported()
+        assertFalse(managed.toString().contains("124.221.68.73"))
+        assertEquals(generated(snell("synthetic.cloud-nodes.com", false)).getAsJsonObject("dns"), managed.getAsJsonObject("dns"))
+        for (host in listOf("cloud-nodes.com", "Synthetic.CLOUD-NODES.COM.")) {
+            val bean = snell(host, true)
+            assertTrue(usesOixManagedDns(bean))
+            assertNull(serverDnsResolverFor(bean, null))
+            assertFalse(generated(bean).getAsJsonArray("outbounds").any { it.asJsonObject.has("domain_resolver") })
+        }
         ordinarySnellOtherOixDomainsAndOtherProtocolsKeepDns()
     }
 
-    private fun dnsNamesAreCaseInsensitiveAndRootedNamesAreSupported() {
-        for (host in listOf("cloud-nodes.com", "Synthetic.CLOUD-NODES.COM.")) assertDedicated(generated(snell(host, true)))
+    @Test fun subscriptionPrecedenceAppliesToOixWithOnlyLegacyFieldFallback() {
+        val bean = snell("synthetic.cloud-nodes.com", true)
+        val subscription = io.nekohasekai.sagernet.database.SubscriptionBean().apply {
+            initializeDefaultValues(); serverDnsResolver = " tcp://192.0.2.72:53 "
+        }
+        val owner = io.nekohasekai.sagernet.database.ProxyGroup(
+            id = 702, name = "subscription", type = io.nekohasekai.sagernet.GroupType.SUBSCRIPTION,
+            customDirectDns = "udp://192.0.2.73:53", subscription = subscription
+        )
+        assertEquals("tcp://192.0.2.72:53", serverDnsResolverFor(bean, owner))
+        subscription.serverDnsResolver = " \n "
+        assertEquals("udp://192.0.2.73:53", serverDnsResolverFor(bean, owner))
+        owner.customDirectDns = " "
+        assertNull(serverDnsResolverFor(bean, owner))
+        for (ordinary in listOf(snell("other.example", true), snell("synthetic.cloud-nodes.com", false),
+            snell("cloud-nodes.com.evil.example", true), snell("evilcloud-nodes.com", true),
+            snell("synthetic.cloud-nodes.com", true).apply { version = 6 })) {
+            assertFalse(usesOixManagedDns(ordinary))
+        }
+    }
+
+    @Test fun managedSignedNamesAreNeverPreResolvedOrRewritten() {
+        val updater = object : io.nekohasekai.sagernet.group.GroupUpdater() {
+            override suspend fun doUpdate(
+                proxyGroup: io.nekohasekai.sagernet.database.ProxyGroup,
+                subscription: io.nekohasekai.sagernet.database.SubscriptionBean,
+                userInterface: io.nekohasekai.sagernet.database.GroupManager.Interface?,
+                byUser: Boolean
+            ) {}
+            fun resolve(bean: AbstractBean) = kotlinx.coroutines.runBlocking {
+                forceResolve(listOf(bean), null)
+            }
+            fun rewrite(bean: AbstractBean) = rewriteAddress(
+                bean, listOf(java.net.InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1))), false
+            )
+        }
+        val bean = snell("Synthetic.CLOUD-NODES.COM.", true)
+        updater.resolve(bean)
+        updater.rewrite(bean)
+        assertEquals("Synthetic.CLOUD-NODES.COM.", bean.serverAddress)
+        val ordinary = snell("ordinary.example", false)
+        updater.rewrite(ordinary)
+        assertEquals("127.0.0.1", ordinary.serverAddress)
     }
 
     private fun ordinarySnellOtherOixDomainsAndOtherProtocolsKeepDns() {
