@@ -32,6 +32,11 @@ var (
 	PUB_KEY  = []byte("jMJaXZXGc1CbTri1UnRdvJ3izp8f0jGhXGr2jjr9nMkBKUZDoh3Avoijc4jQUw")
 )
 
+const (
+	maxControlResponseBytes = 4 << 20
+	maxDecodedControlBytes  = 16 << 20
+)
+
 type RealConfig struct {
 	Type     string
 	Server   string
@@ -65,6 +70,37 @@ func newControlRequest(ctx context.Context, url string, payload []byte, token st
 	}
 	applyControlHeaders(req, token, deviceID, deviceName)
 	return req, nil
+}
+
+func readBounded(reader io.Reader, limit int, label string) ([]byte, error) {
+	limited := &io.LimitedReader{R: reader, N: int64(limit) + 1}
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", label, err)
+	}
+	if len(data) > limit {
+		return nil, fmt.Errorf("%s too large", label)
+	}
+	return data, nil
+}
+
+func decodeMaybeGzip(data []byte, limit int, label string) ([]byte, error) {
+	if !bytes.HasPrefix(data, []byte("\x1f\x8b")) {
+		if len(data) > limit {
+			return nil, fmt.Errorf("%s too large", label)
+		}
+		return data, nil
+	}
+	reader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("open %s gzip: %w", label, err)
+	}
+	decoded, readErr := readBounded(reader, limit, label)
+	closeErr := reader.Close()
+	if err := errors.Join(readErr, closeErr); err != nil {
+		return nil, fmt.Errorf("consume %s gzip: %w", label, err)
+	}
+	return decoded, nil
 }
 
 func FetchDynamicConfig(ctx context.Context, dialer N.Dialer, nodeName string, nodeID string, token string, deviceID string, deviceName string) ([]RealConfig, error) {
@@ -115,10 +151,13 @@ func fetchDynamicConfig(ctx context.Context, client *http.Client, nodeName strin
 	if err != nil {
 		return nil, fmt.Errorf("api request failed: %w", err)
 	}
-	defer resp.Body.Close()
 
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
+	bodyBytes, readErr := readBounded(resp.Body, maxControlResponseBytes, "control response")
+	closeErr := resp.Body.Close()
+	if err := errors.Join(readErr, closeErr); err != nil {
+		return nil, fmt.Errorf("consume control response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("api returned status: %d", resp.StatusCode)
 	}
 
@@ -146,14 +185,15 @@ func fetchDynamicConfig(ctx context.Context, client *http.Client, nodeName strin
 	for i := range rawB64 {
 		rawB64[i] ^= PRIV_KEY[i%len(PRIV_KEY)]
 	}
-	if bytes.HasPrefix(rawB64, []byte("\x1f\x8b")) {
-		gr, _ := gzip.NewReader(bytes.NewReader(rawB64))
-		rawB64, _ = io.ReadAll(gr)
-		gr.Close()
+	rawB64, err = decodeMaybeGzip(rawB64, maxDecodedControlBytes, "decrypted control response")
+	if err != nil {
+		return nil, err
 	}
 
 	var layer1 map[string]interface{}
-	json.Unmarshal(rawB64, &layer1)
+	if err := json.Unmarshal(rawB64, &layer1); err != nil {
+		return nil, errors.New("invalid decrypted control response JSON")
+	}
 
 	if layer1["data"] == nil {
 		return nil, errors.New("decrypted data field is missing")
@@ -188,7 +228,9 @@ func fetchDynamicConfig(ctx context.Context, client *http.Client, nodeName strin
 	var smartData struct {
 		Proxies []map[string]interface{} `yaml:"proxies"`
 	}
-	yaml.Unmarshal(smartPlain, &smartData)
+	if err := yaml.Unmarshal(smartPlain, &smartData); err != nil {
+		return nil, errors.New("invalid smart config YAML")
+	}
 
 	var realConfigs []RealConfig
 
@@ -376,12 +418,16 @@ func decryptBlackstonePayload(rawData []byte) ([]byte, error) {
 	}
 
 	payload := rawData[headerSize:]
+	payloadLength := uint64(len(payload))
 	isKey := make([]bool, len(payload))
 	for _, off := range table {
-		for i := off.start; i < off.end; i++ {
-			if int(i) < len(isKey) {
-				isKey[i] = true
-			}
+		start := uint64(off.start)
+		end := uint64(off.end)
+		if start > end || end > payloadLength {
+			return nil, errors.New("invalid chunk offsets")
+		}
+		for i := start; i < end; i++ {
+			isKey[int(i)] = true
 		}
 	}
 
@@ -417,14 +463,5 @@ func decryptBlackstonePayload(rawData []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	if bytes.HasPrefix(plaintext, []byte("\x1f\x8b")) {
-		gr, err := gzip.NewReader(bytes.NewReader(plaintext))
-		if err == nil {
-			defer gr.Close()
-			uncompressed, _ := io.ReadAll(gr)
-			return uncompressed, nil
-		}
-	}
-
-	return plaintext, nil
+	return decodeMaybeGzip(plaintext, maxDecodedControlBytes, "decrypted smart config")
 }

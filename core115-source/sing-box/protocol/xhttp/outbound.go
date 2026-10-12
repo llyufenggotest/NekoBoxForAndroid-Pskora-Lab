@@ -53,12 +53,17 @@ type Outbound struct {
 	deviceName string
 	uotClient  *uot.Client
 
-	initMu     sync.Mutex
-	initDone   chan struct{}
-	isInit     bool
-	initErr    error
-	bestCfg    RealConfig
-	ssOutbound adapter.Outbound
+	initMu       sync.Mutex
+	initAttempt  *initAttempt
+	isInit       bool
+	initializeFn func(context.Context) error
+	bestCfg      RealConfig
+	ssOutbound   adapter.Outbound
+}
+
+type initAttempt struct {
+	done chan struct{}
+	err  error
 }
 
 func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.XHttpOutboundOptions) (adapter.Outbound, error) {
@@ -151,36 +156,37 @@ func (h *Outbound) pingRace(ctx context.Context, configs []RealConfig) (RealConf
 func (h *Outbound) lazyInit(ctx context.Context) error {
 	h.initMu.Lock()
 	if h.isInit {
-		err := h.initErr
 		h.initMu.Unlock()
-		return err
+		return nil
 	}
-	if h.initDone != nil {
-		done := h.initDone
+	if attempt := h.initAttempt; attempt != nil {
 		h.initMu.Unlock()
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-done:
+		case <-attempt.done:
+			return attempt.err
 		}
-		h.initMu.Lock()
-		err := h.initErr
-		h.initMu.Unlock()
-		return err
 	}
-	h.initDone = make(chan struct{})
-	done := h.initDone
+
+	attempt := &initAttempt{done: make(chan struct{})}
+	h.initAttempt = attempt
 	h.initMu.Unlock()
 
-	err := h.initialize(ctx)
+	initialize := h.initializeFn
+	if initialize == nil {
+		initialize = h.initialize
+	}
+	attempt.err = initialize(ctx)
 
 	h.initMu.Lock()
-	h.initErr = err
-	h.isInit = true
-	h.initDone = nil
-	close(done)
+	if attempt.err == nil {
+		h.isInit = true
+	}
+	h.initAttempt = nil
+	close(attempt.done)
 	h.initMu.Unlock()
-	return err
+	return attempt.err
 }
 
 func (h *Outbound) initialize(ctx context.Context) error {

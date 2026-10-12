@@ -1,12 +1,16 @@
 package xhttp
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"strings"
@@ -18,6 +22,129 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/chacha20poly1305"
 )
+
+func TestLazyInitCanceledAttemptCanRetry(t *testing.T) {
+	var calls atomic.Int32
+	started := make(chan struct{})
+	outbound := &Outbound{initializeFn: func(ctx context.Context) error {
+		if calls.Add(1) == 1 {
+			close(started)
+			<-ctx.Done()
+			return ctx.Err()
+		}
+		return nil
+	}}
+	ctx, cancel := context.WithCancel(context.Background())
+	first := make(chan error, 1)
+	go func() { first <- outbound.lazyInit(ctx) }()
+	<-started
+	cancel()
+	require.ErrorIs(t, <-first, context.Canceled)
+	require.NoError(t, outbound.lazyInit(context.Background()))
+	require.Equal(t, int32(2), calls.Load())
+}
+
+func TestLazyInitDeadlineAttemptCanRetry(t *testing.T) {
+	var calls atomic.Int32
+	outbound := &Outbound{initializeFn: func(ctx context.Context) error {
+		if calls.Add(1) == 1 {
+			<-ctx.Done()
+			return ctx.Err()
+		}
+		return nil
+	}}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	require.ErrorIs(t, outbound.lazyInit(ctx), context.DeadlineExceeded)
+	require.NoError(t, outbound.lazyInit(context.Background()))
+	require.Equal(t, int32(2), calls.Load())
+}
+
+func TestLazyInitTemporaryFailureCanRetry(t *testing.T) {
+	var calls atomic.Int32
+	temporary := errors.New("temporary network failure")
+	outbound := &Outbound{initializeFn: func(context.Context) error {
+		if calls.Add(1) == 1 {
+			return temporary
+		}
+		return nil
+	}}
+	require.ErrorIs(t, outbound.lazyInit(context.Background()), temporary)
+	require.NoError(t, outbound.lazyInit(context.Background()))
+	require.Equal(t, int32(2), calls.Load())
+}
+
+func TestLazyInitConcurrentWaitersShareAttemptResult(t *testing.T) {
+	var calls atomic.Int32
+	started := make(chan struct{})
+	release := make(chan struct{})
+	failure := errors.New("shared initialization failure")
+	outbound := &Outbound{initializeFn: func(context.Context) error {
+		calls.Add(1)
+		close(started)
+		<-release
+		return failure
+	}}
+	const waiterCount = 64
+	results := make(chan error, waiterCount)
+	start := make(chan struct{})
+	for i := 0; i < waiterCount; i++ {
+		go func() {
+			<-start
+			results <- outbound.lazyInit(context.Background())
+		}()
+	}
+	close(start)
+	<-started
+	deadline := time.Now().Add(time.Second)
+	for {
+		outbound.initMu.Lock()
+		attemptRunning := outbound.initAttempt != nil
+		outbound.initMu.Unlock()
+		if attemptRunning && calls.Load() == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("concurrent callers did not join the shared attempt")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+	for i := 0; i < waiterCount; i++ {
+		require.ErrorIs(t, <-results, failure)
+	}
+	require.Equal(t, int32(1), calls.Load())
+}
+
+func TestLazyInitWaiterCancellationDoesNotCancelSharedAttempt(t *testing.T) {
+	var calls atomic.Int32
+	started := make(chan struct{})
+	release := make(chan struct{})
+	outbound := &Outbound{initializeFn: func(context.Context) error {
+		calls.Add(1)
+		close(started)
+		<-release
+		return nil
+	}}
+	leader := make(chan error, 1)
+	go func() { leader <- outbound.lazyInit(context.Background()) }()
+	<-started
+	ctx, cancel := context.WithCancel(context.Background())
+	waiter := make(chan error, 1)
+	go func() { waiter <- outbound.lazyInit(ctx) }()
+	cancel()
+	select {
+	case err := <-waiter:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("canceled waiter did not return promptly")
+	}
+	close(release)
+	require.NoError(t, <-leader)
+	require.NoError(t, outbound.lazyInit(context.Background()))
+	require.Equal(t, int32(1), calls.Load())
+}
 
 func TestBlackstoneControlHeadersConsumeDevicePair(t *testing.T) {
 	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://example.invalid", nil)
@@ -46,6 +173,13 @@ func TestCanceledControlContextStopsBeforeRequest(t *testing.T) {
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) { return f(request) }
+
+type errorClosingBody struct {
+	io.Reader
+	err error
+}
+
+func (b errorClosingBody) Close() error { return b.err }
 
 func TestFetchDynamicConfigCanceledBeforeFetch(t *testing.T) {
 	var calls atomic.Int32
@@ -187,8 +321,8 @@ func TestPingRaceCancelsLosers(t *testing.T) {
 }
 
 func TestLazyInitWaiterInheritsCancellation(t *testing.T) {
-	done := make(chan struct{})
-	outbound := &Outbound{initDone: done}
+	attempt := &initAttempt{done: make(chan struct{})}
+	outbound := &Outbound{initAttempt: attempt}
 	ctx, cancel := context.WithCancel(context.Background())
 	result := make(chan error, 1)
 	go func() { result <- outbound.lazyInit(ctx) }()
@@ -200,10 +334,9 @@ func TestLazyInitWaiterInheritsCancellation(t *testing.T) {
 		t.Fatal("lazy initialization waiter ignored cancellation")
 	}
 	outbound.initMu.Lock()
-	outbound.initErr = errors.New("initializer fixture failure")
-	outbound.isInit = true
-	outbound.initDone = nil
-	close(done)
+	attempt.err = errors.New("initializer fixture failure")
+	outbound.initAttempt = nil
+	close(attempt.done)
 	outbound.initMu.Unlock()
 }
 
@@ -242,6 +375,21 @@ func responseClient(body []byte) *http.Client {
 	})}
 }
 
+func TestFetchDynamicConfigRejectsInvalidBase64WithoutPanic(t *testing.T) {
+	require.NotPanics(t, func() {
+		_, err := fetchDynamicConfig(context.Background(), responseClient([]byte("%%%")), "node-fixture", "node-id-fixture", "token-fixture", "device-fixture", "tablet-fixture")
+		require.Error(t, err)
+	})
+}
+
+func TestFetchDynamicConfigRejectsInvalidDecryptedJSONWithoutPanic(t *testing.T) {
+	body := encryptedControlResponse(t, []byte("{"))
+	require.NotPanics(t, func() {
+		_, err := fetchDynamicConfig(context.Background(), responseClient(body), "node-fixture", "node-id-fixture", "token-fixture", "device-fixture", "tablet-fixture")
+		require.Error(t, err)
+	})
+}
+
 func TestFetchDynamicConfigRejectsMalformedCanonicalEnvelopeWithoutPanic(t *testing.T) {
 	body := encryptedControlResponse(t, []byte(`{"data":"not-an-object"}`))
 	require.NotPanics(t, func() {
@@ -257,4 +405,96 @@ func TestFetchDynamicConfigRejectsMalformedCanonicalYAML(t *testing.T) {
 	body := encryptedControlResponse(t, layer1)
 	_, err = fetchDynamicConfig(context.Background(), responseClient(body), "node-fixture", "node-id-fixture", "token-fixture", "device-fixture", "tablet-fixture")
 	require.Error(t, err)
+}
+
+func gzipFixture(t *testing.T, payload []byte) []byte {
+	t.Helper()
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+	_, err := writer.Write(payload)
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+	return compressed.Bytes()
+}
+
+func TestFetchDynamicConfigReportsBodyCloseError(t *testing.T) {
+	closeFailure := errors.New("close fixture failure")
+	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body: errorClosingBody{
+				Reader: strings.NewReader("{}"),
+				err:    closeFailure,
+			},
+			Header: make(http.Header),
+		}, nil
+	})}
+	_, err := fetchDynamicConfig(context.Background(), client, "node-fixture", "node-id-fixture", "token-fixture", "device-fixture", "tablet-fixture")
+	require.ErrorIs(t, err, closeFailure)
+}
+
+func TestFetchDynamicConfigRejectsOversizedHTTPBody(t *testing.T) {
+	body := bytes.Repeat([]byte("x"), maxControlResponseBytes+1)
+	_, err := fetchDynamicConfig(context.Background(), responseClient(body), "node-fixture", "node-id-fixture", "token-fixture", "device-fixture", "tablet-fixture")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "too large")
+	for _, secret := range []string{"token-fixture", "device-fixture", "tablet-fixture", string(body[:32])} {
+		require.NotContains(t, err.Error(), secret)
+	}
+}
+
+func TestReadBoundedAcceptsExactLimitAndRejectsLimitPlusOne(t *testing.T) {
+	payload := bytes.Repeat([]byte("a"), maxControlResponseBytes)
+	actual, err := readBounded(strings.NewReader(string(payload)), maxControlResponseBytes, "control response")
+	require.NoError(t, err)
+	require.Equal(t, payload, actual)
+	_, err = readBounded(strings.NewReader(string(append(payload, 'b'))), maxControlResponseBytes, "control response")
+	require.Error(t, err)
+}
+
+func TestDecodeMaybeGzipRejectsTruncatedStream(t *testing.T) {
+	compressed := gzipFixture(t, []byte(`{"data":{}}`))
+	_, err := decodeMaybeGzip(compressed[:len(compressed)-4], maxDecodedControlBytes, "control response")
+	require.Error(t, err)
+}
+
+func TestDecodeMaybeGzipRejectsBombAndAcceptsBoundary(t *testing.T) {
+	boundary := bytes.Repeat([]byte("a"), maxDecodedControlBytes)
+	actual, err := decodeMaybeGzip(gzipFixture(t, boundary), maxDecodedControlBytes, "control response")
+	require.NoError(t, err)
+	require.Equal(t, boundary, actual)
+	_, err = decodeMaybeGzip(gzipFixture(t, append(boundary, 'b')), maxDecodedControlBytes, "control response")
+	require.Error(t, err)
+}
+
+func malformedChunkPayload(start, end uint32, payload []byte) []byte {
+	raw := make([]byte, 9+len(payload))
+	raw[0] = 1
+	binary.BigEndian.PutUint32(raw[1:5], start)
+	binary.BigEndian.PutUint32(raw[5:9], end)
+	copy(raw[9:], payload)
+	return raw
+}
+
+func TestDecryptBlackstonePayloadRejectsInvalidOffsetsWithoutPanic(t *testing.T) {
+	for name, raw := range map[string][]byte{
+		"reversed":      malformedChunkPayload(2, 1, []byte("abc")),
+		"out of bounds": malformedChunkPayload(0, 4, []byte("abc")),
+		"max uint32":    malformedChunkPayload(math.MaxUint32, math.MaxUint32, []byte("abc")),
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.NotPanics(t, func() {
+				_, err := decryptBlackstonePayload(raw)
+				require.Error(t, err)
+			})
+		})
+	}
+}
+
+func TestDecryptBlackstonePayloadAcceptsChunkBoundary(t *testing.T) {
+	plaintext := []byte("proxies: []")
+	raw := encryptBlackstonePayloadFixture(t, plaintext)
+	actual, err := decryptBlackstonePayload(raw)
+	require.NoError(t, err)
+	require.Equal(t, plaintext, actual)
 }
