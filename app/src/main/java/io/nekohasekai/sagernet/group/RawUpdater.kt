@@ -5,6 +5,8 @@ import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SubscriptionFilterMode
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.fmt.AbstractBean
+import io.nekohasekai.sagernet.fmt.groupDnsInput
+import io.nekohasekai.sagernet.fmt.setGroupDnsInput
 import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.oppa.OppaBean
 import io.nekohasekai.sagernet.fmt.oppa.parseOppaProvider
@@ -42,6 +44,7 @@ import org.yaml.snakeyaml.error.YAMLException
 import java.io.StringReader
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.util.IdentityHashMap
 import androidx.core.net.toUri
 
 @Suppress("EXPERIMENTAL_API_USAGE")
@@ -61,6 +64,17 @@ object RawUpdater : GroupUpdater() {
         if (existing.isNotBlank() || results.any { it.metadata.hasPolicyConflict }) return existing.takeIf { it.isNotBlank() }
         return results.mapNotNull { it.metadata.groupDns }.distinct().singleOrNull()
     }
+
+    internal fun applySubscriptionGroupDns(proxyGroup: ProxyGroup, metadata: RawMetadata): Boolean {
+        if (proxyGroup.groupDnsInput().isNotBlank() || metadata.hasPolicyConflict) return false
+        val groupDns = metadata.groupDns?.takeIf { it.isNotBlank() } ?: return false
+        proxyGroup.setGroupDnsInput(groupDns)
+        return true
+    }
+
+    private data class YamlParseContext(
+        val sources: IdentityHashMap<AbstractBean, Map<String, Any?>> = IdentityHashMap(),
+    )
 
     suspend fun fetchSubscriptionName(link: String): String? {
         if (!link.startsWith("http")) return null
@@ -187,6 +201,7 @@ object RawUpdater : GroupUpdater() {
 
         val link = subscription.link
         var proxies: List<AbstractBean>
+        var metadata = RawMetadata()
         if (link.startsWith("oppa://")) {
             proxies = fetchOppaNodes(link)
             val provider = parseOppaProvider(link)
@@ -198,8 +213,10 @@ object RawUpdater : GroupUpdater() {
                 ?.bufferedReader()
                 ?.readText()
 
-            proxies = contentText?.let { parseRaw(contentText) }
+            val parsed = contentText?.let { parseRawWithMetadata(it) }
                 ?: error(app.getString(R.string.no_proxies_found_in_subscription))
+            proxies = parsed.proxies
+            metadata = parsed.metadata
         } else {
 
             val response = Libcore.newHttpClient().apply {
@@ -220,8 +237,10 @@ object RawUpdater : GroupUpdater() {
                 setUserAgent(subscription.customUserAgent.takeIf { it.isNotBlank() } ?: USER_AGENT)
             }.execute()
             val content = Util.getStringBox(response.contentString)
-            proxies = parseRaw(content)
-                ?: error(app.getString(R.string.no_proxies_found))
+            val parsed = parseRawWithMetadata(content)
+            proxies = parsed.proxies
+            metadata = parsed.metadata
+            if (proxies.isEmpty()) error(app.getString(R.string.no_proxies_found))
 
             var userinfo = Util.getStringBox(response.getHeader("Subscription-Userinfo"))
             if (userinfo.isBlank()) {
@@ -243,6 +262,8 @@ object RawUpdater : GroupUpdater() {
                 }
             }
         }
+
+        applySubscriptionGroupDns(proxyGroup, metadata)
 
         val proxiesMap = LinkedHashMap<String, AbstractBean>()
         for (proxy in proxies) {
@@ -497,22 +518,20 @@ object RawUpdater : GroupUpdater() {
 
     @Suppress("UNCHECKED_CAST")
     suspend fun parseRawWithMetadata(text: String, fileName: String = ""): RawParseResult {
-        val proxies = parseRaw(text, fileName).orEmpty()
+        val context = YamlParseContext()
+        val proxies = parseRawInternal(text, fileName, context).orEmpty()
         if (!text.contains(Regex("(?m)^\\s*[\"']?proxies[\"']?\\s*:"))) return RawParseResult(proxies)
         val yaml = loadSafeYaml(text.removePrefix("\uFEFF"))
-        val originalServers = ((yaml["proxies"] as? List<*>) ?: emptyList<Any>())
-            .mapNotNull { (it as? Map<*, *>)?.get("server")?.toString() }
         val hosts = parseHosts(yaml["hosts"] as? Map<*, *>)
-        val mappedServers = proxies.mapIndexed { index, bean ->
-            val original = originalServers.getOrNull(index) ?: bean.serverAddress.orEmpty()
-            resolveHost(original, hosts).also { bean.serverAddress = it }
-        }
-        val serverPairs = mappedServers.mapIndexed { index, after ->
-            (originalServers.getOrNull(index) ?: after) to after
+        val serverPairs = proxies.map { bean ->
+            val original = context.sources[bean]?.get("server")?.toString()
+                ?: bean.serverAddress.orEmpty()
+            val after = resolveHost(original, hosts)
+            bean.serverAddress = after
+            original to after
         }
         val dns = yaml["dns"] as? Map<*, *>
-        val candidates = LinkedHashSet<String>()
-        var matched = false
+        val winningSets = mutableListOf<List<String>>()
         for ((before, after) in serverPairs) {
             val proxyPolicy = policyResolvers(
                 dns?.get("proxy-server-nameserver-policy") as? Map<*, *>, before, after,
@@ -521,14 +540,17 @@ object RawUpdater : GroupUpdater() {
                 dns?.get("nameserver-policy") as? Map<*, *>, before, after,
             )
             if (selected.matched && selected.resolvers.isNotEmpty()) {
-                matched = true
-                candidates += selected.resolvers
+                winningSets += selected.resolvers
             }
         }
-        return RawParseResult(
-            proxies,
-            if (matched) RawMetadata(candidates.joinToString(",")) else RawMetadata(),
-        )
+        if (winningSets.isEmpty()) return RawParseResult(proxies)
+        val canonicalSets = winningSets.map { it.toSet() }.distinct()
+        if (canonicalSets.size > 1) {
+            return RawParseResult(proxies, RawMetadata(hasPolicyConflict = true))
+        }
+        val candidates = LinkedHashSet<String>()
+        winningSets.forEach(candidates::addAll)
+        return RawParseResult(proxies, RawMetadata(groupDns = candidates.joinToString(",")))
     }
 
     internal fun policyDomainMatches(pattern: String, domain: String): Boolean {
@@ -631,10 +653,17 @@ object RawUpdater : GroupUpdater() {
         return PolicyResult(matched, result.toList())
     }
 
+    suspend fun parseRaw(text: String, fileName: String = ""): List<AbstractBean>? =
+        parseRawInternal(text, fileName, null)
+
     @Suppress("UNCHECKED_CAST")
-    suspend fun parseRaw(text: String, fileName: String = ""): List<AbstractBean>? {
+    private suspend fun parseRawInternal(
+        text: String,
+        fileName: String,
+        yamlContext: YamlParseContext?,
+    ): List<AbstractBean>? {
         // Files commonly carry a UTF-8 BOM; normalize before format detection.
-        if (text.startsWith("\uFEFF")) return parseRaw(text.removePrefix("\uFEFF"), fileName)
+        if (text.startsWith("\uFEFF")) return parseRawInternal(text.removePrefix("\uFEFF"), fileName, yamlContext)
 
         val proxies = mutableListOf<AbstractBean>()
 
@@ -652,6 +681,7 @@ object RawUpdater : GroupUpdater() {
                     app.getString(R.string.no_proxies_found_in_file)
                 ))) {
                     // Note: YAML numbers parsed as "Long"
+                    val startSize = proxies.size
 
                     when (val proxyType = proxy["type"]?.toString()?.let {
                         if (it.equals("Blackstone", ignoreCase = true) || it.equals("xhttp", ignoreCase = true)) it else it.lowercase()
@@ -1289,6 +1319,9 @@ object RawUpdater : GroupUpdater() {
                             val bean = parseClashSnell(proxy)
                             proxies.add(bean)
                         }
+                    }
+                    if (proxies.size > startSize) {
+                        yamlContext?.sources?.put(proxies.last(), proxy)
                     }
                 }
 
