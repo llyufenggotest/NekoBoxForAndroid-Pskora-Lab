@@ -15,20 +15,26 @@ public class XHttpBean extends AbstractBean {
 
     public String password; // 对应 YAML 中的 JWT Token
     public String nodeId;   // 对应 YAML 中的 node-id
+    public String deviceId; // 对应 YAML/JSON 中的 device_id
+    public String deviceName; // 对应 YAML/JSON 中的 device_name
 
     @Override
     public void initializeDefaultValues() {
         super.initializeDefaultValues();
         if (JavaUtil.isNullOrBlank(password)) password = "";
         if (JavaUtil.isNullOrBlank(nodeId)) nodeId = "";
+        if (JavaUtil.isNullOrBlank(deviceId)) deviceId = "";
+        if (JavaUtil.isNullOrBlank(deviceName)) deviceName = "";
     }
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(1); // version
+        output.writeInt(2); // version
         super.serialize(output);
         output.writeString(password);
         output.writeString(nodeId);
+        output.writeString(deviceId);
+        output.writeString(deviceName);
     }
 
     @Override
@@ -37,6 +43,10 @@ public class XHttpBean extends AbstractBean {
         super.deserialize(input);
         password = input.readString();
         nodeId = input.readString();
+        if (version >= 2) {
+            deviceId = input.readString();
+            deviceName = input.readString();
+        }
     }
 
     @NotNull

@@ -20,6 +20,8 @@ object TypeMap : HashMap<String, Int>() {
         this["juicity"] = ProxyEntity.TYPE_JUICITY
         this["anytls"] = ProxyEntity.TYPE_ANYTLS
         this["snell"] = ProxyEntity.TYPE_SNELL
+        this["blackstone"] = ProxyEntity.TYPE_XHTTP
+        this["xhttp"] = ProxyEntity.TYPE_XHTTP
         this["neko"] = ProxyEntity.TYPE_NEKO
         this["config"] = ProxyEntity.TYPE_CONFIG
     }
@@ -28,8 +30,9 @@ object TypeMap : HashMap<String, Int>() {
 
     init {
         TypeMap.forEach { (key, type) ->
-            reversed[type] = key
+            reversed.putIfAbsent(type, key)
         }
+        reversed[ProxyEntity.TYPE_XHTTP] = "blackstone"
     }
 
 }

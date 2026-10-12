@@ -35,18 +35,23 @@ import (
 
 func RegisterOutbound(registry *outbound.Registry) {
 	outbound.Register[option.XHttpOutboundOptions](registry, "xhttp", NewOutbound)
+	outbound.Register[option.BlackstoneOutboundOptions](registry, "Blackstone", func(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.BlackstoneOutboundOptions) (adapter.Outbound, error) {
+		return newOutbound(ctx, router, logger, tag, "Blackstone", options.XHttpOutboundOptions)
+	})
 }
 
 type Outbound struct {
 	outbound.Adapter
-	ctx       context.Context
-	router    adapter.Router
-	logger    logger.ContextLogger
-	dialer    N.Dialer
-	nodeName  string
-	xToken    string
-	nodeID    string
-	uotClient *uot.Client
+	ctx        context.Context
+	router     adapter.Router
+	logger     logger.ContextLogger
+	dialer     N.Dialer
+	nodeName   string
+	xToken     string
+	nodeID     string
+	deviceID   string
+	deviceName string
+	uotClient  *uot.Client
 
 	initMu     sync.Mutex
 	isInit     bool
@@ -56,6 +61,10 @@ type Outbound struct {
 }
 
 func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.XHttpOutboundOptions) (adapter.Outbound, error) {
+	return newOutbound(ctx, router, logger, tag, "xhttp", options)
+}
+
+func newOutbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, outboundType string, options option.XHttpOutboundOptions) (adapter.Outbound, error) {
 	outboundDialer, err := dialer.New(ctx, options.DialerOptions, options.ServerIsDomain())
 	if err != nil {
 		return nil, err
@@ -67,14 +76,16 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 	}
 
 	ob := &Outbound{
-		Adapter:  outbound.NewAdapterWithDialerOptions("xhttp", tag, options.Network.Build(), options.DialerOptions),
-		ctx:      ctx,
-		router:   router,
-		logger:   logger,
-		dialer:   outboundDialer,
-		nodeName: targetName,
-		xToken:   options.Password,
-		nodeID:   options.NodeID,
+		Adapter:    outbound.NewAdapterWithDialerOptions(outboundType, tag, options.Network.Build(), options.DialerOptions),
+		ctx:        ctx,
+		router:     router,
+		logger:     logger,
+		dialer:     outboundDialer,
+		nodeName:   targetName,
+		xToken:     options.Password,
+		nodeID:     options.NodeID,
+		deviceID:   options.DeviceID,
+		deviceName: options.DeviceName,
 	}
 
 	uotOptions := common.PtrValueOrDefault(options.UDPOverTCP)
@@ -140,10 +151,10 @@ func (h *Outbound) lazyInit(ctx context.Context) error {
 
 	h.logger.InfoContext(ctx, "[xhttp] 🌟 节点首次发包，通过特权直连拉取最新配置...")
 
-	apiCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	apiCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	realConfigs, err := FetchDynamicConfig(apiCtx, h.dialer, h.nodeName, h.nodeID, h.xToken)
+	realConfigs, err := FetchDynamicConfig(apiCtx, h.dialer, h.nodeName, h.nodeID, h.xToken, h.deviceID, h.deviceName)
 	if err != nil {
 		h.logger.ErrorContext(ctx, "[xhttp] ❌ 动态配置获取失败: ", err)
 		return err

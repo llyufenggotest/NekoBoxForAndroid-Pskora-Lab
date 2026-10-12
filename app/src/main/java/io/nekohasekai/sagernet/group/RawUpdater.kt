@@ -503,14 +503,31 @@ object RawUpdater : GroupUpdater() {
                 ))) {
                     // Note: YAML numbers parsed as "Long"
 
-                    when (proxy["type"]?.toString()?.lowercase()) {
-                        "xhttp" -> {
+                    when (val proxyType = proxy["type"]?.toString()?.let {
+                        if (it.equals("Blackstone", ignoreCase = true) || it.equals("xhttp", ignoreCase = true)) it else it.lowercase()
+                    }) {
+                        "Blackstone", "xhttp" -> {
+                            fun strictOptionalString(key: String): String? {
+                                if (!proxy.containsKey(key)) return null
+                                return (proxy[key] as? String)?.takeIf { it.isNotBlank() }
+                                    ?: error("$proxyType $key must be a non-empty string")
+                            }
+                            val deviceId = strictOptionalString("device_id")
+                            val deviceName = strictOptionalString("device_name")
+                            if (proxyType == "Blackstone" && (deviceId == null || deviceName == null)) {
+                                error("Blackstone requires device_id and device_name")
+                            }
+                            if ((deviceId == null) != (deviceName == null)) {
+                                error("$proxyType requires device_id and device_name together")
+                            }
                             proxies.add(XHttpBean().apply {
                                 serverAddress = proxy["server"]?.toString() ?: ""
                                 serverPort = proxy["port"]?.toString()?.toIntOrNull() ?: 0
                                 name = proxy["name"]?.toString() ?: ""
                                 password = proxy["password"]?.toString() ?: ""
                                 nodeId = proxy["node-id"]?.toString() ?: ""
+                                this.deviceId = deviceId ?: ""
+                                this.deviceName = deviceName ?: ""
                             })
                         }
                         

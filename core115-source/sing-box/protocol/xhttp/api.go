@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -40,7 +41,33 @@ type RealConfig struct {
 	TcpFake  string
 }
 
-func FetchDynamicConfig(ctx context.Context, dialer N.Dialer, nodeName string, nodeID string, token string) ([]RealConfig, error) {
+func applyControlHeaders(req *http.Request, token string, deviceID string, deviceName string) {
+	req.Host = "g.just4test.xyz"
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("x-version", "520")
+	req.Header.Set("x-platform", "android")
+	req.Header.Set("user-agent", "okhttp/4.9.2")
+	req.Header.Set("x-header", buildXHeader(token, deviceID, deviceName))
+	if deviceID != "" && deviceName != "" {
+		req.Header.Set("x-version", "540")
+		req.Header.Set("accept", "application/json, text/plain, */*")
+		req.Header.Set("accept-language", "zh_CN")
+	}
+}
+
+func newControlRequest(ctx context.Context, url string, payload []byte, token string, deviceID string, deviceName string) (*http.Request, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	applyControlHeaders(req, token, deviceID, deviceName)
+	return req, nil
+}
+
+func FetchDynamicConfig(ctx context.Context, dialer N.Dialer, nodeName string, nodeID string, token string, deviceID string, deviceName string) ([]RealConfig, error) {
 	cfNodeIP := "104.21.41.69"
 	url := fmt.Sprintf("https://%s/api/v3/proxy/config", cfNodeIP)
 
@@ -60,14 +87,10 @@ func FetchDynamicConfig(ctx context.Context, dialer N.Dialer, nodeName string, n
 	payloadMap := map[string]string{"data": encryptedReq}
 	payloadJson, _ := json.Marshal(payloadMap)
 
-	req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadJson))
-
-	req.Host = "g.just4test.xyz"
-	req.Header.Set("content-type", "application/json")
-	req.Header.Set("x-version", "520")
-	req.Header.Set("x-platform", "android")
-	req.Header.Set("user-agent", "okhttp/4.9.2")
-	req.Header.Set("x-header", buildXHeader(token))
+	req, err := newControlRequest(ctx, url, payloadJson, token, deviceID, deviceName)
+	if err != nil {
+		return nil, err
+	}
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -256,22 +279,31 @@ func crackCertificate(certPem string) (RealConfig, error) {
 	return RealConfig{}, errors.New("all asn.1 offsets failed")
 }
 
-func buildXHeader(token string) string {
+func buildXHeader(token string, deviceID string, deviceName string) string {
 	headerMap := map[string]interface{}{
-		"X-DEVICE-NAME":     "Lenovo - Lenovo TB-J606F",
-		"X-IDENTIFIER":      "ed7295e154b50905",
-		"X-TOKEN":           token,
-		"X-SOURCE":          `{"mvjarp":"gp","sracun":"gp"}`,
-		"X-TIMESTAMP":       "1779367490",
-		"X-CHECK-MOBILE":    `{"isRoot":true,"isEmulator":false,"bundleID":"com.heysocks.android"}`,
-		"X-BUNDLE-ID":       "",
-		"X-ABIS":            "arm64-v8a,armeabi-v7a,armeabi",
-		"X-INSTALLREFERRER": "unknown",
-		"X-OS-VERSION":      "30",
-		"X-ISP":             "",
-		"X-COUNTRY-CODE":    "CN",
-		"X-LOADED":          "false",
-		"x-sign":            "2763cb26083e582d60dd016e1a5e0ae9",
+		"X-DEVICE-NAME":  "Lenovo - Lenovo TB-J606F",
+		"X-IDENTIFIER":   "ed7295e154b50905",
+		"X-TOKEN":        token,
+		"X-TIMESTAMP":    "1779367490",
+		"X-CHECK-MOBILE": `{"isRoot":true,"isEmulator":false,"bundleID":"com.heysocks.android"}`,
+		"X-OS-VERSION":   "30",
+	}
+	if deviceID != "" && deviceName != "" {
+		headerMap = map[string]interface{}{
+			"X-IDENTIFIER":      deviceID,
+			"X-DEVICE-NAME":     deviceName,
+			"X-TOKEN":           token,
+			"X-TIMESTAMP":       fmt.Sprintf("%d", time.Now().Unix()),
+			"X-SOURCE":          `{"mvjarp":"gp","sracun":"gp"}`,
+			"X-CHECK-MOBILE":    `{"isRoot":true,"isEmulator":false,"bundleID":"com.heysocks.android"}`,
+			"X-BUNDLE-ID":       "",
+			"X-ABIS":            "arm64-v8a,armeabi-v7a,armeabi",
+			"X-INSTALLREFERRER": "unknown",
+			"X-OS-VERSION":      "30",
+			"X-ISP":             "",
+			"X-COUNTRY-CODE":    "CN",
+			"X-LOADED":          "false",
+		}
 	}
 	headerJson, _ := json.Marshal(headerMap)
 	return encryptRequestData(string(headerJson))

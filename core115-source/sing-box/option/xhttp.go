@@ -1,12 +1,50 @@
 package option
 
-// XHttpOutboundOptions 定义了自定义 xhttp 协议的出站配置反序列化结构
+import (
+	"context"
+	"strings"
+
+	E "github.com/sagernet/sing/common/exceptions"
+	"github.com/sagernet/sing/common/json"
+)
+
+// XHttpOutboundOptions is the compatibility storage for the Blackstone contract.
 type XHttpOutboundOptions struct {
 	DialerOptions `json:",inline"`
 	ServerOptions `json:",inline"`
-	Name          string             `json:"name,omitempty"`    // 用于精准匹配下发节点名
-	Password      string             `json:"password"`          // 对应 YAML 里的 JWT Token
-	NodeID        string             `json:"node-id,omitempty"` // 对应 YAML 里的 node-id
+	Name          string             `json:"name,omitempty"`
+	Password      string             `json:"password"`
+	NodeID        string             `json:"node-id,omitempty"`
+	DeviceID      string             `json:"device_id,omitempty"`
+	DeviceName    string             `json:"device_name,omitempty"`
 	Network       NetworkList        `json:"network,omitempty"`
-	UDPOverTCP    *UDPOverTCPOptions `json:"udp_over_tcp,omitempty"` // 🚀 抄作业成功，100% 准确！
+	UDPOverTCP    *UDPOverTCPOptions `json:"udp_over_tcp,omitempty"`
+}
+
+type BlackstoneOutboundOptions struct {
+	XHttpOutboundOptions
+}
+
+func (o *BlackstoneOutboundOptions) UnmarshalJSONContext(ctx context.Context, content []byte) error {
+	if err := o.XHttpOutboundOptions.UnmarshalJSONContext(ctx, content); err != nil {
+		return err
+	}
+	if o.DeviceID == "" || o.DeviceName == "" {
+		return E.New("Blackstone requires device_id and device_name")
+	}
+	return nil
+}
+
+func (o *XHttpOutboundOptions) UnmarshalJSONContext(ctx context.Context, content []byte) error {
+	type plain XHttpOutboundOptions
+	if err := json.UnmarshalContext(ctx, content, (*plain)(o)); err != nil {
+		return err
+	}
+	if (o.DeviceID == "") != (o.DeviceName == "") {
+		return E.New("device_id and device_name must be provided together")
+	}
+	if o.DeviceID != "" && (strings.TrimSpace(o.DeviceID) == "" || strings.TrimSpace(o.DeviceName) == "") {
+		return E.New("device_id and device_name must be non-empty strings")
+	}
+	return nil
 }

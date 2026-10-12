@@ -4903,6 +4903,9 @@ public class SingBoxOptions {
         @SerializedName("node-id")
         public String node_id;
 
+        public String device_id;
+        public String device_name;
+
         public String detour;
         public String bind_interface;
         public Long connect_timeout;

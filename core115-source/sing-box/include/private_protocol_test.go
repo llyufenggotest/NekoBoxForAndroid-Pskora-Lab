@@ -23,7 +23,7 @@ func TestAnyTLSDetourSchemaAndRegistration(t *testing.T) {
 func TestPrivateProtocolSchemaAndRegistration(t *testing.T) {
 	ctx := Context(context.Background())
 	for _, raw := range []string{
-		`{"type":"xhttp","tag":"blackstone","server":"127.0.0.1","server_port":443,"password":"fixture","node-id":"1"}`,
+		`{"type":"Blackstone","tag":"blackstone","server":"127.0.0.1","server_port":443,"password":"fixture","node-id":"1","device_id":"device-fixture","device_name":"tablet-fixture"}`,
 		`{"type":"trojan","server":"127.0.0.1","server_port":443,"password":"fixture#fastup","mpw":"per-node"}`,
 		`{"type":"vless","server":"127.0.0.1","server_port":443,"uuid":"00000000-0000-0000-0000-000000000001#juzi","transport":{"type":"xhttp","mode":"stream-up"},"tunnet":{"snapshot":"fixture.json"}}`,
 		`{"type":"anytls","server":"127.0.0.1","server_port":443,"password":"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f#sl","tls":{"enabled":true}}`,
@@ -38,7 +38,7 @@ func TestPrivateProtocolSchemaAndRegistration(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
-	for _, name := range []string{"snell", "anytls", "bridge", "vless", "trojan", "xhttp", "shadowsocksr"} {
+	for _, name := range []string{"snell", "anytls", "bridge", "vless", "trojan", "Blackstone", "xhttp", "shadowsocksr"} {
 		_, ok := OutboundRegistry().CreateOptions(name)
 		require.True(t, ok, name)
 	}

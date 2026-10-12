@@ -226,7 +226,7 @@ data class ProxyEntity(
         TYPE_NEKO -> nekoBean!!.displayType()
         TYPE_CONFIG -> configBean!!.displayType()
         TYPE_SNELL -> "Snell"
-        TYPE_XHTTP -> "XHTTP"
+        TYPE_XHTTP -> "Blackstone"
         TYPE_OPPA -> "Oppa"
         else -> "Undefined type $type"
     }
