@@ -68,6 +68,22 @@ func newControlRequest(ctx context.Context, url string, payload []byte, token st
 }
 
 func FetchDynamicConfig(ctx context.Context, dialer N.Dialer, nodeName string, nodeID string, token string, deviceID string, deviceName string) ([]RealConfig, error) {
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(c context.Context, network, addr string) (net.Conn, error) {
+				return dialer.DialContext(c, "tcp", M.ParseSocksaddr(addr))
+			},
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+				ServerName:         "g.just4test.xyz",
+			},
+			ForceAttemptHTTP2: true,
+		},
+	}
+	return fetchDynamicConfig(ctx, client, nodeName, nodeID, token, deviceID, deviceName)
+}
+
+func fetchDynamicConfig(ctx context.Context, client *http.Client, nodeName string, nodeID string, token string, deviceID string, deviceName string) ([]RealConfig, error) {
 	cfNodeIP := "104.21.41.69"
 	url := fmt.Sprintf("https://%s/api/v3/proxy/config", cfNodeIP)
 
@@ -91,23 +107,13 @@ func FetchDynamicConfig(ctx context.Context, dialer N.Dialer, nodeName string, n
 	if err != nil {
 		return nil, err
 	}
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(c context.Context, network, addr string) (net.Conn, error) {
-				return dialer.DialContext(c, "tcp", M.ParseSocksaddr(addr))
-			},
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				ServerName:         "g.just4test.xyz",
-			},
-			ForceAttemptHTTP2: true,
-		},
+	if client == nil {
+		return nil, errors.New("missing control HTTP client")
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("api request failed: %v", err)
+		return nil, fmt.Errorf("api request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -120,7 +126,11 @@ func FetchDynamicConfig(ctx context.Context, dialer N.Dialer, nodeName string, n
 	var jsonResp map[string]interface{}
 
 	if err := json.Unmarshal(bodyBytes, &jsonResp); err == nil && jsonResp["data"] != nil {
-		encryptedB64 = jsonResp["data"].(string)
+		dataValue, ok := jsonResp["data"].(string)
+		if !ok || dataValue == "" {
+			return nil, errors.New("api response encrypted data must be a non-empty string")
+		}
+		encryptedB64 = dataValue
 	} else {
 		encryptedB64 = strings.Trim(string(bodyBytes), "\"'\n\r\t ")
 	}
@@ -149,10 +159,27 @@ func FetchDynamicConfig(ctx context.Context, dialer N.Dialer, nodeName string, n
 		return nil, errors.New("decrypted data field is missing")
 	}
 
-	dataObj := layer1["data"].(map[string]interface{})
-	smartB64 := dataObj["smart"].(string)
+	dataValue, ok := layer1["data"]
+	if !ok {
+		return nil, errors.New("api response missing data")
+	}
+	data, ok := dataValue.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("api response data must be an object")
+	}
+	smartValue, ok := data["smart"]
+	if !ok {
+		return nil, errors.New("api response missing smart config")
+	}
+	smartB64, ok := smartValue.(string)
+	if !ok || smartB64 == "" {
+		return nil, errors.New("api response smart config must be a non-empty string")
+	}
 
-	smartRaw, _ := base64.StdEncoding.DecodeString(smartB64)
+	smartRaw, err := base64.StdEncoding.DecodeString(smartB64)
+	if err != nil {
+		return nil, errors.New("invalid smart config encoding")
+	}
 	smartPlain, err := decryptBlackstonePayload(smartRaw)
 	if err != nil {
 		return nil, err

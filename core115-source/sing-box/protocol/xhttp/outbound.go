@@ -54,6 +54,7 @@ type Outbound struct {
 	uotClient  *uot.Client
 
 	initMu     sync.Mutex
+	initDone   chan struct{}
 	isInit     bool
 	initErr    error
 	bestCfg    RealConfig
@@ -106,7 +107,7 @@ func (h *Outbound) pingRace(ctx context.Context, configs []RealConfig) (RealConf
 		cfg RealConfig
 		err error
 	}
-	resCh := make(chan raceResult, len(configs))
+	resCh := make(chan raceResult)
 	raceCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -121,9 +122,15 @@ func (h *Outbound) pingRace(ctx context.Context, configs []RealConfig) (RealConf
 			conn, err := h.dialer.DialContext(dialCtx, N.NetworkTCP, addr)
 			if err == nil {
 				conn.Close()
-				cancel()
 			}
-			resCh <- raceResult{cfg: c, err: err}
+			result := raceResult{cfg: c, err: err}
+			select {
+			case resCh <- result:
+				if err == nil {
+					cancel()
+				}
+			case <-raceCtx.Done():
+			}
 		}(cfg)
 	}
 
@@ -143,12 +150,40 @@ func (h *Outbound) pingRace(ctx context.Context, configs []RealConfig) (RealConf
 
 func (h *Outbound) lazyInit(ctx context.Context) error {
 	h.initMu.Lock()
-	defer h.initMu.Unlock()
-
 	if h.isInit {
-		return h.initErr
+		err := h.initErr
+		h.initMu.Unlock()
+		return err
 	}
+	if h.initDone != nil {
+		done := h.initDone
+		h.initMu.Unlock()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-done:
+		}
+		h.initMu.Lock()
+		err := h.initErr
+		h.initMu.Unlock()
+		return err
+	}
+	h.initDone = make(chan struct{})
+	done := h.initDone
+	h.initMu.Unlock()
 
+	err := h.initialize(ctx)
+
+	h.initMu.Lock()
+	h.initErr = err
+	h.isInit = true
+	h.initDone = nil
+	close(done)
+	h.initMu.Unlock()
+	return err
+}
+
+func (h *Outbound) initialize(ctx context.Context) error {
 	h.logger.InfoContext(ctx, "[xhttp] 🌟 节点首次发包，通过特权直连拉取最新配置...")
 
 	apiCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -178,16 +213,15 @@ func (h *Outbound) lazyInit(ctx context.Context) error {
 			Method:   best.Cipher,
 			Password: best.Password + "#BLACKSTONE",
 		}
-		h.ssOutbound, h.initErr = shadowsocks.NewOutbound(h.ctx, h.router, h.logger, h.Tag()+"_ss", ssOpts)
-		if h.initErr != nil {
-			return h.initErr
+		ssOutbound, err := shadowsocks.NewOutbound(h.ctx, h.router, h.logger, h.Tag()+"_ss", ssOpts)
+		if err != nil {
+			return err
 		}
+		h.ssOutbound = ssOutbound
 	} else {
 		h.logger.InfoContext(ctx, fmt.Sprintf("[xhttp] ⚡ 锁定优选 XHTTP 节点 -> %s:%s", best.Server, best.Port))
 	}
 
-	h.isInit = true
-	h.initErr = nil
 	return nil
 }
 

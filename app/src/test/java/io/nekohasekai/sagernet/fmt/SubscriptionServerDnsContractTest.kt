@@ -13,6 +13,8 @@ class SubscriptionServerDnsContractTest {
         val source = builder.readText()
         assertTrue(source.contains("serverDnsResolversFor(bean, ownerGroup)"))
         assertTrue(source.contains("\"domain_resolver\""))
+        assertTrue(source.contains("resolverTags.first()"))
+        assertTrue(source.contains("core115 accepts one domain_resolver server"))
         assertTrue(!source.contains("if (!legacyDns.isNullOrBlank() && nodeDomainList.isNotEmpty())"))
         val policy = File(builder.parentFile, "GroupDnsPolicy.kt").readText()
         assertTrue(policy.contains("cleanGroupDns(subscription?.serverDnsResolver)"))
