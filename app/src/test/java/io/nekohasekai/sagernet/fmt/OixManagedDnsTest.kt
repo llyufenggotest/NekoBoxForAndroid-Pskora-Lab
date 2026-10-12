@@ -62,12 +62,12 @@ class OixManagedDnsTest {
         val proxy = ProxyEntity().apply { id = 920; groupId = owner.id; putBean(bean) }
         val root = JsonParser.parseString(buildConfig(proxy, forTest = true).config).asJsonObject
         val outbound = root.getAsJsonArray("outbounds").first { it.asJsonObject.get("type").asString == "snell" }.asJsonObject
-        assertEquals("dns-sub-701", outbound.getAsJsonObject("domain_resolver").get("server").asString)
+        assertEquals("dns-sub-701-0", outbound.getAsJsonObject("domain_resolver").get("server").asString)
         val dns = root.getAsJsonObject("dns")
         assertEquals("tcp://192.0.2.71:1053", dns.getAsJsonArray("servers").single {
-            it.asJsonObject.get("tag").asString == "dns-sub-701"
+            it.asJsonObject.get("tag").asString == "dns-sub-701-0"
         }.asJsonObject.get("address").asString)
-        assertFalse(dns.getAsJsonArray("rules").any { it.asJsonObject.get("server")?.asString == "dns-sub-701" })
+        assertFalse(dns.getAsJsonArray("rules").any { it.asJsonObject.get("server")?.asString == "dns-sub-701-0" })
         assertFalse(root.toString().contains("dns-oix-managed"))
         assertFalse(root.toString().contains("124.221.68.73"))
         owner.customDirectDns = " \n\t "
@@ -76,7 +76,7 @@ class OixManagedDnsTest {
         io.nekohasekai.sagernet.database.SagerDatabase.groupDao.updateGroup(owner)
         val blank = JsonParser.parseString(buildConfig(proxy, forTest = true).config).asJsonObject
         assertFalse(blank.getAsJsonArray("outbounds").any { it.asJsonObject.has("domain_resolver") })
-        assertFalse(blank.toString().contains("dns-sub-701"))
+        assertFalse(blank.toString().contains("dns-sub-701-0"))
     }
 
     @Test fun blankGroupDnsPreservesNormalDnsAndStandardNodes() {

@@ -498,20 +498,26 @@ fun buildConfig(
                     val ownerGroup = groupCache.getOrPut(ownerGid) {
                         SagerDatabase.groupDao.getById(ownerGid)
                     }
-                    val resolver = serverDnsResolverFor(bean, ownerGroup)
-                    if (resolver != null) {
-                        val resolverTag = "dns-sub-$ownerGid"
-                        if (dns.servers.none { it.tag == resolverTag }) {
-                            dns.servers.add(DNSServerOptions().apply {
-                                tag = resolverTag
-                                address = resolver
-                                detour = TAG_DIRECT
-                                address_resolver = "dns-direct"
-                                strategy = autoDnsDomainStrategy(defaultServerDomainStrategy)
-                            })
+                    val resolvers = serverDnsResolversFor(bean, ownerGroup)
+                    if (resolvers.isNotEmpty()) {
+                        val resolverTags = resolvers.mapIndexed { resolverIndex, resolver ->
+                            val resolverTag = "dns-sub-$ownerGid-$resolverIndex"
+                            if (dns.servers.none { it.tag == resolverTag }) {
+                                dns.servers.add(DNSServerOptions().apply {
+                                    tag = resolverTag
+                                    address = resolver
+                                    detour = TAG_DIRECT
+                                    address_resolver = "dns-direct"
+                                    strategy = autoDnsDomainStrategy(defaultServerDomainStrategy)
+                                })
+                            }
+                            resolverTag
                         }
+                        // core115 accepts one domain_resolver server. Preserve all configured
+                        // endpoints as ordered DNS servers and select the first for core traffic;
+                        // NodeDnsLookup performs verified ordered fallback for connection tests.
                         _hack_config_map["domain_resolver"] = mapOf(
-                            "server" to resolverTag,
+                            "server" to resolverTags.first(),
                             "strategy" to autoDnsDomainStrategy(defaultServerDomainStrategy).orEmpty(),
                         )
                     }

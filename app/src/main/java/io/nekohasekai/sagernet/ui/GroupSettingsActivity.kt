@@ -26,6 +26,10 @@ import io.nekohasekai.sagernet.SubscriptionFilterMode
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.fmt.AbstractBean
+import io.nekohasekai.sagernet.fmt.groupDnsInput
+import io.nekohasekai.sagernet.fmt.isValidGroupDnsInput
+import io.nekohasekai.sagernet.fmt.normalizeGroupDnsInput
+import io.nekohasekai.sagernet.fmt.setGroupDnsInput
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.group.RawUpdater
 import io.nekohasekai.sagernet.fmt.oppa.parseOppaProvider
@@ -51,7 +55,9 @@ class GroupSettingsActivity(
 
     fun ProxyGroup.init() {
         DataStore.groupName = name ?: ""
-        DataStore.groupCustomDns = customDirectDns ?: "" // 🚀 读出数据到UI缓存
+        val logicalGroupDns = groupDnsInput()
+        DataStore.groupCustomDns = logicalGroupDns
+        DataStore.subscriptionServerDns = logicalGroupDns
         DataStore.groupType = type
         DataStore.groupOrder = order
         DataStore.groupIsSelector = isSelector
@@ -73,15 +79,17 @@ class GroupSettingsActivity(
         DataStore.subscriptionAutoUpdateDelay = subscription.autoUpdateDelay
         DataStore.subscriptionFilterMode = subscription.filterMode
         DataStore.subscriptionFilterRegex = subscription.filterRegex
-        DataStore.subscriptionServerDns = subscription.serverDnsResolver
-            .orEmpty()
-            .ifBlank { customDirectDns.orEmpty() }
     }
 
     fun ProxyGroup.serialize() {
         name = DataStore.groupName.takeIf { it.isNotBlank() } ?: "My group"
-        customDirectDns = if (DataStore.groupType == GroupType.SUBSCRIPTION) null else DataStore.groupCustomDns
         type = DataStore.groupType
+        val logicalGroupDns = if (type == GroupType.SUBSCRIPTION) {
+            DataStore.subscriptionServerDns
+        } else {
+            DataStore.groupCustomDns
+        }
+        setGroupDnsInput(logicalGroupDns)
         order = DataStore.groupOrder
         isSelector = DataStore.groupIsSelector
 
@@ -110,8 +118,9 @@ class GroupSettingsActivity(
                 autoUpdateDelay = DataStore.subscriptionAutoUpdateDelay
                 filterMode = DataStore.subscriptionFilterMode
                 filterRegex = DataStore.subscriptionFilterRegex
-                serverDnsResolver = DataStore.subscriptionServerDns
+                serverDnsResolver = customDirectDns.orEmpty()
             }
+            customDirectDns = subscription!!.serverDnsResolver
         }
     }
 
@@ -146,26 +155,34 @@ class GroupSettingsActivity(
                     cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf { it >= 0 }
                         ?.let(cursor::getString)
                 }.orEmpty()
-                val proxies = if (fileName.endsWith(".zip", true)) {
-                    val result = mutableListOf<io.nekohasekai.sagernet.fmt.AbstractBean>()
+                val parseResults = if (fileName.endsWith(".zip", true)) {
+                    val results = mutableListOf<RawUpdater.RawParseResult>()
                     ZipInputStream(contentResolver.openInputStream(file)!!).use { zip ->
                         while (true) {
                             val entry = zip.nextEntry ?: break
-                            if (!entry.isDirectory) RawUpdater.parseRaw(zip.bufferedReader().readText(), entry.name)?.let(result::addAll)
+                            if (!entry.isDirectory) {
+                                results += RawUpdater.parseRawWithMetadata(zip.bufferedReader().readText(), entry.name)
+                            }
                             zip.closeEntry()
                         }
                     }
-                    result
+                    results
                 } else {
                     val text = contentResolver.openInputStream(file)!!.bufferedReader().use { it.readText() }
-                    RawUpdater.parseRaw(text, fileName).orEmpty()
+                    listOf(RawUpdater.parseRawWithMetadata(text, fileName))
                 }
+                val proxies = parseResults.flatMap { it.proxies }
                 require(proxies.isNotEmpty()) { getString(R.string.no_proxies_found_in_file) }
+                val importedDns = RawUpdater.groupDnsForFileImport(parseResults, DataStore.groupCustomDns)
                 pendingFileName = fileName.substringBeforeLast('.').ifBlank { "Imported" }
                 pendingFileProxies = proxies
                 onMainDispatcher {
                     DataStore.groupType = GroupType.BASIC
                     DataStore.groupName = pendingFileName
+                    if (DataStore.groupCustomDns.isBlank() && importedDns != null) {
+                        DataStore.groupCustomDns = importedDns
+                        DataStore.subscriptionServerDns = importedDns
+                    }
                     DataStore.dirty = true
                     if (::groupNamePreference.isInitialized) groupNamePreference.text = pendingFileName
                 }
@@ -239,12 +256,19 @@ class GroupSettingsActivity(
             val isSubscription = groupType == GroupType.SUBSCRIPTION
             groupSubscription.isVisible = isSubscription
             subscriptionUpdate.isVisible = isSubscription
-            legacyGroupDns.isVisible = !isSubscription
+            legacyGroupDns.isVisible = true
             findPreference<Preference>("groupFilePicker")?.isVisible = !isSubscription
         }
         updateGroupType()
         groupType.setOnPreferenceChangeListener { _, newValue ->
             val selectedType = (newValue as String).toInt()
+            val logicalDns = if (DataStore.groupType == GroupType.SUBSCRIPTION) {
+                DataStore.subscriptionServerDns
+            } else {
+                DataStore.groupCustomDns
+            }
+            DataStore.groupCustomDns = logicalDns
+            DataStore.subscriptionServerDns = logicalDns
             updateGroupType(selectedType)
             if (selectedType != GroupType.BASIC) {
                 pendingFileName = ""
@@ -315,10 +339,16 @@ class GroupSettingsActivity(
 
         val subscriptionServerDns =
             findPreference<EditTextPreference>(Key.SUBSCRIPTION_SERVER_DNS)!!
-        subscriptionServerDns.setOnPreferenceChangeListener { pref, newValue ->
-            val value = (newValue as String).trim()
-            if (isValidServerDns(value)) {
-                if (value != newValue) {
+        subscriptionServerDns.isVisible = false
+        legacyGroupDns.title = getString(R.string.server_dns)
+        legacyGroupDns.summary = getString(R.string.server_dns_subscription_sum)
+        legacyGroupDns.setOnPreferenceChangeListener { pref, newValue ->
+            val raw = newValue as String
+            val value = normalizeGroupDnsInput(raw)
+            if (value != null && isValidGroupDnsInput(raw)) {
+                DataStore.groupCustomDns = value
+                DataStore.subscriptionServerDns = value
+                if (value != raw) {
                     (pref as EditTextPreference).text = value
                     false
                 } else {
@@ -571,22 +601,4 @@ class GroupSettingsActivity(
         }
     }
 
-}
-
-private fun isValidServerDns(raw: String): Boolean {
-    val value = raw.trim()
-    if (value.isEmpty()) return true
-    if (value.any { it.isISOControl() || it.isWhitespace() }) return false
-
-    if (value.contains("://")) {
-        val scheme = value.substringBefore("://").lowercase()
-        if (scheme !in setOf("https", "tls", "quic", "udp", "tcp")) return false
-        val rest = value.substringAfter("://")
-        val host = rest.substringBefore("/").substringBefore("?")
-        val bare = host.substringBeforeLast(":").trim('[', ']')
-        return bare.isNotEmpty()
-    }
-
-    val host = value.substringBeforeLast(":").trim('[', ']')
-    return host.isNotEmpty()
 }

@@ -133,6 +133,31 @@ class NodeDnsLookupTest {
         }
     }
 
+    @Test fun orderedResolverListFallsBackWithoutTreatingCommaStringAsOneUri() {
+        java.net.DatagramSocket(0, java.net.InetAddress.getByName("127.0.0.1")).use { server ->
+            server.soTimeout = 5000
+            val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+            try {
+                val peer = executor.submit<Unit> {
+                    val packet = java.net.DatagramPacket(ByteArray(4096), 4096)
+                    server.receive(packet)
+                    val q = packet.data.copyOf(packet.length)
+                    val bytes = compressed(q)
+                    server.send(java.net.DatagramPacket(bytes, bytes.size, packet.socketAddress))
+                }
+                assertEquals(
+                    "192.0.2.1",
+                    NodeDnsLookup.resolve(
+                        "example.test",
+                        "udp://127.0.0.1:9,udp://127.0.0.1:${server.localPort}",
+                        timeoutMillis = 100,
+                    ),
+                )
+                peer.get(6, java.util.concurrent.TimeUnit.SECONDS)
+            } finally { executor.shutdownNow() }
+        }
+    }
+
     @Test fun queryBoundsAnswerClassAndCredentialsAreRejected() {
         assertTrue(runCatching { NodeDnsLookup.query("example.test", 5) }.isFailure)
         assertTrue(runCatching { NodeDnsLookup.query(List(4) { "a".repeat(63) }.joinToString(".")) }.isFailure)

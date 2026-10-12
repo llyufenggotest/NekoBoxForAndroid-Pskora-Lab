@@ -21,6 +21,6 @@ class SnellOixUiContractTest {
     }
     @Test fun clipboardAndCurrentFileImporterBothReachRawParser() {
         assertTrue(source("java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt").contains("RawUpdater.parseRaw(text)"))
-        assertTrue(source("java/io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt").contains("RawUpdater.parseRaw(text, fileName)"))
+        assertTrue(source("java/io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt").contains("RawUpdater.parseRawWithMetadata(text, fileName)"))
     }
 }

@@ -8,8 +8,8 @@ class CustomServerDnsContractTest {
     @Test
     fun acceptsUdpAndTcpPrivateDnsSchemes() {
         val files = listOf(
-            File("src/main/java/io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt"),
-            File("app/src/main/java/io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt")
+            File("src/main/java/io/nekohasekai/sagernet/fmt/GroupDnsPolicy.kt"),
+            File("app/src/main/java/io/nekohasekai/sagernet/fmt/GroupDnsPolicy.kt")
         )
         val file = files.first { it.isFile }
         val source = file.readText()

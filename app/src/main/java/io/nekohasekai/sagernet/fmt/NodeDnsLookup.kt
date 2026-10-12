@@ -9,7 +9,13 @@ internal object NodeDnsLookup {
     private const val MAX_DNS_MESSAGE = 64 * 1024
     private const val TIMEOUT_MS = 3000
 
-    fun resolve(domain: String, resolver: String): String? = runCatching {
+    fun resolve(domain: String, resolver: String, timeoutMillis: Int = TIMEOUT_MS): String? {
+        val resolvers = if (resolver == "local") listOf(resolver) else parseGroupDnsResolvers(resolver).orEmpty()
+        for (candidate in resolvers) resolveOne(domain, candidate, timeoutMillis)?.let { return it }
+        return null
+    }
+
+    private fun resolveOne(domain: String, resolver: String, timeoutMillis: Int): String? = runCatching {
         if (resolver == "local") return@runCatching InetAddress.getAllByName(domain).firstOrNull()?.hostAddress
         val uri = URI(if (resolver.contains("://")) resolver else "udp://$resolver")
         require(uri.rawUserInfo == null && uri.rawFragment == null)
@@ -20,7 +26,7 @@ internal object NodeDnsLookup {
         val response = when (uri.scheme) {
             "https" -> {
                 val connection = uri.toURL().openConnection() as HttpURLConnection
-                connection.connectTimeout = TIMEOUT_MS; connection.readTimeout = TIMEOUT_MS
+                connection.connectTimeout = timeoutMillis; connection.readTimeout = timeoutMillis
                 connection.instanceFollowRedirects = false
                 connection.requestMethod = "POST"; connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/dns-message")
@@ -32,7 +38,7 @@ internal object NodeDnsLookup {
                 } finally { connection.disconnect() }
             }
             "tcp", "tls" -> {
-                val raw = Socket().apply { soTimeout = TIMEOUT_MS; connect(InetSocketAddress(host, port), TIMEOUT_MS) }
+                val raw = Socket().apply { soTimeout = timeoutMillis; connect(InetSocketAddress(host, port), timeoutMillis) }
                 raw.use {
                     val socket = if (uri.scheme == "tls") {
                         val layered = (SSLSocketFactory.getDefault() as javax.net.ssl.SSLSocketFactory).createSocket(it, host, port, true) as javax.net.ssl.SSLSocket
@@ -49,7 +55,7 @@ internal object NodeDnsLookup {
                 }
             }
             "udp" -> DatagramSocket().use {
-                it.soTimeout = TIMEOUT_MS
+                it.soTimeout = timeoutMillis
                 it.connect(InetSocketAddress(host, port))
                 it.send(DatagramPacket(request, request.size))
                 val packet = DatagramPacket(ByteArray(MAX_DNS_MESSAGE), MAX_DNS_MESSAGE)

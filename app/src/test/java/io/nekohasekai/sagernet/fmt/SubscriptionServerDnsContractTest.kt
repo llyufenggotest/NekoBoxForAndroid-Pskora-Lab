@@ -11,11 +11,11 @@ class SubscriptionServerDnsContractTest {
             .takeIf { it.isFile }
             ?: File("app/src/main/java/io/nekohasekai/sagernet/fmt/ConfigBuilder.kt")
         val source = builder.readText()
-        assertTrue(source.contains("serverDnsResolverFor(bean, ownerGroup)"))
+        assertTrue(source.contains("serverDnsResolversFor(bean, ownerGroup)"))
         assertTrue(source.contains("\"domain_resolver\""))
         assertTrue(!source.contains("if (!legacyDns.isNullOrBlank() && nodeDomainList.isNotEmpty())"))
         val policy = File(builder.parentFile, "GroupDnsPolicy.kt").readText()
-        assertTrue(policy.contains("clean(group.subscription?.serverDnsResolver)"))
-        assertTrue(policy.contains("clean(group?.customDirectDns)"))
+        assertTrue(policy.contains("cleanGroupDns(subscription?.serverDnsResolver)"))
+        assertTrue(policy.contains("cleanGroupDns(customDirectDns)"))
     }
 }

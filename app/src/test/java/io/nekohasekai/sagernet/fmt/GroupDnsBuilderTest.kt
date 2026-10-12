@@ -6,6 +6,7 @@ import io.nekohasekai.sagernet.*
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.fmt.internal.ChainBean
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -48,12 +49,26 @@ class GroupDnsBuilderTest {
         for ((gid, expected) in listOf(101L to "tcp://192.0.2.2:53", 102L to "udp://192.0.2.3")) {
             val json = root(node(gid, gid))
             val outbound = json.getAsJsonArray("outbounds").first().asJsonObject
-            assertEquals("dns-sub-$gid", outbound.getAsJsonObject("domain_resolver")?.get("server")?.asString)
+            assertEquals("dns-sub-$gid-0", outbound.getAsJsonObject("domain_resolver")?.get("server")?.asString)
             assertEquals(expected, json.getAsJsonObject("dns").getAsJsonArray("servers").single {
-                it.asJsonObject.get("tag").asString == "dns-sub-$gid"
+                it.asJsonObject.get("tag").asString == "dns-sub-$gid-0"
             }.asJsonObject.get("address").asString)
         }
     }
+    @Test fun multipleResolversAreMaterializedInStableOrderAndFirstIsSelectedForCore() = runBlocking {
+        group(103, "udp://192.0.2.10:53,tcp://192.0.2.11:5353,udp://192.0.2.10:53")
+        val json = root(node(103, 103))
+        val servers = json.getAsJsonObject("dns").getAsJsonArray("servers").map { it.asJsonObject }
+            .filter { it.get("tag")?.asString?.startsWith("dns-sub-103-") == true }
+        assertEquals(listOf("dns-sub-103-0", "dns-sub-103-1"), servers.map { it.get("tag").asString })
+        assertEquals(listOf("udp://192.0.2.10:53", "tcp://192.0.2.11:5353"), servers.map { it.get("address").asString })
+        assertEquals(
+            "dns-sub-103-0",
+            json.getAsJsonArray("outbounds").first().asJsonObject
+                .getAsJsonObject("domain_resolver").get("server").asString,
+        )
+    }
+
     private fun externalNode(id: Long, gid: Long, bean: AbstractBean) = ProxyEntity().apply {
         this.id = id; groupId = gid
         bean.initializeDefaultValues(); bean.name = "external-$id"
@@ -84,15 +99,15 @@ class GroupDnsBuilderTest {
             val target = outbounds.single { it.get("tag").asString == route.get("outbound").asString }
             if (id == 312L) {
                 assertEquals("resolve", rules.first().get("action")?.asString)
-                assertEquals("dns-sub-$gid", rules.first().get("server")?.asString)
+                assertEquals("dns-sub-$gid-0", rules.first().get("server")?.asString)
                 assertEquals("socks", target.get("type").asString)
             } else {
                 assertEquals("direct", target.get("type").asString)
-                assertEquals("dns-sub-$gid", target.getAsJsonObject("domain_resolver")?.get("server")?.asString)
+                assertEquals("dns-sub-$gid-0", target.getAsJsonObject("domain_resolver")?.get("server")?.asString)
                 assertFalse(target.has("detour"))
             }
             val dnsServer = json.getAsJsonObject("dns").getAsJsonArray("servers").map { it.asJsonObject }.single {
-                it.get("tag").asString == "dns-sub-$gid"
+                it.get("tag").asString == "dns-sub-$gid-0"
             }
             assertEquals(if (gid == 301) "udp://127.0.0.1:15301" else "tcp://127.0.0.1:15302",
                 dnsServer.get("address").asString)
@@ -142,7 +157,7 @@ class GroupDnsBuilderTest {
                     it.get("tag").asString == rule.get("outbound").asString
                 }
                 assertEquals("direct", target.get("type").asString)
-                assertEquals("dns-sub-401", target.getAsJsonObject("domain_resolver")?.get("server")?.asString)
+                assertEquals("dns-sub-401-0", target.getAsJsonObject("domain_resolver")?.get("server")?.asString)
                 assertEquals("shared.example", maps.single().get("override_address").asString)
             } else {
                 // FakeTCP and Neko explicitly opt out: plugin-owned DNS is outside mapping coverage.
@@ -166,7 +181,7 @@ class GroupDnsBuilderTest {
         for (hop in hops) {
             val out = hop.asJsonObject
             val gid = if (out.get("server").asString == "shared.example") 201 else 202
-            assertEquals("dns-sub-$gid", out.getAsJsonObject("domain_resolver")?.get("server")?.asString)
+            assertEquals("dns-sub-$gid-0", out.getAsJsonObject("domain_resolver")?.get("server")?.asString)
         }
         assertFalse(json.getAsJsonObject("dns").getAsJsonArray("rules").any {
             it.asJsonObject.get("server")?.asString == "dns-airport"

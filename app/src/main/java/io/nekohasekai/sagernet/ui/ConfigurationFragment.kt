@@ -76,7 +76,7 @@ import io.nekohasekai.sagernet.databinding.LayoutProfileListBinding
 import io.nekohasekai.sagernet.databinding.LayoutProgressListBinding
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.buildConfig
-import io.nekohasekai.sagernet.fmt.serverDnsResolverFor
+import io.nekohasekai.sagernet.fmt.serverDnsResolversFor
 import io.nekohasekai.sagernet.fmt.NodeDnsLookup
 import io.nekohasekai.sagernet.fmt.oppa.parseOppaProvider
 import io.nekohasekai.sagernet.fmt.toUniversalLink
@@ -1943,7 +1943,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                             }
                         }
                         if (!address.isIpAddress()) {
-                            val customDns = serverDnsResolverFor(bean, SagerDatabase.groupDao.getById(profile.groupId))
+                            val groupDns = serverDnsResolversFor(bean, SagerDatabase.groupDao.getById(profile.groupId))
+                            val customDns = groupDns.takeIf { it.isNotEmpty() }?.joinToString(",")
                                 ?: DataStore.directDns.split("\n").firstOrNull { it.isNotBlank() && !it.startsWith("#") }
                             val resolvedIp = customDns?.let { NodeDnsLookup.resolve(address, it) }
                             if (resolvedIp != null) {

@@ -35,8 +35,9 @@ import org.ini4j.Ini
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
-import org.yaml.snakeyaml.TypeDescription
+import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.constructor.SafeConstructor
 import org.yaml.snakeyaml.error.YAMLException
 import java.io.StringReader
 import java.net.URLDecoder
@@ -45,6 +46,21 @@ import androidx.core.net.toUri
 
 @Suppress("EXPERIMENTAL_API_USAGE")
 object RawUpdater : GroupUpdater() {
+
+    data class RawMetadata(
+        val groupDns: String? = null,
+        val hasPolicyConflict: Boolean = false,
+    )
+
+    data class RawParseResult(
+        val proxies: List<AbstractBean>,
+        val metadata: RawMetadata = RawMetadata(),
+    )
+
+    internal fun groupDnsForFileImport(results: List<RawParseResult>, existing: String): String? {
+        if (existing.isNotBlank() || results.any { it.metadata.hasPolicyConflict }) return existing.takeIf { it.isNotBlank() }
+        return results.mapNotNull { it.metadata.groupDns }.distinct().singleOrNull()
+    }
 
     suspend fun fetchSubscriptionName(link: String): String? {
         if (!link.startsWith("http")) return null
@@ -480,6 +496,142 @@ object RawUpdater : GroupUpdater() {
     }
 
     @Suppress("UNCHECKED_CAST")
+    suspend fun parseRawWithMetadata(text: String, fileName: String = ""): RawParseResult {
+        val proxies = parseRaw(text, fileName).orEmpty()
+        if (!text.contains(Regex("(?m)^\\s*[\"']?proxies[\"']?\\s*:"))) return RawParseResult(proxies)
+        val yaml = loadSafeYaml(text.removePrefix("\uFEFF"))
+        val originalServers = ((yaml["proxies"] as? List<*>) ?: emptyList<Any>())
+            .mapNotNull { (it as? Map<*, *>)?.get("server")?.toString() }
+        val hosts = parseHosts(yaml["hosts"] as? Map<*, *>)
+        val mappedServers = proxies.mapIndexed { index, bean ->
+            val original = originalServers.getOrNull(index) ?: bean.serverAddress.orEmpty()
+            resolveHost(original, hosts).also { bean.serverAddress = it }
+        }
+        val serverPairs = mappedServers.mapIndexed { index, after ->
+            (originalServers.getOrNull(index) ?: after) to after
+        }
+        val dns = yaml["dns"] as? Map<*, *>
+        val candidates = LinkedHashSet<String>()
+        var matched = false
+        for ((before, after) in serverPairs) {
+            val proxyPolicy = policyResolvers(
+                dns?.get("proxy-server-nameserver-policy") as? Map<*, *>, before, after,
+            )
+            val selected = if (proxyPolicy.matched) proxyPolicy else policyResolvers(
+                dns?.get("nameserver-policy") as? Map<*, *>, before, after,
+            )
+            if (selected.matched && selected.resolvers.isNotEmpty()) {
+                matched = true
+                candidates += selected.resolvers
+            }
+        }
+        return RawParseResult(
+            proxies,
+            if (matched) RawMetadata(candidates.joinToString(",")) else RawMetadata(),
+        )
+    }
+
+    internal fun policyDomainMatches(pattern: String, domain: String): Boolean {
+        val normalizedPattern = pattern.trim().removeSuffix(".").lowercase()
+        val normalizedDomain = domain.trim().removeSuffix(".").lowercase()
+        return when {
+            normalizedPattern.startsWith("+.") -> {
+                val suffix = normalizedPattern.removePrefix("+.")
+                normalizedDomain == suffix || normalizedDomain.endsWith(".$suffix")
+            }
+            normalizedPattern.startsWith("*.") -> {
+                val suffix = normalizedPattern.removePrefix("*.")
+                normalizedDomain != suffix && normalizedDomain.endsWith(".$suffix")
+            }
+            else -> normalizedDomain == normalizedPattern
+        }
+    }
+
+    private fun loadSafeYaml(text: String): Map<*, *> {
+        val options = LoaderOptions().apply {
+            maxAliasesForCollections = 50
+            isAllowDuplicateKeys = false
+        }
+        val result = Yaml(SafeConstructor(options)).load<Any?>(text) as? Map<*, *> ?: emptyMap<Any, Any>()
+        enforceYamlDepth(result, 0)
+        return result
+    }
+
+    private fun enforceYamlDepth(value: Any?, depth: Int) {
+        require(depth <= 50) { "YAML nesting is too deep" }
+        when (value) {
+            is Map<*, *> -> value.forEach { (key, item) ->
+                enforceYamlDepth(key, depth + 1)
+                enforceYamlDepth(item, depth + 1)
+            }
+            is List<*> -> value.forEach { enforceYamlDepth(it, depth + 1) }
+        }
+    }
+
+    private fun validHostAtom(value: String): Boolean {
+        if (value.isBlank() || value.any { it.isWhitespace() || it.isISOControl() }) return false
+        if (value.isIpAddress()) return true
+        val atom = value.removeSuffix(".")
+        if (!atom.contains('.')) return false
+        return runCatching {
+            java.net.IDN.toASCII(atom).split('.').all { label ->
+                label.isNotEmpty() && label.length <= 63 &&
+                    label.first() != '-' && label.last() != '-' &&
+                    label.all { it.isLetterOrDigit() || it == '-' }
+            }
+        }.getOrDefault(false)
+    }
+
+    private fun parseHosts(raw: Map<*, *>?): Map<String, String> {
+        if (raw == null) return emptyMap()
+        val hosts = linkedMapOf<String, String>()
+        for ((key, rawValue) in raw) {
+            val source = key?.toString()?.trim()?.removeSuffix(".")?.lowercase() ?: continue
+            if (source.contains('*') || !validHostAtom(source)) continue
+            val target = when (rawValue) {
+                is List<*> -> rawValue.mapNotNull { it?.toString() }.firstOrNull { it.isIpAddress() }
+                null -> null
+                else -> rawValue.toString().trim().takeIf(::validHostAtom)
+            } ?: continue
+            hosts[source] = target
+        }
+        return hosts
+    }
+
+    private fun resolveHost(original: String, hosts: Map<String, String>): String {
+        var current = original.trim().removeSuffix(".")
+        val visited = linkedSetOf<String>()
+        while (true) {
+            val key = current.lowercase()
+            if (!visited.add(key)) return original
+            val next = hosts[key] ?: return current
+            if (!validHostAtom(next) || next.equals(current, true)) return original
+            current = next.removeSuffix(".")
+        }
+    }
+
+    private data class PolicyResult(val matched: Boolean, val resolvers: List<String> = emptyList())
+
+    private fun policyResolvers(policy: Map<*, *>?, before: String, after: String): PolicyResult {
+        if (policy == null) return PolicyResult(false)
+        val result = LinkedHashSet<String>()
+        var matched = false
+        for ((rawPattern, rawValue) in policy) {
+            val pattern = rawPattern?.toString() ?: continue
+            if (!policyDomainMatches(pattern, before) && !policyDomainMatches(pattern, after)) continue
+            matched = true
+            val values = if (rawValue is List<*>) rawValue else listOf(rawValue)
+            values.mapNotNull { it?.toString()?.trim() }
+                .filterNot { it.startsWith("@url:") }
+                .flatMap { value ->
+                    io.nekohasekai.sagernet.fmt.parseGroupDnsResolvers(value).orEmpty()
+                }
+                .let(result::addAll)
+        }
+        return PolicyResult(matched, result.toList())
+    }
+
+    @Suppress("UNCHECKED_CAST")
     suspend fun parseRaw(text: String, fileName: String = ""): List<AbstractBean>? {
         // Files commonly carry a UTF-8 BOM; normalize before format detection.
         if (text.startsWith("\uFEFF")) return parseRaw(text.removePrefix("\uFEFF"), fileName)
@@ -492,9 +644,7 @@ object RawUpdater : GroupUpdater() {
 
             try {
 
-                val yaml = Yaml().apply {
-                    addTypeDescription(TypeDescription(String::class.java, "str"))
-                }.loadAs(text, Map::class.java)
+                val yaml = loadSafeYaml(text)
 
                 val globalClientFingerprint = yaml["global-client-fingerprint"]?.toString() ?: ""
 
