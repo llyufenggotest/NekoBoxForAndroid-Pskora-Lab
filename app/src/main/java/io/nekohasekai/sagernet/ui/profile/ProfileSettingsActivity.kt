@@ -33,6 +33,7 @@ import io.nekohasekai.sagernet.*
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.databinding.LayoutGroupItemBinding
@@ -41,6 +42,7 @@ import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.ThemedActivity
 import io.nekohasekai.sagernet.widget.ListListener
 import kotlinx.parcelize.Parcelize
+import java.util.UUID
 import kotlin.properties.Delegates
 
 @Suppress("UNCHECKED_CAST")
@@ -81,16 +83,51 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
     companion object {
         const val EXTRA_PROFILE_ID = "id"
         const val EXTRA_IS_SUBSCRIPTION = "sub"
+
+        private const val STATE_EDITING_ID = "profileSettings.editingId"
+        private const val STATE_EDITING_GROUP = "profileSettings.editingGroup"
+        private const val STATE_IS_SUBSCRIPTION = "profileSettings.isSubscription"
+        private const val STATE_SESSION_ID = "profileSettings.sessionId"
+        private const val CACHE_SESSION_ID = "profileSettings.cacheSessionId"
+        private const val CACHE_SESSION_PROFILE_ID = "profileSettings.cacheSessionProfileId"
     }
 
     abstract fun createEntity(): T
     abstract fun T.init()
     abstract fun T.serialize()
 
-    val proxyEntity by lazy { SagerDatabase.proxyDao.getById(DataStore.editingId) }
+    private var editingId = 0L
+    private var editingGroup = 0L
+    private lateinit var editingSessionId: String
+    private var restoredEditorCache = false
+    private var loadedProxyEntity: ProxyEntity? = null
+    val proxyEntity get() = loadedProxyEntity
     protected var isSubscription by Delegates.notNull<Boolean>()
 
+    private fun restoreEditorIdentity(savedInstanceState: Bundle?) {
+        editingId = savedInstanceState?.getLong(STATE_EDITING_ID)
+            ?: intent.getLongExtra(EXTRA_PROFILE_ID, 0L)
+        isSubscription = savedInstanceState?.getBoolean(STATE_IS_SUBSCRIPTION)
+            ?: intent.getBooleanExtra(EXTRA_IS_SUBSCRIPTION, false)
+        editingGroup = savedInstanceState?.getLong(STATE_EDITING_GROUP) ?: 0L
+        editingSessionId = savedInstanceState?.getString(STATE_SESSION_ID)
+            ?: UUID.randomUUID().toString()
+
+        val cachedSession = DataStore.profileCacheStore.getString(CACHE_SESSION_ID)
+        val cachedProfile = DataStore.profileCacheStore.getLong(CACHE_SESSION_PROFILE_ID)
+        restoredEditorCache = savedInstanceState != null &&
+            cachedSession == editingSessionId && cachedProfile == editingId
+        if (!restoredEditorCache) {
+            DataStore.profileCacheStore.reset()
+            DataStore.profileCacheStore.putString(CACHE_SESSION_ID, editingSessionId)
+            DataStore.profileCacheStore.putLong(CACHE_SESSION_PROFILE_ID, editingId)
+        }
+        DataStore.editingId = editingId
+        if (editingGroup != 0L) DataStore.editingGroup = editingGroup
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        restoreEditorIdentity(savedInstanceState)
         super.onCreate(savedInstanceState)
         setSupportActionBar(findViewById(R.id.toolbar))
         supportActionBar?.apply {
@@ -99,35 +136,56 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
             setHomeAsUpIndicator(R.drawable.ic_navigation_close)
         }
 
+        if (editingId != 0L) {
+            loadedProxyEntity = SagerDatabase.proxyDao.getById(editingId)
+        }
         if (savedInstanceState == null) {
-            val editingId = intent.getLongExtra(EXTRA_PROFILE_ID, 0L)
-            isSubscription = intent.getBooleanExtra(EXTRA_IS_SUBSCRIPTION, false)
-            DataStore.editingId = editingId
             runOnDefaultDispatcher {
-                if (editingId == 0L) {
-                    DataStore.editingGroup = DataStore.selectedGroupForImport()
-                    createEntity().applyDefaultValues().init()
-                } else {
-                    if (proxyEntity == null) {
-                        onMainDispatcher {
-                            finish()
-                        }
-                        return@runOnDefaultDispatcher
-                    }
-                    DataStore.editingGroup = proxyEntity!!.groupId
-                    (proxyEntity!!.requireBean() as T).init()
-                }
-
-                onMainDispatcher {
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.settings, MyPreferenceFragmentCompat())
-                        .commit()
-                }
+                initializeEditorFromSource()
             }
+        } else if (!restoredEditorCache) {
+            // The process-local TempDatabase was lost. Rebuild only from the persisted entity;
+            // unsaved UI edits are intentionally discarded rather than applied to another profile.
+            runOnDefaultDispatcher {
+                initializeEditorFromSource()
+            }
+        }
+    }
 
-
+    private suspend fun initializeEditorFromSource() {
+        DataStore.editingId = editingId
+        if (editingId == 0L) {
+            editingGroup = if (editingGroup != 0L) editingGroup else DataStore.selectedGroupForImport()
+            DataStore.editingGroup = editingGroup
+            loadedProxyEntity = null
+            createEntity().applyDefaultValues().init()
+        } else {
+            loadedProxyEntity = SagerDatabase.proxyDao.getById(editingId)
+            val entity = loadedProxyEntity
+            if (entity == null) {
+                onMainDispatcher { finish() }
+                return
+            }
+            editingGroup = entity.groupId
+            DataStore.editingGroup = editingGroup
+            (entity.requireBean() as T).init()
         }
 
+        onMainDispatcher {
+            if (supportFragmentManager.findFragmentById(R.id.settings) == null) {
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.settings, MyPreferenceFragmentCompat())
+                    .commit()
+            }
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putLong(STATE_EDITING_ID, editingId)
+        outState.putLong(STATE_EDITING_GROUP, DataStore.editingGroup)
+        outState.putBoolean(STATE_IS_SUBSCRIPTION, isSubscription)
+        outState.putString(STATE_SESSION_ID, editingSessionId)
+        super.onSaveInstanceState(outState)
     }
 
     open suspend fun saveAndExit() {
