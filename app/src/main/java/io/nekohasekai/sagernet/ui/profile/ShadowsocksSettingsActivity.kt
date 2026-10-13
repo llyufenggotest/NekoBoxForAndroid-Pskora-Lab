@@ -50,9 +50,49 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
     private val muxBrutalUpMbps = pbm.add(PreferenceBinding(Type.TextToInt, "muxBrutalUpMbps"))
     private val muxBrutalDownMbps = pbm.add(PreferenceBinding(Type.TextToInt, "muxBrutalDownMbps"))
 
+    private companion object {
+        const val PLUGIN_NAME_KEY = "pluginName"
+        const val PLUGIN_CONFIG_KEY = "pluginConfig"
+        const val GOST_PLUGIN = "gost-plugin"
+        const val GOST_RAW_OPTIONS_KEY = "shadowsocksGostRawOptions"
+        const val PLUGIN_CONFIGS_KEY = "shadowsocksPluginConfigs"
+    }
+
     private var syncingGostPreferences = false
     private var gostRawOptions = ""
     private val pluginConfigs = mutableMapOf<String, String>()
+
+    private fun persistPluginState(pluginName: String, raw: String) {
+        if (pluginName.isNotBlank()) pluginConfigs[pluginName] = raw
+        if (pluginName == GOST_PLUGIN) {
+            gostRawOptions = raw
+            DataStore.profileCacheStore.putString(GOST_RAW_OPTIONS_KEY, raw)
+        }
+        val json = org.json.JSONObject()
+        pluginConfigs.forEach { (name, config) -> json.put(name, config) }
+        DataStore.profileCacheStore.putString(PLUGIN_CONFIGS_KEY, json.toString())
+    }
+
+    private fun cachePluginConfig(pluginName: String, raw: String) {
+        DataStore.profileCacheStore.putString(PLUGIN_CONFIG_KEY, raw)
+        persistPluginState(pluginName, raw)
+    }
+
+    private fun restorePluginState() {
+        pluginConfigs.clear()
+        DataStore.profileCacheStore.getString(PLUGIN_CONFIGS_KEY)?.let { encoded ->
+            runCatching {
+                val json = org.json.JSONObject(encoded)
+                json.keys().forEach { name -> pluginConfigs[name] = json.getString(name) }
+            }
+        }
+        gostRawOptions = DataStore.profileCacheStore.getString(GOST_RAW_OPTIONS_KEY)
+            ?: pluginConfigs[GOST_PLUGIN].orEmpty()
+        if (gostRawOptions.isNotEmpty()) pluginConfigs[GOST_PLUGIN] = gostRawOptions
+        val selected = DataStore.profileCacheStore.getString(PLUGIN_NAME_KEY).orEmpty()
+        val current = pluginConfigs[selected]
+        if (current != null) DataStore.profileCacheStore.putString(PLUGIN_CONFIG_KEY, current)
+    }
 
     override fun ShadowsocksBean.init() {
         pbm.writeToCacheAll(this)
@@ -60,10 +100,11 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
         val currentPluginName = plugin.substringBefore(";")
         val currentConfig = plugin.substringAfter(';', "")
         val state = GostPluginUiState.fromPlugin(plugin)
-        pluginConfigs[currentPluginName] = currentConfig
-        if (state.enabled) gostRawOptions = currentConfig
-        DataStore.profileCacheStore.putString("pluginName", currentPluginName)
-        DataStore.profileCacheStore.putString("pluginConfig", currentConfig)
+        DataStore.profileCacheStore.putString(PLUGIN_NAME_KEY, currentPluginName)
+        DataStore.profileCacheStore.putString(PLUGIN_CONFIG_KEY, currentConfig)
+        pluginConfigs.clear()
+        gostRawOptions = ""
+        persistPluginState(currentPluginName, currentConfig)
         if (state.enabled) writeGostState(state)
     }
 
@@ -71,8 +112,12 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
         pbm.fromCacheAll(this)
 
         val pn = pluginName.readStringFromCache()
-        val pc = if (pn == "gost-plugin") gostRawOptions else pluginConfig.readStringFromCache()
-        plugin = if (pn == "gost-plugin") {
+        val pc = if (pn == GOST_PLUGIN) {
+            DataStore.profileCacheStore.getString(GOST_RAW_OPTIONS_KEY) ?: gostRawOptions
+        } else {
+            pluginConfigs[pn] ?: pluginConfig.readStringFromCache()
+        }
+        plugin = if (pn == GOST_PLUGIN) {
             if (pc.isBlank()) pn else "$pn;$pc"
         } else if (pn.isNotBlank()) {
             if (pc.isBlank()) pn else "$pn;$pc"
@@ -122,10 +167,10 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
             else current.mux,
         )
         gostRawOptions = merged.mergeStructured().canonical()
-        pluginConfigs["gost-plugin"] = gostRawOptions
+        persistPluginState(GOST_PLUGIN, gostRawOptions)
         syncingGostPreferences = true
         try {
-            DataStore.profileCacheStore.putString("pluginConfig", gostRawOptions)
+            DataStore.profileCacheStore.putString(PLUGIN_CONFIG_KEY, gostRawOptions)
         } finally {
             syncingGostPreferences = false
         }
@@ -148,22 +193,24 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
         }
 
         val preferenceFragment = this
+        restorePluginState()
         val selectedPlugin = pluginName.readStringFromCache()
         configureGostPluginPreferences(preferenceFragment, selectedPlugin)
+        if (selectedPlugin == GOST_PLUGIN) syncStructuredFromRaw(gostRawOptions)
         pluginName.preference.apply {
             this as SimpleMenuPreference
             setOnPreferenceChangeListener { _, newValue ->
                 val oldPlugin = pluginName.readStringFromCache()
-                pluginConfigs[oldPlugin] = pluginConfig.readStringFromCache()
+                persistPluginState(oldPlugin, pluginConfig.readStringFromCache())
                 val nextPlugin = newValue.toString()
                 configureGostPluginPreferences(preferenceFragment, nextPlugin)
-                val nextConfig = if (nextPlugin == "gost-plugin") {
-                    gostRawOptions
+                val nextConfig = if (nextPlugin == GOST_PLUGIN) {
+                    DataStore.profileCacheStore.getString(GOST_RAW_OPTIONS_KEY) ?: gostRawOptions
                 } else {
                     pluginConfigs[nextPlugin].orEmpty()
                 }
-                DataStore.profileCacheStore.putString("pluginConfig", nextConfig)
-                if (nextPlugin == "gost-plugin") syncStructuredFromRaw(nextConfig)
+                cachePluginConfig(nextPlugin, nextConfig)
+                if (nextPlugin == GOST_PLUGIN) syncStructuredFromRaw(nextConfig)
                 true
             }
         }
@@ -171,9 +218,8 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
         pluginConfig.preference.setOnPreferenceChangeListener { _, newValue ->
             val raw = newValue.toString()
             val selected = pluginName.readStringFromCache()
-            pluginConfigs[selected] = raw
-            if (selected == "gost-plugin" && !syncingGostPreferences) {
-                gostRawOptions = raw
+            cachePluginConfig(selected, raw)
+            if (selected == GOST_PLUGIN && !syncingGostPreferences) {
                 syncStructuredFromRaw(raw)
             }
             true
@@ -181,7 +227,7 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
 
         fun bindStructured(key: String, preference: androidx.preference.Preference) {
             preference.setOnPreferenceChangeListener { _, newValue ->
-                if (!syncingGostPreferences && pluginName.readStringFromCache() == "gost-plugin") {
+                if (!syncingGostPreferences && pluginName.readStringFromCache() == GOST_PLUGIN) {
                     mergeStructuredIntoRaw(key, newValue)
                 }
                 true

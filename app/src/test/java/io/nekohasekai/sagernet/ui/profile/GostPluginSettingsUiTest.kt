@@ -9,6 +9,10 @@ import androidx.preference.SwitchPreference
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.RoomLifecycleRule
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.ProxyGroup
+import io.nekohasekai.sagernet.database.SagerDatabase
+import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
+import kotlinx.coroutines.runBlocking
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -96,6 +100,98 @@ class GostPluginSettingsUiTest {
         plugin.value = "gost-plugin"
         assertEquals("mode=grpc;host=cdn.invalid;mux;future=false", raw.text)
         controller.pause().stop().destroy()
+    }
+
+    @Test fun activityRecreationRestoresGostRawAndIsolatedPluginConfigsBeforeSerialize() {
+        DataStore.profileCacheStore.reset()
+        val controller = launchEditor()
+        selectPlugin(controller.get(), "obfs-local")
+        changeRaw(controller.get(), "obfs=http;obfs-host=plain.invalid")
+        selectPlugin(controller.get(), "gost-plugin")
+        changeRaw(controller.get(), "mode=grpc;mux;future=false")
+        changeText(controller.get(), "gostPluginHost", "cdn.invalid")
+
+        controller.recreate()
+        assertEditorState(controller.get(), "gost-plugin", "mode=grpc;host=cdn.invalid;mux;future=false")
+        selectPlugin(controller.get(), "obfs-local")
+        assertEditorState(controller.get(), "obfs-local", "obfs=http;obfs-host=plain.invalid")
+        selectPlugin(controller.get(), "gost-plugin")
+
+        assertEquals(
+            "gost-plugin;mode=grpc;host=cdn.invalid;mux;future=false",
+            serializeProduction(controller.get()).plugin,
+        )
+        controller.pause().stop().destroy()
+    }
+
+    @Test fun processLikeActivityRestoreUsesCacheAsGostSourceOfTruth() {
+        DataStore.profileCacheStore.reset()
+        var controller = launchEditor()
+        selectPlugin(controller.get(), "gost-plugin")
+        changeRaw(controller.get(), "mode=mwss;host=cdn.invalid;path=/gost;mux=3;future=value\\;semi")
+        controller.pause().stop().destroy()
+
+        controller = Robolectric.buildActivity(ShadowsocksSettingsActivity::class.java).setup()
+        assertEditorState(
+            controller.get(),
+            "gost-plugin",
+            "mode=mwss;host=cdn.invalid;path=/gost;mux=3;future=value\\;semi",
+        )
+        assertEquals(
+            "gost-plugin;mode=mwss;host=cdn.invalid;path=/gost;mux=3;future=value\\;semi",
+            serializeProduction(controller.get()).plugin,
+        )
+        controller.pause().stop().destroy()
+    }
+
+    @Test fun directSaveAfterGostEditPersistsRealBeanInsteadOfBarePlugin() = runBlocking {
+        DataStore.profileCacheStore.reset()
+        val controller = launchEditor()
+        selectPlugin(controller.get(), "gost-plugin")
+        changeRaw(controller.get(), "mode=grpc;mux;future=false")
+        changeText(controller.get(), "gostPluginHost", "cdn.invalid")
+
+        controller.get().saveAndExit()
+
+        val saved = SagerDatabase.proxyDao.getAll().single().requireBean() as ShadowsocksBean
+        assertEquals("gost-plugin;mode=grpc;host=cdn.invalid;mux;future=false", saved.plugin)
+    }
+
+    private fun launchEditor(): org.robolectric.android.controller.ActivityController<ShadowsocksSettingsActivity> {
+        val group = ProxyGroup(name = "test")
+        group.id = SagerDatabase.groupDao.createGroup(group)
+        DataStore.selectedGroup = group.id
+        return Robolectric.buildActivity(ShadowsocksSettingsActivity::class.java).setup()
+    }
+
+    private fun fragment(activity: ShadowsocksSettingsActivity) =
+        activity.supportFragmentManager.fragments.single() as PreferenceFragmentCompat
+
+    private fun selectPlugin(activity: ShadowsocksSettingsActivity, name: String) {
+        val preference = fragment(activity).findPreference<SimpleMenuPreference>("pluginName")!!
+        preference.callChangeListener(name)
+        preference.value = name
+    }
+
+    private fun changeRaw(activity: ShadowsocksSettingsActivity, raw: String) =
+        changeText(activity, "pluginConfig", raw)
+
+    private fun changeText(activity: ShadowsocksSettingsActivity, key: String, text: String) {
+        val preference = fragment(activity).findPreference<EditTextPreference>(key)!!
+        preference.callChangeListener(text)
+        preference.text = text
+    }
+
+    private fun assertEditorState(activity: ShadowsocksSettingsActivity, plugin: String, raw: String) {
+        val current = fragment(activity)
+        assertEquals(plugin, current.findPreference<SimpleMenuPreference>("pluginName")!!.value)
+        assertEquals(raw, current.findPreference<EditTextPreference>("pluginConfig")!!.text)
+    }
+
+    private fun serializeProduction(activity: ShadowsocksSettingsActivity): ShadowsocksBean {
+        val bean = ShadowsocksBean()
+        with(activity) { bean.serialize() }
+        return bean
     }
 
     @Test fun preferencesAreStructuredOnlyForGostAndSurviveFragmentRecreation() {
