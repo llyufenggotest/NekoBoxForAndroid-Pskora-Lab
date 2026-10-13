@@ -27,6 +27,11 @@ type IdlePlugin interface {
 	CloseIdleConnections()
 }
 
+type ResetPlugin interface {
+	Plugin
+	ResetConnections()
+}
+
 var plugins map[string]PluginConstructor
 
 func RegisterPlugin(name string, constructor PluginConstructor) {

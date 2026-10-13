@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/sagernet/sing-box/adapter"
 	boxTLS "github.com/sagernet/sing-box/common/tls"
@@ -31,13 +32,14 @@ const (
 )
 
 type gostOptions struct {
-	mode       gostMode
-	tls        bool
-	mux        bool
-	host       string
-	path       string
-	serverName string
-	insecure   bool
+	mode        gostMode
+	tls         bool
+	muxEnabled  bool
+	muxCapacity int
+	host        string
+	path        string
+	serverName  string
+	insecure    bool
 }
 
 func parseGostOptions(pluginOpts Args) (gostOptions, error) {
@@ -55,17 +57,20 @@ func parseGostOptions(pluginOpts Args) (gostOptions, error) {
 	case "wss":
 		options.tls = true
 	case "mws":
-		options.mux = true
+		options.muxEnabled = true
+		options.muxCapacity = 1
 	case "mwss":
 		options.tls = true
-		options.mux = true
+		options.muxEnabled = true
+		options.muxCapacity = 1
 	case "tls":
 		options.mode = gostModeTLS
 		options.tls = true
 	case "mtls":
 		options.mode = gostModeTLS
 		options.tls = true
-		options.mux = true
+		options.muxEnabled = true
+		options.muxCapacity = 1
 	case "h2", "quic", "grpc":
 		return options, E.New("gost-plugin: unsupported mode: ", mode)
 	default:
@@ -91,10 +96,12 @@ func parseGostOptions(pluginOpts Args) (gostOptions, error) {
 		}
 	}
 	if value, loaded := pluginOpts.Get("mux"); loaded {
-		options.mux, err = parseGostBool("mux", value)
-		if err != nil {
-			return options, err
+		capacity, parseErr := strconv.ParseUint(value, 10, 16)
+		if parseErr != nil {
+			return options, E.New("gost-plugin: invalid mux value: ", strconv.Quote(value))
 		}
+		options.muxEnabled = true
+		options.muxCapacity = int(capacity)
 	}
 	if value, loaded := pluginOpts.Get("insecure"); loaded {
 		options.insecure, err = parseGostBool("insecure", value)
@@ -139,9 +146,30 @@ type gostPlugin struct {
 	options    gostOptions
 	tlsConfig  boxTLS.Config
 
-	access  sync.Mutex
-	session *smux.Session
-	closed  bool
+	access    sync.Mutex
+	sessions  []*gostSession
+	closeIdle bool
+	closed    bool
+}
+
+type gostSession struct {
+	client     *smux.Session
+	lastActive time.Time
+}
+
+type gostStream struct {
+	net.Conn
+	plugin  *gostPlugin
+	session *gostSession
+	once    sync.Once
+}
+
+func (s *gostStream) Close() error {
+	err := s.Conn.Close()
+	s.once.Do(func() {
+		s.plugin.closeSessionIfIdle(s.session)
+	})
+	return err
 }
 
 func newGostPlugin(ctx context.Context, pluginOpts Args, _ adapter.Router, dialer N.Dialer, serverAddr M.Socksaddr) (Plugin, error) {
@@ -169,58 +197,59 @@ func newGostPlugin(ctx context.Context, pluginOpts Args, _ adapter.Router, diale
 }
 
 func (p *gostPlugin) DialContext(ctx context.Context) (net.Conn, error) {
-	p.access.Lock()
-	if p.closed {
+	if !p.options.muxEnabled {
+		p.access.Lock()
+		closed := p.closed
 		p.access.Unlock()
+		if closed {
+			return nil, net.ErrClosed
+		}
+		return p.dialTransport(ctx)
+	}
+
+	p.access.Lock()
+	defer p.access.Unlock()
+	if p.closed {
 		return nil, net.ErrClosed
 	}
-	if p.options.mux && p.session != nil && !p.session.IsClosed() {
-		session := p.session
-		p.access.Unlock()
-		stream, err := session.OpenStream()
-		if err == nil {
-			return stream, nil
+	return p.dialMuxLocked(ctx)
+}
+
+func (p *gostPlugin) dialMuxLocked(ctx context.Context) (net.Conn, error) {
+	p.removeClosedSessionsLocked()
+	for _, session := range p.sessions {
+		if p.options.muxCapacity > 0 && session.client.NumStreams() >= p.options.muxCapacity {
+			continue
 		}
-		p.resetSession(session)
-		return p.DialContext(ctx)
+		stream, err := session.client.OpenStream()
+		session.lastActive = time.Now()
+		if err == nil {
+			return &gostStream{Conn: stream, plugin: p, session: session}, nil
+		}
+		p.removeSessionLocked(session)
 	}
-	p.access.Unlock()
 
 	conn, err := p.dialTransport(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !p.options.mux {
-		return conn, nil
-	}
 	config := smux.DefaultConfig()
 	config.Version = 1
 	config.KeepAliveDisabled = true
-	session, err := smux.Client(conn, config)
+	client, err := smux.Client(conn, config)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, err
 	}
-	p.access.Lock()
-	if p.closed {
-		p.access.Unlock()
-		session.Close()
-		return nil, net.ErrClosed
-	}
-	if p.session != nil && !p.session.IsClosed() {
-		existing := p.session
-		p.access.Unlock()
-		session.Close()
-		return existing.OpenStream()
-	}
-	p.session = session
-	p.access.Unlock()
-	stream, err := session.OpenStream()
+	session := &gostSession{client: client, lastActive: time.Now()}
+	p.sessions = append(p.sessions, session)
+	stream, err := client.OpenStream()
+	session.lastActive = time.Now()
 	if err != nil {
-		p.resetSession(session)
+		p.removeSessionLocked(session)
 		return nil, err
 	}
-	return stream, nil
+	return &gostStream{Conn: stream, plugin: p, session: session}, nil
 }
 
 func (p *gostPlugin) dialTransport(ctx context.Context) (net.Conn, error) {
@@ -256,13 +285,37 @@ func (p *gostPlugin) dialTransport(ctx context.Context) (net.Conn, error) {
 	}
 }
 
-func (p *gostPlugin) resetSession(session *smux.Session) {
+func (p *gostPlugin) closeSessionIfIdle(session *gostSession) {
 	p.access.Lock()
-	if p.session == session {
-		p.session = nil
+	defer p.access.Unlock()
+	if p.closeIdle && session.client.NumStreams() == 0 {
+		p.removeSessionLocked(session)
 	}
-	p.access.Unlock()
-	_ = session.Close()
+}
+
+func (p *gostPlugin) removeClosedSessionsLocked() {
+	for index := 0; index < len(p.sessions); {
+		if p.sessions[index].client.IsClosed() {
+			p.closeAndRemoveSessionLocked(index)
+			continue
+		}
+		index++
+	}
+}
+
+func (p *gostPlugin) removeSessionLocked(target *gostSession) {
+	for index, session := range p.sessions {
+		if session == target {
+			p.closeAndRemoveSessionLocked(index)
+			return
+		}
+	}
+}
+
+func (p *gostPlugin) closeAndRemoveSessionLocked(index int) {
+	session := p.sessions[index]
+	p.sessions = append(p.sessions[:index], p.sessions[index+1:]...)
+	_ = session.client.Close()
 }
 
 func (p *gostPlugin) Close() error {
@@ -272,31 +325,49 @@ func (p *gostPlugin) Close() error {
 		return nil
 	}
 	p.closed = true
-	session := p.session
-	p.session = nil
+	sessions := p.sessions
+	p.sessions = nil
 	p.access.Unlock()
-	if session != nil {
-		return session.Close()
+	var closeErr error
+	for _, session := range sessions {
+		if err := session.client.Close(); err != nil && closeErr == nil {
+			closeErr = err
+		}
 	}
-	return nil
+	return closeErr
 }
 
 func (p *gostPlugin) SetKeepIdleConnections(keep bool) {
+	p.access.Lock()
+	p.closeIdle = !keep
+	p.access.Unlock()
 	if !keep {
 		p.CloseIdleConnections()
 	}
 }
 
 func (p *gostPlugin) MultiplexEnabled() bool {
-	return p.options.mux
+	return p.options.muxEnabled
+}
+
+func (p *gostPlugin) ResetConnections() {
+	p.access.Lock()
+	sessions := p.sessions
+	p.sessions = nil
+	p.access.Unlock()
+	for _, session := range sessions {
+		_ = session.client.Close()
+	}
 }
 
 func (p *gostPlugin) CloseIdleConnections() {
 	p.access.Lock()
-	session := p.session
-	p.session = nil
-	p.access.Unlock()
-	if session != nil {
-		_ = session.Close()
+	defer p.access.Unlock()
+	for index := 0; index < len(p.sessions); {
+		if p.sessions[index].client.NumStreams() == 0 {
+			p.closeAndRemoveSessionLocked(index)
+			continue
+		}
+		index++
 	}
 }

@@ -14,7 +14,7 @@ func TestGostPluginMuxAndUoTLayering(t *testing.T) {
 		ServerOptions: option.ServerOptions{Server: "127.0.0.1", ServerPort: 443},
 		Method:        "none",
 		Plugin:        "gost-plugin",
-		PluginOptions: "mode=mws;host=front.invalid;path=/gost;mux=true",
+		PluginOptions: "mode=mws;host=front.invalid;path=/gost;mux=2",
 		UDPOverTCP:    &option.UDPOverTCPOptions{Enabled: true, Version: uot.Version},
 	})
 	if err != nil {
@@ -37,7 +37,7 @@ func TestGostPluginMuxRejectsSingMux(t *testing.T) {
 		ServerOptions: option.ServerOptions{Server: "127.0.0.1", ServerPort: 443},
 		Method:        "none",
 		Plugin:        "gost-plugin",
-		PluginOptions: "mode=mws;mux=true",
+		PluginOptions: "mode=mws;mux=2",
 		Multiplex:     &option.OutboundMultiplexOptions{Enabled: true},
 	})
 	if err == nil {

@@ -1,4 +1,11 @@
-$ go test ./transport/sip003 ./protocol/shadowsocks -count=1
-ok  	github.com/sagernet/sing-box/transport/sip003	0.069s
-ok  	github.com/sagernet/sing-box/protocol/shadowsocks	0.052s
+$ go test ./transport/sip003 ./protocol/shadowsocks -count=10
+ok  	github.com/sagernet/sing-box/transport/sip003	0.451s
+ok  	github.com/sagernet/sing-box/protocol/shadowsocks	0.061s
 exit=0
+
+$ go vet ./transport/sip003 ./protocol/shadowsocks
+exit=0
+
+$ go test -race ./transport/sip003 ./protocol/shadowsocks -count=1
+go: -race requires cgo; enable cgo by setting CGO_ENABLED=1
+exit=2

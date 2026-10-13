@@ -9,7 +9,8 @@
 - Dial endpoint, HTTP Host, and TLS SNI are independent.
 - Multiplexing uses `github.com/sagernet/smux`, protocol version 1, not sing-mux.
 - UoT stays above the Shadowsocks/plugin dialer. Ordinary Shadowsocks and existing SIP003 plugins retain their prior path.
-- Scope close, interface updates, and close-idle operations close gost smux sessions.
+- Scope close and interface updates close all gost smux sessions; close-idle operations close only sessions with zero active streams.
+- `mux=N` retains the reference numeric stream-capacity semantics (`mux=0` is unlimited); `mws`/`mwss`/`mtls` default to capacity 1.
 
 ## References
 
@@ -19,7 +20,8 @@
 
 ## Verification
 
-- `focused-tests.log`: SIP003 and Shadowsocks unit/integration tests.
+- `focused-tests.log`: SIP003 and Shadowsocks unit/integration tests repeated 10 times, plus focused `go vet`; race is unavailable because CGO is disabled.
+- New focused coverage pins numeric option parsing, `mux=1` versus `mux=2` concurrent underlay allocation, active-stream-safe idle flushing with post-drain closure, concurrent dial failure cleanup, and all-session interface reset.
 - `reference-wire.log`: loopback wire interop with the pinned maskedeken server for WS binary stream and MWS/smux v1, two streams.
 - `scoped-tests.log`: all transport packages plus Shadowsocks packages.
 - `preexisting-snell-gate.log`: confirms the unrelated full-suite Snell uTLS tests pass with their required `with_utls` tag.

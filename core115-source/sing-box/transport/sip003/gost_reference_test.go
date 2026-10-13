@@ -92,7 +92,7 @@ func TestGostReferencePluginMuxWebsocketInterop(t *testing.T) {
 	}()
 	waitTCP(t, M.ParseSocksaddr(fmt.Sprintf("127.0.0.1:%d", pluginPort)), logOutput)
 
-	plugin, err := newGostPlugin(context.Background(), mustArgs(t, "mode=mws;host=front.invalid;path=/gost;mux=true"), nil, stdDialer{}, M.ParseSocksaddr(fmt.Sprintf("127.0.0.1:%d", pluginPort)))
+	plugin, err := newGostPlugin(context.Background(), mustArgs(t, "mode=mws;host=front.invalid;path=/gost;mux=2"), nil, stdDialer{}, M.ParseSocksaddr(fmt.Sprintf("127.0.0.1:%d", pluginPort)))
 	if err != nil {
 		t.Fatal(err)
 	}

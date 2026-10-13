@@ -142,7 +142,9 @@ func (h *Outbound) MultiplexEnabled() bool {
 }
 
 func (h *Outbound) InterfaceUpdated(ctx context.Context) {
-	if idlePlugin, isIdlePlugin := h.plugin.(sip003.IdlePlugin); isIdlePlugin {
+	if resetPlugin, isResetPlugin := h.plugin.(sip003.ResetPlugin); isResetPlugin {
+		resetPlugin.ResetConnections()
+	} else if idlePlugin, isIdlePlugin := h.plugin.(sip003.IdlePlugin); isIdlePlugin {
 		idlePlugin.CloseIdleConnections()
 	}
 	if h.multiplexDialer != nil {

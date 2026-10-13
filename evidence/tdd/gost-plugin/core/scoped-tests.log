@@ -2,7 +2,7 @@ $ go test ./transport/... ./protocol/shadowsocks/... -count=1
 ?   	github.com/sagernet/sing-box/transport/openconnect	[no test files]
 ?   	github.com/sagernet/sing-box/transport/openvpn	[no test files]
 ?   	github.com/sagernet/sing-box/transport/simple-obfs	[no test files]
-ok  	github.com/sagernet/sing-box/transport/sip003	0.076s
+ok  	github.com/sagernet/sing-box/transport/sip003	0.104s
 ?   	github.com/sagernet/sing-box/transport/trojan	[no test files]
 ?   	github.com/sagernet/sing-box/transport/v2ray	[no test files]
 ?   	github.com/sagernet/sing-box/transport/v2raygrpc	[no test files]
@@ -13,7 +13,7 @@ ok  	github.com/sagernet/sing-box/transport/sip003	0.076s
 ?   	github.com/sagernet/sing-box/transport/v2raykcp	[no test files]
 ?   	github.com/sagernet/sing-box/transport/v2rayquic	[no test files]
 ?   	github.com/sagernet/sing-box/transport/v2raywebsocket	[no test files]
-ok  	github.com/sagernet/sing-box/transport/v2rayxhttp	0.080s
+ok  	github.com/sagernet/sing-box/transport/v2rayxhttp	0.146s
 ?   	github.com/sagernet/sing-box/transport/wireguard	[no test files]
-ok  	github.com/sagernet/sing-box/protocol/shadowsocks	0.054s
+ok  	github.com/sagernet/sing-box/protocol/shadowsocks	0.051s
 exit=0
