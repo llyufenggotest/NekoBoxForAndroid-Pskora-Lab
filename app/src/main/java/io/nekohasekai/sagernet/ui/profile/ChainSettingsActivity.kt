@@ -177,7 +177,7 @@ class ChainSettingsActivity : ProfileSettingsActivity<ChainBean>(R.layout.layout
     }
 
     fun testProfileAllowed(profile: ProxyEntity): Boolean {
-        if (profile.id == DataStore.editingId) return false
+        if (profile.id == currentEditingId()) return false
 
         for (entity in proxyList) {
             if (testProfileContains(entity, profile)) return false

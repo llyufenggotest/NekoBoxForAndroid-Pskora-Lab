@@ -44,9 +44,11 @@ import io.nekohasekai.sagernet.ui.ThemedActivity
 import io.nekohasekai.sagernet.widget.ListListener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.parcelize.Parcelize
 import java.util.UUID
 import kotlin.coroutines.coroutineContext
@@ -61,11 +63,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
         override fun AlertDialog.Builder.prepare(listener: DialogInterface.OnClickListener) {
             setTitle(R.string.unsaved_changes_prompt)
             setPositiveButton(R.string.yes) { _, _ ->
-                (requireActivity() as ProfileSettingsActivity<*>).let { activity ->
-                    activity.lifecycleScope.launch(Dispatchers.Default) {
-                        activity.saveAndExit()
-                    }
-                }
+                (requireActivity() as ProfileSettingsActivity<*>).launchSaveAndExit()
             }
             setNegativeButton(R.string.no) { _, _ ->
                 requireActivity().finish()
@@ -80,11 +78,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
         override fun AlertDialog.Builder.prepare(listener: DialogInterface.OnClickListener) {
             setTitle(R.string.delete_confirm_prompt)
             setPositiveButton(R.string.yes) { _, _ ->
-                val activity = requireActivity() as ProfileSettingsActivity<*>
-                activity.lifecycleScope.launch(Dispatchers.Default) {
-                    ProfileManager.deleteProfile(arg.groupId, arg.profileId)
-                }
-                activity.finish()
+                (requireActivity() as ProfileSettingsActivity<*>).deleteAndExit()
             }
             setNegativeButton(R.string.no, null)
         }
@@ -104,9 +98,13 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
 
         @Volatile
         internal var testEntityLoader: (suspend (Long) -> ProxyEntity?)? = null
+        internal var testBeforeSerialize: (suspend () -> Unit)? = null
+        internal var testProfileDeleter: (suspend (Long, Long) -> Unit)? = null
 
         internal fun resetTestHooks() {
             testEntityLoader = null
+            testBeforeSerialize = null
+            testProfileDeleter = null
         }
     }
 
@@ -120,6 +118,8 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
     private var restoredEditorCache = false
     private var loadedProxyEntity: ProxyEntity? = null
     private var initializationJob: Job? = null
+    @Volatile
+    private var pendingWriteJob: Job? = null
     private var destroyed = false
     val proxyEntity get() = loadedProxyEntity
     protected var isSubscription by Delegates.notNull<Boolean>()
@@ -174,6 +174,11 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
     override fun onCreate(savedInstanceState: Bundle?) {
         restoreEditorIdentity(savedInstanceState)
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null && !restoredEditorCache) {
+            supportFragmentManager.findFragmentById(R.id.settings)?.let { restoredFragment ->
+                supportFragmentManager.beginTransaction().remove(restoredFragment).commitNow()
+            }
+        }
         setSupportActionBar(findViewById(R.id.toolbar))
         supportActionBar?.apply {
             setTitle(R.string.profile_config)
@@ -240,14 +245,16 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
 
     private suspend fun finishInitialization() {
         if (!verifySessionOwner()) return
-        DataStore.profileCacheStore.putBoolean(CACHE_INITIALIZED, true)
-        if (!verifySessionOwner()) return
         if (!ownsCache() || isFinishing || isDestroyed) return
         if (supportFragmentManager.findFragmentById(R.id.settings) == null) {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.settings, MyPreferenceFragmentCompat())
                 .commitNow()
         }
+        if (!verifySessionOwner()) return
+        val fragment = supportFragmentManager.findFragmentById(R.id.settings) as? MyPreferenceFragmentCompat
+        if (fragment?.preferencesCreated != true) return
+        DataStore.profileCacheStore.putBoolean(CACHE_INITIALIZED, true)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -263,23 +270,93 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
 
         val targetId = editingId
         val targetGroup = editingGroup
+        testBeforeSerialize?.invoke()
+        if (!verifySessionOwner()) return
         val serializedBean = createEntity().apply { serialize() }
+        if (!verifySessionOwner()) return
         if (targetId == 0L) {
+            if (!verifySessionOwner()) return
             ProfileManager.createProfile(targetGroup, serializedBean)
         } else {
             val entity = loadedProxyEntity ?: loadEntity(targetId)
             if (entity == null || entity.id != targetId) {
-                withContext(Dispatchers.Main.immediate) { finish() }
+                withContext(Dispatchers.Main.immediate) {
+                    if (!isFinishing && !isDestroyed) finish()
+                }
                 return
             }
+            if (!verifySessionOwner()) return
             loadedProxyEntity = entity
             if (entity.id == DataStore.selectedProxy) {
                 SagerNet.stopService()
             }
+            if (!verifySessionOwner()) return
             entity.putBean(serializedBean)
             ProfileManager.updateProfile(entity)
         }
-        withContext(Dispatchers.Main.immediate) { finish() }
+        withContext(Dispatchers.Main.immediate) {
+            if (!isFinishing && !isDestroyed) finish()
+        }
+    }
+
+    internal fun launchSaveAndExit() {
+        pendingWriteJob = runOnDefaultDispatcher { saveAndExit() }
+    }
+
+    internal fun deleteAndExit() {
+        val targetId = editingId
+        val targetGroup = editingGroup
+        if (targetId == 0L) {
+            finish()
+            return
+        }
+        pendingWriteJob = runOnDefaultDispatcher {
+            if (!verifySessionOwner()) return@runOnDefaultDispatcher
+            (testProfileDeleter ?: { groupId, profileId ->
+                ProfileManager.deleteProfile(groupId, profileId)
+            })(targetGroup, targetId)
+            if (!verifySessionOwner()) return@runOnDefaultDispatcher
+            withContext(Dispatchers.Main.immediate) {
+                if (!isFinishing && !isDestroyed) finish()
+            }
+        }
+    }
+
+    internal suspend fun awaitPendingWriteForTest(pumpMain: () -> Unit = {}) {
+        try {
+            withTimeout(5_000) {
+                while (pendingWriteJob?.isCompleted == false) {
+                    pumpMain()
+                    kotlinx.coroutines.yield()
+                }
+            }
+        } catch (error: TimeoutCancellationException) {
+            throw AssertionError("Profile write did not complete", error)
+        }
+        pendingWriteJob?.join()
+        pumpMain()
+    }
+
+    internal suspend fun moveAndExit(newGroupId: Long) {
+        if (!verifySessionOwner()) return
+        val targetId = editingId
+        val entity = loadedProxyEntity ?: loadEntity(targetId) ?: return
+        if (entity.id != targetId || !verifySessionOwner()) return
+        val oldGroupId = entity.groupId
+        entity.groupId = newGroupId
+        if (!verifySessionOwner()) return
+        ProfileManager.updateProfile(entity)
+        if (!verifySessionOwner()) return
+        GroupManager.postUpdate(oldGroupId)
+        GroupManager.postUpdate(newGroupId)
+        setEditingGroup(newGroupId)
+        withContext(Dispatchers.Main.immediate) {
+            if (!isFinishing && !isDestroyed) finish()
+        }
+    }
+
+    internal fun launchMoveAndExit(newGroupId: Long) {
+        pendingWriteJob = runOnDefaultDispatcher { moveAndExit(newGroupId) }
     }
 
     internal fun awaitInitializationForTest() {
@@ -367,6 +444,8 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
     class MyPreferenceFragmentCompat : PreferenceFragmentCompat() {
 
         var activity: ProfileSettingsActivity<*>? = null
+        var preferencesCreated = false
+            private set
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             preferenceManager.preferenceDataStore = DataStore.profileCacheStore
@@ -374,6 +453,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
                 activity = (requireActivity() as ProfileSettingsActivity<*>).apply {
                     createPreferences(savedInstanceState, rootKey)
                 }
+                preferencesCreated = true
             } catch (e: Exception) {
                 Toast.makeText(
                     SagerNet.application,
@@ -431,11 +511,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
             }
 
             R.id.action_apply -> {
-                activity?.let { editor ->
-                    editor.lifecycleScope.launch(Dispatchers.Default) {
-                        editor.saveAndExit()
-                    }
-                }
+                activity?.launchSaveAndExit()
                 true
             }
 
@@ -505,18 +581,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
                                 groupName.text = group.displayName()
                                 groupUpdate.text = getString(R.string.move)
                                 groupUpdate.setOnClickListener {
-                                    activity.lifecycleScope.launch(Dispatchers.Default) {
-                                        val oldGroupId = ent.groupId
-                                        val newGroupId = group.id
-                                        ent.groupId = newGroupId
-                                        ProfileManager.updateProfile(ent)
-                                        GroupManager.postUpdate(oldGroupId) // reload
-                                        GroupManager.postUpdate(newGroupId)
-                                        activity.setEditingGroup(newGroupId) // post switch animation
-                                        withContext(Dispatchers.Main.immediate) {
-                                            activity.finish()
-                                        }
-                                    }
+                                    activity.launchMoveAndExit(group.id)
                                 }
                             }
                         }

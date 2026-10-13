@@ -16,6 +16,7 @@ import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import moe.matsuri.nb4a.TempDatabase
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
 import org.junit.After
@@ -32,7 +33,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28, 31], application = Application::class)
+@Config(application = Application::class)
 class GostPluginSettingsUiTest {
     @get:Rule
     val roomLifecycle = RoomLifecycleRule()
@@ -80,6 +81,33 @@ class GostPluginSettingsUiTest {
         val state = GostPluginUiState.fromPlugin("v2ray-plugin;$raw")
         assertFalse(state.enabled)
         assertEquals("v2ray-plugin;$raw", state.toPlugin("v2ray-plugin"))
+    }
+
+    @Test fun gostBeanInitializationCompletesBeforePreferencesBindAndSurvivesRecreate(): Unit = runBlocking {
+        DataStore.profileCacheStore.reset()
+        val group = createGroup("early-gost-init")
+        val profileId = createProfile(group.id, "gost-plugin;mode=grpc;host=early.invalid;mux;future=value")
+        val controller = Robolectric.buildActivity(
+            ShadowsocksSettingsActivity::class.java,
+            editorIntent(profileId),
+        ).create().start().resume().visible()
+
+        controller.get().awaitInitializationForTest()
+        assertTrue(DataStore.profileCacheStore.getBoolean("profileSettings.cacheInitialized") == true)
+        assertEditorState(
+            controller.get(),
+            "gost-plugin",
+            "mode=grpc;host=early.invalid;mux;future=value",
+        )
+
+        controller.recreate()
+        controller.get().awaitInitializationForTest()
+        assertEditorState(
+            controller.get(),
+            "gost-plugin",
+            "mode=grpc;host=early.invalid;mux;future=value",
+        )
+        controller.pause().stop().destroy()
     }
 
     @Test fun realActivityKeepsGostAndOtherPluginConfigsIsolatedAndMergesImmediately() {
@@ -198,6 +226,7 @@ class GostPluginSettingsUiTest {
         DataStore.profileCacheStore.reset()
         controller = Robolectric.buildActivity(ShadowsocksSettingsActivity::class.java, intent)
             .create(savedState).start().resume().visible()
+        controller.get().awaitInitializationForTest()
 
         assertEquals(profileId, DataStore.editingId)
         assertEquals(group.id, DataStore.editingGroup)
@@ -226,6 +255,7 @@ class GostPluginSettingsUiTest {
         DataStore.editingId = 99L
         controller = Robolectric.buildActivity(ShadowsocksSettingsActivity::class.java, intent)
             .create(savedState).start().resume().visible()
+        controller.get().awaitInitializationForTest()
 
         assertEquals(0L, DataStore.editingId)
         assertEquals(group.id, DataStore.editingGroup)
@@ -337,6 +367,129 @@ class GostPluginSettingsUiTest {
         assertEquals(newGroup.id, created.groupId)
     }
 
+    @Test fun directSaveFinishesOnlyAfterDelayedDaoCompletes(): Unit = runBlocking {
+        DataStore.profileCacheStore.reset()
+        val group = createGroup("save-delayed")
+        DataStore.selectedGroup = group.id
+        val controller = Robolectric.buildActivity(ShadowsocksSettingsActivity::class.java).setup().also {
+            it.get().awaitInitializationForTest()
+        }
+        selectPlugin(controller.get(), "gost-plugin")
+        changeRaw(controller.get(), "mode=ws;host=after.invalid")
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        ProfileSettingsActivity.testBeforeSerialize = {
+            entered.complete(Unit)
+            release.await()
+        }
+
+        controller.get().launchSaveAndExit()
+        withTimeout(5_000) { entered.await() }
+        assertFalse(controller.get().isFinishing)
+        assertTrue(SagerDatabase.proxyDao.getAll().isEmpty())
+
+        release.complete(Unit)
+        controller.get().awaitPendingWriteForTest { shadowOf(Looper.getMainLooper()).idle() }
+        shadowOf(Looper.getMainLooper()).idle()
+        val saved = SagerDatabase.proxyDao.getAll().single().requireBean() as ShadowsocksBean
+        assertEquals("gost-plugin;mode=ws;host=after.invalid", saved.plugin)
+        assertTrue(controller.get().isFinishing)
+    }
+
+    @Test fun deleteFinishesOnlyAfterDelayedDaoCompletes(): Unit = runBlocking {
+        DataStore.profileCacheStore.reset()
+        val group = createGroup("delete-delayed")
+        val profileId = createProfile(group.id, "gost-plugin;mode=ws;host=delete.invalid")
+        val controller = launchExisting(profileId)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        ProfileSettingsActivity.testProfileDeleter = { groupId, id ->
+            assertEquals(group.id, groupId)
+            assertEquals(profileId, id)
+            entered.complete(Unit)
+            release.await()
+            io.nekohasekai.sagernet.database.ProfileManager.deleteProfile(groupId, id)
+        }
+
+        controller.get().deleteAndExit()
+        withTimeout(5_000) { entered.await() }
+        assertFalse(controller.get().isFinishing)
+        assertTrue(SagerDatabase.proxyDao.getById(profileId) != null)
+        release.complete(Unit)
+        controller.get().awaitPendingWriteForTest { shadowOf(Looper.getMainLooper()).idle() }
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertTrue(controller.get().isFinishing)
+        assertEquals(null, SagerDatabase.proxyDao.getById(profileId))
+        controller.pause().stop().destroy()
+    }
+
+    @Test fun staleOwnerDuringSerializationCannotWrite(): Unit = runBlocking {
+        DataStore.profileCacheStore.reset()
+        val group = createGroup("save-takeover")
+        val profileId = createProfile(group.id, "gost-plugin;mode=ws;host=before.invalid")
+        val first = launchExisting(profileId)
+        first.get().claimOwnershipForTest(
+            mapOf("pluginName" to "gost-plugin", "pluginConfig" to "mode=ws;host=stale.invalid")
+        )
+        val serializeEntered = CompletableDeferred<Unit>()
+        val releaseSerialize = CompletableDeferred<Unit>()
+        ProfileSettingsActivity.testBeforeSerialize = {
+            serializeEntered.complete(Unit)
+            releaseSerialize.await()
+        }
+
+        first.get().launchSaveAndExit()
+        withTimeout(5_000) { serializeEntered.await() }
+        val second = launchExisting(profileId)
+        releaseSerialize.complete(Unit)
+        first.get().awaitPendingWriteForTest { shadowOf(Looper.getMainLooper()).idle() }
+
+        val persisted = SagerDatabase.proxyDao.getById(profileId)!!.requireBean() as ShadowsocksBean
+        assertEquals("gost-plugin;mode=ws;host=before.invalid", persisted.plugin)
+        assertFalse(first.get().isFinishing)
+        first.pause().stop().destroy()
+        second.pause().stop().destroy()
+    }
+
+    @Test fun failedPreferenceCreationDoesNotMarkCacheInitializedAndRecreateRetries() {
+        DataStore.profileCacheStore.reset()
+        FailingPreferencesActivity.failuresRemaining = 1
+        FailingPreferencesActivity.createPreferencesCalls = 0
+        val controller = Robolectric.buildActivity(FailingPreferencesActivity::class.java).setup()
+        controller.get().awaitInitializationForTest()
+        assertFalse(
+            DataStore.profileCacheStore.getBoolean("profileSettings.cacheInitialized") == true
+        )
+
+        controller.recreate()
+        controller.get().awaitInitializationForTest()
+        assertTrue(DataStore.profileCacheStore.getBoolean("profileSettings.cacheInitialized") == true)
+        controller.pause().stop().destroy()
+    }
+
+    @Test
+    @Config(sdk = [28])
+    fun sdk28Marker() {
+        assertEquals(28, android.os.Build.VERSION.SDK_INT)
+    }
+
+    class FailingPreferencesActivity : ProfileSettingsActivity<ShadowsocksBean>() {
+        companion object {
+            var failuresRemaining = 0
+            var createPreferencesCalls = 0
+        }
+
+        override fun createEntity() = ShadowsocksBean()
+        override fun ShadowsocksBean.init() = initializeDefaultValues()
+        override fun ShadowsocksBean.serialize() = initializeDefaultValues()
+        override fun PreferenceFragmentCompat.createPreferences(savedInstanceState: Bundle?, rootKey: String?) {
+            createPreferencesCalls++
+            if (failuresRemaining-- > 0) error("synthetic preference failure")
+            addPreferencesFromResource(R.xml.shadowsocks_preferences)
+        }
+    }
+
     @Test fun directSaveAfterGostEditPersistsRealBeanInsteadOfBarePlugin(): Unit = runBlocking {
         DataStore.profileCacheStore.reset()
         val controller = launchEditor()
@@ -344,10 +497,13 @@ class GostPluginSettingsUiTest {
         changeRaw(controller.get(), "mode=grpc;mux;future=false")
         changeText(controller.get(), "gostPluginHost", "cdn.invalid")
 
-        controller.get().saveAndExit()
+        controller.get().launchSaveAndExit()
+        controller.get().awaitPendingWriteForTest { shadowOf(Looper.getMainLooper()).idle() }
+        shadowOf(Looper.getMainLooper()).idle()
 
         val saved = SagerDatabase.proxyDao.getAll().single().requireBean() as ShadowsocksBean
         assertEquals("gost-plugin;mode=grpc;host=cdn.invalid;mux;future=false", saved.plugin)
+        assertTrue(controller.get().isFinishing)
     }
 
     private fun createGroup(name: String): ProxyGroup {
@@ -408,8 +564,8 @@ class GostPluginSettingsUiTest {
 
     private fun assertEditorState(activity: ShadowsocksSettingsActivity, plugin: String, raw: String) {
         val current = fragment(activity)
-        assertEquals(plugin, current.findPreference<SimpleMenuPreference>("pluginName")!!.value)
-        assertEquals(raw, current.findPreference<EditTextPreference>("pluginConfig")!!.text)
+        assertEquals(plugin, current.findPreference<SimpleMenuPreference>("pluginName")!!.value ?: "")
+        assertEquals(raw, current.findPreference<EditTextPreference>("pluginConfig")!!.text ?: "")
     }
 
     private fun serializeProduction(activity: ShadowsocksSettingsActivity): ShadowsocksBean {

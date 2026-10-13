@@ -76,6 +76,14 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
     private fun cachePluginConfig(pluginName: String, raw: String) {
         DataStore.profileCacheStore.putString(PLUGIN_CONFIG_KEY, raw)
         persistPluginState(pluginName, raw)
+        if (!syncingGostPreferences) {
+            syncingGostPreferences = true
+            try {
+                (pluginConfig.preference as EditTextPreference).text = raw
+            } finally {
+                syncingGostPreferences = false
+            }
+        }
     }
 
     private fun restorePluginState() {
@@ -105,7 +113,7 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
         pluginConfigs.clear()
         gostRawOptions = ""
         persistPluginState(currentPluginName, currentConfig)
-        if (state.enabled) writeGostState(state)
+        if (state.enabled) persistGostState(state)
     }
 
     override fun ShadowsocksBean.serialize() {
@@ -131,22 +139,31 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
         writeGostState(state)
     }
 
+    private fun persistGostState(state: GostPluginUiState) {
+        DataStore.profileCacheStore.putString("gostPluginMode", state.mode)
+        DataStore.profileCacheStore.putString("gostPluginHost", state.host)
+        DataStore.profileCacheStore.putString("gostPluginPath", state.path)
+        DataStore.profileCacheStore.putBoolean("gostPluginTls", state.tls)
+        DataStore.profileCacheStore.putString("gostPluginMux", state.mux.editorText())
+    }
+
+    private fun syncGostPreferences(state: GostPluginUiState) {
+        val modePreference = gostPluginMode.preference as SimpleMenuPreference
+        if (state.modeSupported) {
+            modePreference.entries = resources.getTextArray(R.array.gost_plugin_modes)
+            modePreference.entryValues = resources.getTextArray(R.array.gost_plugin_mode_values)
+        } else {
+            modePreference.entries = arrayOf("Custom (${state.mode})", "WebSocket", "Multiplexed WebSocket")
+            modePreference.entryValues = arrayOf(state.mode, "ws", "mws")
+        }
+    }
+
     private fun writeGostState(state: GostPluginUiState) {
+        if (syncingGostPreferences) return
         syncingGostPreferences = true
         try {
-            val modePreference = gostPluginMode.preference as SimpleMenuPreference
-            if (state.modeSupported) {
-                modePreference.entries = resources.getTextArray(R.array.gost_plugin_modes)
-                modePreference.entryValues = resources.getTextArray(R.array.gost_plugin_mode_values)
-            } else {
-                modePreference.entries = arrayOf("Custom (${state.mode})", "WebSocket", "Multiplexed WebSocket")
-                modePreference.entryValues = arrayOf(state.mode, "ws", "mws")
-            }
-            DataStore.profileCacheStore.putString("gostPluginMode", state.mode)
-            DataStore.profileCacheStore.putString("gostPluginHost", state.host)
-            DataStore.profileCacheStore.putString("gostPluginPath", state.path)
-            DataStore.profileCacheStore.putBoolean("gostPluginTls", state.tls)
-            DataStore.profileCacheStore.putString("gostPluginMux", state.mux.editorText())
+            persistGostState(state)
+            syncGostPreferences(state)
         } finally {
             syncingGostPreferences = false
         }
@@ -167,13 +184,7 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
             else current.mux,
         )
         gostRawOptions = merged.mergeStructured().canonical()
-        persistPluginState(GOST_PLUGIN, gostRawOptions)
-        syncingGostPreferences = true
-        try {
-            DataStore.profileCacheStore.putString(PLUGIN_CONFIG_KEY, gostRawOptions)
-        } finally {
-            syncingGostPreferences = false
-        }
+        cachePluginConfig(GOST_PLUGIN, gostRawOptions)
     }
 
     override fun PreferenceFragmentCompat.createPreferences(
