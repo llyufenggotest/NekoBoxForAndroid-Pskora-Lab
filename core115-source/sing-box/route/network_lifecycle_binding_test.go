@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/common/control"
 	"github.com/sagernet/sing/common/logger"
@@ -33,10 +34,10 @@ func TestProductionConstructionOrderBindsGenerationManager(t *testing.T) {
 	connections := NewConnectionManager(logger.NOP())
 	service.MustRegister[adapter.ConnectionManager](ctx, connections)
 	network.BindConnectionManager(connections)
-	if err = network.Start(adapter.StartStateInitialize); err != nil {
+	if err = network.Start(adapter.StartStateInitialize, adapter.NewScope(context.Background(), log.NewNOPFactory().NewLogger("test"))); err != nil {
 		t.Fatal(err)
 	}
-	if err = network.Start(adapter.StartStatePostStart); err != nil {
+	if err = network.Start(adapter.StartStatePostStart, adapter.NewScope(context.Background(), log.NewNOPFactory().NewLogger("test"))); err != nil {
 		t.Fatal(err)
 	}
 

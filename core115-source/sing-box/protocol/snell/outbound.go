@@ -449,7 +449,24 @@ func (h *Outbound) ListenPacket(ctx context.Context, destination M.Socksaddr) (n
 	return h.dialUDPOverTCP(ctx)
 }
 
-func (h *Outbound) Start(stage adapter.StartStage) error {
+func (h *Outbound) Start(stage adapter.StartStage, scope *adapter.Scope) error {
+	if stage == adapter.StartStateInitialize {
+		scope.Add(h.client.Close)
+		if h.quicDestCache != nil {
+			scope.Add(func() error {
+				h.quicDestCache.Close()
+				return nil
+			})
+		}
+		scope.Add(func() error {
+			h.warmAccess.Lock()
+			h.warmClosed = true
+			h.warmAccess.Unlock()
+			h.cancelWarm()
+			return nil
+		})
+		return nil
+	}
 	if stage != adapter.StartStateStarted || h.preconnect == 0 {
 		return nil
 	}

@@ -43,16 +43,16 @@ func TestOIXPreconnectOutboundLifecycle(t *testing.T) {
 		require.NoError(t, h.client.Close())
 		fake := &lifecycleWarmer{entered: make(chan int, 1)}
 		h.client = fake
-		require.NoError(t, h.Start(adapter.StartStateInitialize))
+		require.NoError(t, h.Start(adapter.StartStateInitialize, adapter.NewScope(context.Background(), log.NewNOPFactory().NewLogger("test"))))
 		require.Zero(t, fake.calls.Load())
 		if closeBefore {
 			require.NoError(t, h.Close())
-			require.ErrorIs(t, h.Start(adapter.StartStateStarted), net.ErrClosed)
+			require.ErrorIs(t, h.Start(adapter.StartStateStarted, adapter.NewScope(context.Background(), log.NewNOPFactory().NewLogger("test"))), net.ErrClosed)
 			require.Zero(t, fake.calls.Load())
 			continue
 		}
-		require.NoError(t, h.Start(adapter.StartStateStarted))
-		require.NoError(t, h.Start(adapter.StartStateStarted))
+		require.NoError(t, h.Start(adapter.StartStateStarted, adapter.NewScope(context.Background(), log.NewNOPFactory().NewLogger("test"))))
+		require.NoError(t, h.Start(adapter.StartStateStarted, adapter.NewScope(context.Background(), log.NewNOPFactory().NewLogger("test"))))
 		select {
 		case count := <-fake.entered:
 			require.Equal(t, 2, count)
@@ -76,7 +76,7 @@ func TestOIXPreconnectOutboundLifecycle(t *testing.T) {
 func TestStandardSnellDoesNotPreconnect(t *testing.T) {
 	fake := &lifecycleWarmer{entered: make(chan int, 1)}
 	h := &Outbound{client: fake}
-	require.NoError(t, h.Start(adapter.StartStateStarted))
+	require.NoError(t, h.Start(adapter.StartStateStarted, adapter.NewScope(context.Background(), log.NewNOPFactory().NewLogger("test"))))
 	require.Zero(t, fake.calls.Load())
 	require.NoError(t, h.Close())
 }

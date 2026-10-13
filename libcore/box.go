@@ -132,10 +132,16 @@ func (b *BoxInstance) Start() (err error) {
 	defer device.DeferPanicToError("box.Start", func(err_ error) { err = err_ })
 
 	if b.state == 0 {
+		if err = b.Box.Start(); err != nil {
+			return err
+		}
 		b.state = 1
-		return b.Box.Start()
+		return nil
 	}
-	return errors.New("already started")
+	if b.state == 1 {
+		return nil
+	}
+	return errors.New("already closed")
 }
 
 func (b *BoxInstance) Close() (err error) {

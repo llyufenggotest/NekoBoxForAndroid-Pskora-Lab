@@ -2,18 +2,15 @@ package dns
 
 import (
 	"context"
-	"io"
 	"os"
 	"strings"
 	"sync"
 
 	"github.com/sagernet/sing-box/adapter"
-	"github.com/sagernet/sing-box/common/taskmonitor"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
-	"github.com/sagernet/sing/common/logger"
 )
 
 var _ adapter.DNSTransportManager = (*TransportManager)(nil)
@@ -26,6 +23,7 @@ type TransportManager struct {
 	access                   sync.RWMutex
 	started                  bool
 	stage                    adapter.StartStage
+	scope                    *adapter.Scope
 	transports               []adapter.DNSTransport
 	transportByTag           map[string]adapter.DNSTransport
 	dependByTag              map[string][]string
@@ -34,9 +32,8 @@ type TransportManager struct {
 	fakeIPTransport          adapter.FakeIPTransport
 }
 
-func NewTransportManager(logger logger.ContextLogger, registry adapter.DNSTransportRegistry, outbound adapter.OutboundManager, defaultTag string) *TransportManager {
+func NewTransportManager(registry adapter.DNSTransportRegistry, outbound adapter.OutboundManager, defaultTag string) *TransportManager {
 	return &TransportManager{
-		logger:         logger,
 		registry:       registry,
 		outbound:       outbound,
 		defaultTag:     defaultTag,
@@ -49,13 +46,14 @@ func (m *TransportManager) Initialize(defaultTransportFallback func() (adapter.D
 	m.defaultTransportFallback = defaultTransportFallback
 }
 
-func (m *TransportManager) Start(stage adapter.StartStage) error {
+func (m *TransportManager) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 	m.access.Lock()
 	if m.started && m.stage >= stage {
 		panic("already started")
 	}
 	m.started = true
 	m.stage = stage
+	m.scope = scope
 	if stage == adapter.StartStateStart {
 		if m.defaultTag != "" && m.defaultTransport == nil {
 			m.access.Unlock()
@@ -73,12 +71,12 @@ func (m *TransportManager) Start(stage adapter.StartStage) error {
 		}
 		transports := m.transports
 		m.access.Unlock()
-		return m.startTransports(transports)
+		return m.startTransports(scope, transports)
 	} else {
 		transports := m.transports
 		m.access.Unlock()
 		for _, outbound := range transports {
-			err := adapter.LegacyStart(outbound, stage)
+			err := adapter.LegacyStart(outbound, stage, scope)
 			if err != nil {
 				return E.Cause(err, stage, " dns/", outbound.Type(), "[", outbound.Tag(), "]")
 			}
@@ -87,8 +85,7 @@ func (m *TransportManager) Start(stage adapter.StartStage) error {
 	return nil
 }
 
-func (m *TransportManager) startTransports(transports []adapter.DNSTransport) error {
-	monitor := taskmonitor.New(m.logger, C.StartTimeout)
+func (m *TransportManager) startTransports(scope *adapter.Scope, transports []adapter.DNSTransport) error {
 	started := make(map[string]bool)
 	for {
 		canContinue := false
@@ -106,13 +103,10 @@ func (m *TransportManager) startTransports(transports []adapter.DNSTransport) er
 			}
 			started[transportTag] = true
 			canContinue = true
-			if starter, isStarter := transportToStart.(adapter.Lifecycle); isStarter {
-				monitor.Start("start dns/", transportToStart.Type(), "[", transportTag, "]")
-				err := starter.Start(adapter.StartStateStart)
-				monitor.Finish()
-				if err != nil {
-					return E.Cause(err, "start dns/", transportToStart.Type(), "[", transportTag, "]")
-				}
+			name := "dns/" + transportToStart.Type() + "[" + transportTag + "]"
+			err := scope.Start(name, transportToStart, adapter.StartStateStart)
+			if err != nil {
+				return err
 			}
 		}
 		if len(started) == len(transports) {
@@ -141,30 +135,6 @@ func (m *TransportManager) startTransports(transports []adapter.DNSTransport) er
 			return lintTransport(append(oTree, problemTransportTag), problemTransport)
 		}
 		return lintTransport([]string{currentTransport.Tag()}, currentTransport)
-	}
-	return nil
-}
-
-func (m *TransportManager) Close() error {
-	monitor := taskmonitor.New(m.logger, C.StopTimeout)
-	m.access.Lock()
-	if !m.started {
-		m.access.Unlock()
-		return nil
-	}
-	m.started = false
-	transports := m.transports
-	m.transports = nil
-	m.access.Unlock()
-	var err error
-	for _, transport := range transports {
-		if closer, isCloser := transport.(io.Closer); isCloser {
-			monitor.Start("close server/", transport.Type(), "[", transport.Tag(), "]")
-			err = E.Append(err, closer.Close(), func(err error) error {
-				return E.Cause(err, "close server/", transport.Type(), "[", transport.Tag(), "]")
-			})
-			monitor.Finish()
-		}
 	}
 	return nil
 }
@@ -237,7 +207,7 @@ func (m *TransportManager) Remove(tag string) error {
 		}
 	}
 	if started {
-		transport.Close()
+		common.Close(transport)
 	}
 	return nil
 }
@@ -254,7 +224,7 @@ func (m *TransportManager) Create(ctx context.Context, logger log.ContextLogger,
 	defer m.access.Unlock()
 	if m.started {
 		for _, stage := range adapter.ListStartStages {
-			err = adapter.LegacyStart(transport, stage)
+			err = adapter.LegacyStart(transport, stage, m.scope)
 			if err != nil {
 				return E.Cause(err, stage, " dns/", transport.Type(), "[", transport.Tag(), "]")
 			}

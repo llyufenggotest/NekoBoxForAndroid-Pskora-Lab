@@ -21,6 +21,7 @@ type Manager struct {
 	access       sync.Mutex
 	started      bool
 	stage        adapter.StartStage
+	scope        *adapter.Scope
 	services     []adapter.Service
 	serviceByTag map[string]adapter.Service
 }
@@ -33,22 +34,18 @@ func NewManager(logger log.ContextLogger, registry adapter.ServiceRegistry) *Man
 	}
 }
 
-func (m *Manager) Start(stage adapter.StartStage) error {
+func (m *Manager) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 	m.access.Lock()
-	if m.started && m.stage >= stage {
-		panic("already started")
-	}
 	m.started = true
 	m.stage = stage
+	m.scope = scope
 	services := m.services
 	m.access.Unlock()
 	for _, service := range services {
 		name := "service/" + service.Type() + "[" + service.Tag() + "]"
-		done := adapter.LogElapsed(m.logger, stage, " ", name)
-		err := adapter.LegacyStart(service, stage)
-		done()
+		err := scope.Start(name, service, stage)
 		if err != nil {
-			return E.Cause(err, stage, " ", name)
+			return err
 		}
 	}
 	return nil
@@ -69,7 +66,7 @@ func (m *Manager) Close() error {
 		name := "service/" + service.Type() + "[" + service.Tag() + "]"
 		done := adapter.LogElapsed(m.logger, "close ", name)
 		monitor.Start("close ", name)
-		err = E.Append(err, service.Close(), func(err error) error {
+		err = E.Append(err, common.Close(service), func(err error) error {
 			return E.Cause(err, "close ", name)
 		})
 		monitor.Finish()
@@ -107,9 +104,10 @@ func (m *Manager) Remove(tag string) error {
 	}
 	m.services = append(m.services[:index], m.services[index+1:]...)
 	started := m.started
+	scope := m.scope
 	m.access.Unlock()
 	if started {
-		return service.Close()
+		return scope.Remove(service)
 	}
 	return nil
 }
@@ -124,17 +122,16 @@ func (m *Manager) Create(ctx context.Context, logger log.ContextLogger, tag stri
 	if m.started {
 		name := "service/" + service.Type() + "[" + service.Tag() + "]"
 		for _, stage := range adapter.ListStartStages {
-			done := adapter.LogElapsed(m.logger, stage, " ", name)
-			err = adapter.LegacyStart(service, stage)
-			done()
+			err = m.scope.Start(name, service, stage)
 			if err != nil {
-				return E.Cause(err, stage, " ", name)
+				_ = m.scope.Remove(service)
+				return err
 			}
 		}
 	}
 	if existsService, loaded := m.serviceByTag[tag]; loaded {
 		if m.started {
-			err = existsService.Close()
+			err = m.scope.Remove(existsService)
 			if err != nil {
 				return E.Cause(err, "close service/", existsService.Type(), "[", existsService.Tag(), "]")
 			}

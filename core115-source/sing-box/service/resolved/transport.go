@@ -58,6 +58,7 @@ type LinkServers struct {
 	Link         *TransportLink
 	Servers      []adapter.DNSTransport
 	serverOffset uint32
+	serverScope  *adapter.Scope
 }
 
 func (c *LinkServers) ServerOffset(rotate bool) uint32 {
@@ -85,7 +86,7 @@ func NewTransport(ctx context.Context, logger log.ContextLogger, tag string, opt
 	}, nil
 }
 
-func (t *Transport) Start(stage adapter.StartStage) error {
+func (t *Transport) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 	if stage != adapter.StartStateInitialize {
 		return nil
 	}
@@ -101,17 +102,14 @@ func (t *Transport) Start(stage adapter.StartStage) error {
 	resolvedInbound.updateCallback = t.updateTransports
 	resolvedInbound.deleteCallback = t.deleteTransport
 	t.service = resolvedInbound
-	return nil
-}
-
-func (t *Transport) Close() error {
-	t.linkAccess.RLock()
-	defer t.linkAccess.RUnlock()
-	for _, servers := range t.linkServers {
-		for _, server := range servers.Servers {
-			server.Close()
+	scope.Add(func() error {
+		t.linkAccess.RLock()
+		defer t.linkAccess.RUnlock()
+		for _, servers := range t.linkServers {
+			servers.serverScope.Close()
 		}
-	}
+		return nil
+	})
 	return nil
 }
 
@@ -171,9 +169,7 @@ func (t *Transport) updateTransports(link *TransportLink) error {
 	t.linkAccess.Lock()
 	defer t.linkAccess.Unlock()
 	if servers, loaded := t.linkServers[link]; loaded {
-		for _, server := range servers.Servers {
-			server.Close()
-		}
+		servers.serverScope.Close()
 	}
 	serverDialer := common.Must1(dialer.NewDefault(t.ctx, option.DialerOptions{
 		AbstractDialerOptions: option.AbstractDialerOptions{
@@ -234,9 +230,7 @@ func (t *Transport) deleteTransport(link *TransportLink) {
 	if !loaded {
 		return
 	}
-	for _, server := range servers.Servers {
-		server.Close()
-	}
+	servers.serverScope.Close()
 	delete(t.linkServers, link)
 }
 

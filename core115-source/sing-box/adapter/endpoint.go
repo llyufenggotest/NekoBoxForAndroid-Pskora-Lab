@@ -27,6 +27,7 @@ type EndpointRegistry interface {
 
 type EndpointManager interface {
 	Lifecycle
+	StartEndpoint(endpoint Endpoint) error
 	Endpoints() []Endpoint
 	Get(tag string) (Endpoint, bool)
 	Remove(tag string) error

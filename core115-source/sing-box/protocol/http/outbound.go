@@ -27,7 +27,7 @@ func RegisterOutbound(registry *outbound.Registry) {
 type Outbound struct {
 	outbound.Adapter
 	logger    logger.ContextLogger
-	client    *sHTTP.Client
+	client    *closeableClient
 	tlsDialer tls.Dialer
 	server    M.Socksaddr
 	username  string
@@ -63,7 +63,7 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 	return &Outbound{
 		Adapter: outbound.NewAdapterWithDialerOptions(C.TypeHTTP, tag, []string{N.NetworkTCP}, options.DialerOptions),
 		logger:  logger,
-		client: sHTTP.NewClient(sHTTP.Options{
+		client: newCloseableClient(sHTTP.Options{
 			Dialer:   detour,
 			Server:   options.ServerOptions.Build(),
 			Username: options.Username,
@@ -79,6 +79,27 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		path:      options.Path,
 		headers:   headers,
 	}, nil
+}
+
+type closeableClient struct {
+	*sHTTP.Client
+	options sHTTP.Options
+}
+
+func newCloseableClient(options sHTTP.Options) *closeableClient {
+	return &closeableClient{Client: sHTTP.NewClient(options), options: options}
+}
+
+func (c *closeableClient) Close() error {
+	c.Client = sHTTP.NewClient(c.options)
+	return nil
+}
+
+func (h *Outbound) Start(stage adapter.StartStage, scope *adapter.Scope) error {
+	if stage == adapter.StartStateInitialize {
+		scope.Add(h.client.Close)
+	}
+	return nil
 }
 
 func (h *Outbound) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {

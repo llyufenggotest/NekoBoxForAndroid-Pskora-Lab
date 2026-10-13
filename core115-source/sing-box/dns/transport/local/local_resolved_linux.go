@@ -294,7 +294,7 @@ func (t *DBusResolvedResolver) updateStatus(ctx context.Context) {
 	}
 	oldServerSet := t.savedServerSet.Swap(serverSet)
 	if oldServerSet != nil {
-		_ = oldServerSet.Close()
+		_ = oldServerSet.serverScope.Close()
 	}
 	if err != nil {
 		var dbusErr dbus.Error
@@ -443,13 +443,12 @@ func (t *DBusResolvedResolver) createResolvedServer(serverDialer N.Dialer, dnsOv
 		}, nil
 	}
 	if dnsOverTLSMode == "opportunistic" {
-		primaryTransport, err := t.createResolvedTransport(serverDialer, serverSpecification, true)
+		primaryTransport, err := t.createResolvedTransport(serverScope, serverDialer, serverSpecification, true)
 		if err != nil {
 			return resolvedServer{}, err
 		}
-		fallbackTransport, err := t.createResolvedTransport(serverDialer, serverSpecification, false)
+		fallbackTransport, err := t.createResolvedTransport(serverScope, serverDialer, serverSpecification, false)
 		if err != nil {
-			_ = primaryTransport.Close()
 			return resolvedServer{}, err
 		}
 		return resolvedServer{
@@ -457,7 +456,7 @@ func (t *DBusResolvedResolver) createResolvedServer(serverDialer N.Dialer, dnsOv
 			fallbackTransport: fallbackTransport,
 		}, nil
 	}
-	primaryTransport, err := t.createResolvedTransport(serverDialer, serverSpecification, false)
+	primaryTransport, err := t.createResolvedTransport(serverScope, serverDialer, serverSpecification, false)
 	if err != nil {
 		return resolvedServer{}, err
 	}
@@ -466,7 +465,7 @@ func (t *DBusResolvedResolver) createResolvedServer(serverDialer N.Dialer, dnsOv
 	}, nil
 }
 
-func (t *DBusResolvedResolver) createResolvedTransport(serverDialer N.Dialer, serverSpecification resolvedServerSpecification, useTLS bool) (adapter.DNSTransport, error) {
+func (t *DBusResolvedResolver) createResolvedTransport(serverScope *adapter.Scope, serverDialer N.Dialer, serverSpecification resolvedServerSpecification, useTLS bool) (adapter.DNSTransport, error) {
 	serverAddress := M.SocksaddrFrom(serverSpecification.address, resolvedServerPort(serverSpecification.port, useTLS))
 	if useTLS {
 		tlsAddress := serverSpecification.address
@@ -485,17 +484,15 @@ func (t *DBusResolvedResolver) createResolvedTransport(serverDialer N.Dialer, se
 			return nil, err
 		}
 		serverTransport := dnsTransport.NewTLSRaw(t.logger, dns.NewTransportAdapter(C.DNSTypeTLS, "", nil), serverDialer, serverAddress, tlsConfig)
-		err = serverTransport.Start(adapter.StartStateStart)
+		err = serverTransport.Start(adapter.StartStateStart, serverScope)
 		if err != nil {
-			_ = serverTransport.Close()
 			return nil, err
 		}
 		return serverTransport, nil
 	}
 	serverTransport := dnsTransport.NewUDPRaw(t.logger, dns.NewTransportAdapter(C.DNSTypeUDP, "", nil), serverDialer, serverAddress)
-	err := serverTransport.Start(adapter.StartStateStart)
+	err := serverTransport.Start(adapter.StartStateStart, serverScope)
 	if err != nil {
-		_ = serverTransport.Close()
 		return nil, err
 	}
 	return serverTransport, nil

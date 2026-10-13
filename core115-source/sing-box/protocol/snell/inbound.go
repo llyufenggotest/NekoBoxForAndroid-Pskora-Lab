@@ -166,11 +166,28 @@ func newSnellV5Service(options snellv5.ServiceOptions, userList []int, keyList [
 	return service, nil
 }
 
-func (h *Inbound) Start(stage adapter.StartStage) error {
+func (h *Inbound) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 	if stage != adapter.StartStateStart {
 		return nil
 	}
-	return h.listener.Start()
+	err := h.listener.Start()
+	if err != nil {
+		return err
+	}
+	scope.Add(h.listener.Close)
+	if h.udpNat != nil {
+		scope.Add(func() error {
+			h.udpNat.Close()
+			return nil
+		})
+	}
+	if h.quicAuth != nil {
+		scope.Add(func() error {
+			h.quicAuth.Close()
+			return nil
+		})
+	}
+	return nil
 }
 
 func (h *Inbound) Close() error {

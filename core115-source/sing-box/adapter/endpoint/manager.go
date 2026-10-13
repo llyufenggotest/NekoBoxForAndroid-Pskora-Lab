@@ -21,6 +21,7 @@ type Manager struct {
 	access        sync.Mutex
 	started       bool
 	stage         adapter.StartStage
+	scope         *adapter.Scope
 	endpoints     []adapter.Endpoint
 	endpointByTag map[string]adapter.Endpoint
 }
@@ -33,28 +34,28 @@ func NewManager(logger log.ContextLogger, registry adapter.EndpointRegistry) *Ma
 	}
 }
 
-func (m *Manager) Start(stage adapter.StartStage) error {
+func (m *Manager) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 	m.access.Lock()
-	defer m.access.Unlock()
-	if m.started && m.stage >= stage {
-		panic("already started")
-	}
 	m.started = true
 	m.stage = stage
+	m.scope = scope
 	if stage == adapter.StartStateStart {
-		// started with outbound manager
+		m.access.Unlock()
 		return nil
 	}
-	for _, endpoint := range m.endpoints {
+	endpoints := m.endpoints
+	m.access.Unlock()
+	for _, endpoint := range endpoints {
 		name := "endpoint/" + endpoint.Type() + "[" + endpoint.Tag() + "]"
-		done := adapter.LogElapsed(m.logger, stage, " ", name)
-		err := adapter.LegacyStart(endpoint, stage)
-		done()
-		if err != nil {
-			return E.Cause(err, stage, " ", name)
+		if err := scope.Start(name, endpoint, stage); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+func (m *Manager) StartEndpoint(endpoint adapter.Endpoint) error {
+	return m.scope.Start("endpoint/"+endpoint.Type()+"["+endpoint.Tag()+"]", endpoint, adapter.StartStateStart)
 }
 
 func (m *Manager) Close() error {
@@ -72,7 +73,7 @@ func (m *Manager) Close() error {
 		name := "endpoint/" + endpoint.Type() + "[" + endpoint.Tag() + "]"
 		done := adapter.LogElapsed(m.logger, "close ", name)
 		monitor.Start("close ", name)
-		err = E.Append(err, endpoint.Close(), func(err error) error {
+		err = E.Append(err, common.Close(endpoint), func(err error) error {
 			return E.Cause(err, "close ", name)
 		})
 		monitor.Finish()
@@ -110,9 +111,10 @@ func (m *Manager) Remove(tag string) error {
 	}
 	m.endpoints = append(m.endpoints[:index], m.endpoints[index+1:]...)
 	started := m.started
+	scope := m.scope
 	m.access.Unlock()
 	if started {
-		return endpoint.Close()
+		return scope.Remove(endpoint)
 	}
 	return nil
 }
@@ -127,17 +129,16 @@ func (m *Manager) Create(ctx context.Context, router adapter.Router, logger log.
 	if m.started {
 		name := "endpoint/" + endpoint.Type() + "[" + endpoint.Tag() + "]"
 		for _, stage := range adapter.ListStartStages {
-			done := adapter.LogElapsed(m.logger, stage, " ", name)
-			err = adapter.LegacyStart(endpoint, stage)
-			done()
+			err = m.scope.Start(name, endpoint, stage)
 			if err != nil {
-				return E.Cause(err, stage, " ", name)
+				_ = m.scope.Remove(endpoint)
+				return err
 			}
 		}
 	}
 	if existsEndpoint, loaded := m.endpointByTag[tag]; loaded {
 		if m.started {
-			err = existsEndpoint.Close()
+			err = m.scope.Remove(existsEndpoint)
 			if err != nil {
 				return E.Cause(err, "close endpoint/", existsEndpoint.Type(), "[", existsEndpoint.Tag(), "]")
 			}

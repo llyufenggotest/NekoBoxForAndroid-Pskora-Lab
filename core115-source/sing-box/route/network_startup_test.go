@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing/common/control"
 	"github.com/sagernet/sing/common/logger"
 	"github.com/sagernet/sing/service/pause"
@@ -111,12 +112,12 @@ func TestInitialNotificationDoesNotResetLiveConnections(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("initial callback not running")
 	}
-	if err := r.Start(adapter.StartStatePostStart); err != nil {
+	if err := r.Start(adapter.StartStatePostStart, adapter.NewScope(context.Background(), log.NewNOPFactory().NewLogger("test"))); err != nil {
 		t.Fatal(err)
 	}
 	close(plat.release)
-	r.interfaceUpdateRunAccess.Lock()
-	r.interfaceUpdateRunAccess.Unlock()
+	r.resetRunAccess.Lock()
+	r.resetRunAccess.Unlock()
 	if connections.closed.Load() != 0 {
 		t.Fatal("initial notification closed live connections after PostStart")
 	}

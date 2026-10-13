@@ -2,13 +2,15 @@ package androidmonitor
 
 import (
 	"context"
+	"testing"
+
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-box/route"
 	tun "github.com/sagernet/sing-tun"
 	"github.com/sagernet/sing/common/logger"
 	"github.com/sagernet/sing/service"
-	"testing"
 )
 
 // Compile this same test for GOOS=android: no host-safe config substitution.
@@ -35,7 +37,7 @@ func TestActualCoreSelectsJavaMonitorWithAutoDetect(t *testing.T) {
 	if p.created != 1 {
 		t.Fatal("core did not select platform monitor")
 	}
-	if err = nm.Start(adapter.StartStateInitialize); err != nil {
+	if err = nm.Start(adapter.StartStateInitialize, adapter.NewScope(context.Background(), log.NewNOPFactory().NewLogger("test"))); err != nil {
 		t.Fatal(err)
 	}
 	if p.p.starts != 1 {

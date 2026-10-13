@@ -23,6 +23,7 @@ type Manager struct {
 	access        sync.Mutex
 	started       bool
 	stage         adapter.StartStage
+	scope         *adapter.Scope
 	providers     []adapter.CertificateProviderService
 	providerByTag map[string]adapter.CertificateProviderService
 }
@@ -35,24 +36,19 @@ func NewManager(logger log.ContextLogger, registry adapter.CertificateProviderRe
 	}
 }
 
-func (m *Manager) Start(stage adapter.StartStage) error {
+func (m *Manager) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 	m.access.Lock()
-	if m.started && m.stage >= stage {
-		panic("already started")
-	}
 	m.started = true
 	m.stage = stage
+	m.scope = scope
 	providers := m.providers
 	m.access.Unlock()
 	for _, provider := range providers {
 		name := "certificate-provider/" + provider.Type() + "[" + provider.Tag() + "]"
-		m.logger.Trace(stage, " ", name)
-		startTime := time.Now()
-		err := adapter.LegacyStart(provider, stage)
+		err := scope.Start(name, provider, stage)
 		if err != nil {
-			return E.Cause(err, stage, " ", name)
+			return err
 		}
-		m.logger.Trace(stage, " ", name, " completed (", F.Seconds(time.Since(startTime).Seconds()), "s)")
 	}
 	return nil
 }
@@ -73,7 +69,7 @@ func (m *Manager) Close() error {
 		m.logger.Trace("close ", name)
 		startTime := time.Now()
 		monitor.Start("close ", name)
-		err = E.Append(err, provider.Close(), func(err error) error {
+		err = E.Append(err, common.Close(provider), func(err error) error {
 			return E.Cause(err, "close ", name)
 		})
 		monitor.Finish()
@@ -111,9 +107,10 @@ func (m *Manager) Remove(tag string) error {
 	}
 	m.providers = append(m.providers[:index], m.providers[index+1:]...)
 	started := m.started
+	scope := m.scope
 	m.access.Unlock()
 	if started {
-		return provider.Close()
+		return scope.Remove(provider)
 	}
 	return nil
 }
@@ -128,18 +125,16 @@ func (m *Manager) Create(ctx context.Context, logger log.ContextLogger, tag stri
 	if m.started {
 		name := "certificate-provider/" + provider.Type() + "[" + provider.Tag() + "]"
 		for _, stage := range adapter.ListStartStages {
-			m.logger.Trace(stage, " ", name)
-			startTime := time.Now()
-			err = adapter.LegacyStart(provider, stage)
+			err = m.scope.Start(name, provider, stage)
 			if err != nil {
-				return E.Cause(err, stage, " ", name)
+				_ = m.scope.Remove(provider)
+				return err
 			}
-			m.logger.Trace(stage, " ", name, " completed (", F.Seconds(time.Since(startTime).Seconds()), "s)")
 		}
 	}
 	if existsProvider, loaded := m.providerByTag[tag]; loaded {
 		if m.started {
-			err = existsProvider.Close()
+			err = m.scope.Remove(existsProvider)
 			if err != nil {
 				return E.Cause(err, "close certificate-provider/", existsProvider.Type(), "[", existsProvider.Tag(), "]")
 			}

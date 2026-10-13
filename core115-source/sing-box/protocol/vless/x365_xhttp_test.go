@@ -10,10 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sagernet/sing-box/adapter"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	M "github.com/sagernet/sing/common/metadata"
+	"github.com/stretchr/testify/require"
 )
 
 const referenceX365UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -43,7 +45,9 @@ func TestX365XHTTPOutboundRequestUserAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer outbound.(*Outbound).Close()
+	scope := adapter.NewScope(context.Background(), log.NewNOPFactory().NewLogger("test"))
+	require.NoError(t, scope.Start("vless", outbound.(*Outbound), adapter.StartStateInitialize))
+	defer scope.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	conn, err := outbound.DialContext(ctx, "tcp", M.ParseSocksaddr("example.com:443"))

@@ -322,9 +322,12 @@ func (t *Inbound) Tag() string {
 	return t.tag
 }
 
-func (t *Inbound) Start(stage adapter.StartStage) error {
+func (t *Inbound) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 	switch stage {
 	case adapter.StartStateInitialize:
+		if t.autoRedirect != nil {
+			scope.Add(t.autoRedirect.Close)
+		}
 		if t.tunOptions.DNSModeOrDefault() != tun.DNSModeDisabled && len(t.tunOptions.DNSAddress) == 0 {
 			inet4DNSAddress, _ := t.tunOptions.Inet4DNSAddress()
 			inet6DNSAddress, _ := t.tunOptions.Inet6DNSAddress()
@@ -395,10 +398,20 @@ func (t *Inbound) Start(stage adapter.StartStage) error {
 				t.routeExcludeAddressSet = routeExcludeAddressSet
 				t.routeAddressSetAccess.Unlock()
 				for _, routeRuleSet := range t.routeRuleSet {
-					t.routeRuleSetCallback = append(t.routeRuleSetCallback, routeRuleSet.RegisterCallback(t.updateRouteAddressSet))
+					callback := routeRuleSet.RegisterCallback(t.updateRouteAddressSet)
+					t.routeRuleSetCallback = append(t.routeRuleSetCallback, callback)
+					scope.Add(func() error {
+						routeRuleSet.UnregisterCallback(callback)
+						return nil
+					})
 				}
 				for _, routeExcludeRuleSet := range t.routeExcludeRuleSet {
-					t.routeExcludeRuleSetCallback = append(t.routeExcludeRuleSetCallback, routeExcludeRuleSet.RegisterCallback(t.updateRouteAddressSet))
+					callback := routeExcludeRuleSet.RegisterCallback(t.updateRouteAddressSet)
+					t.routeExcludeRuleSetCallback = append(t.routeExcludeRuleSetCallback, callback)
+					scope.Add(func() error {
+						routeExcludeRuleSet.UnregisterCallback(callback)
+						return nil
+					})
 				}
 			}
 		}
@@ -439,14 +452,13 @@ func (t *Inbound) Start(stage adapter.StartStage) error {
 		if err != nil {
 			return E.Cause(err, "configure tun interface")
 		}
+		scope.Add(tunInterface.Close)
 		t.logger.Trace("creating stack")
 		t.tunIf = tunInterface
 		if t.platformInterface != nil {
 			err = t.platformInterface.ProcessPlatformOptions(t.platformOptions)
 			if err != nil {
-				closeError := t.tunIf.Close()
-				t.tunIf = nil
-				return E.Errors(E.Cause(err, "process platform options"), closeError)
+				return E.Cause(err, "process platform options")
 			}
 		}
 		var includeAllNetworks bool
@@ -471,6 +483,7 @@ func (t *Inbound) Start(stage adapter.StartStage) error {
 		if err != nil {
 			return err
 		}
+		scope.Add(tunStack.Close)
 		t.tunStack = tunStack
 		t.logger.Info("started at ", t.tunOptions.Name)
 	case adapter.StartStatePostStart:
@@ -526,14 +539,6 @@ func (t *Inbound) InterfaceUpdated(ctx context.Context) {
 	if tunStack != nil {
 		tunStack.ResetNetwork()
 	}
-}
-
-func (t *Inbound) Close() error {
-	return common.Close(
-		t.tunStack,
-		t.tunIf,
-		t.autoRedirect,
-	)
 }
 
 func (t *Inbound) JudgeFlow(network uint8, source netip.AddrPort, destination netip.AddrPort, firstPacket []byte) tun.FlowVerdict {

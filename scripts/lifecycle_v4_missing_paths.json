@@ -1,0 +1,6 @@
+﻿[
+  "protocol/masque/client.go",
+  "protocol/masque/server.go",
+  "protocol/tailscale/tailcat_inbound.go",
+  "protocol/tailscale/tailcat_outbound.go"
+]

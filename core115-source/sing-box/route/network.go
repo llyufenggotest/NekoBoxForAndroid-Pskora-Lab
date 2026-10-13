@@ -37,44 +37,45 @@ import (
 var _ adapter.NetworkManager = (*NetworkManager)(nil)
 
 type NetworkManager struct {
-	ctx                      context.Context
-	logger                   logger.ContextLogger
-	router                   adapter.Router
-	interfaceFinder          *control.DefaultInterfaceFinder
-	networkInterfaces        common.TypedValue[[]adapter.NetworkInterface]
-	autoDetectInterface      bool
-	defaultOptions           adapter.NetworkOptions
-	autoRedirectOutputMark   uint32
-	networkMonitor           tun.NetworkUpdateMonitor
-	interfaceMonitor         tun.DefaultInterfaceMonitor
-	packageManager           tun.PackageManager
-	powerListener            winpowrprof.EventListener
-	pauseManager             pause.Manager
-	platformInterface        adapter.PlatformInterface
-	connectionManager        adapter.ConnectionManager
-	connectionManagerAccess  sync.RWMutex
-	endpoint                 adapter.EndpointManager
-	inbound                  adapter.InboundManager
-	outbound                 adapter.OutboundManager
-	needWIFIState            bool
-	wifiMonitor              settings.WIFIMonitor
-	wifiState                adapter.WIFIState
-	networkEnvironment       uint64
-	stateAccess              sync.RWMutex
-	environmentUpdateAccess  sync.Mutex
-	environmentUpdateTimer   *time.Timer
-	interfaceUpdateAccess    sync.Mutex
-	interfaceUpdateCancel    context.CancelFunc
-	interfaceUpdateRunAccess sync.Mutex
-	powerUpdateAccess        sync.Mutex
-	powerUpdateCancel        context.CancelFunc
-	tunRecoveryAccess        sync.Mutex
-	tunRecoveryCancel        context.CancelFunc
-	recoveryStateAccess      sync.Mutex
-	recoveryOfflinePending   bool
-	recoveryOfflineEpoch     uint64
-	recoveryEpoch            atomic.Uint64
-	started                  atomic.Bool
+	ctx                     context.Context
+	logger                  logger.ContextLogger
+	router                  adapter.Router
+	interfaceFinder         *control.DefaultInterfaceFinder
+	networkInterfaces       common.TypedValue[[]adapter.NetworkInterface]
+	autoDetectInterface     bool
+	defaultOptions          adapter.NetworkOptions
+	autoRedirectOutputMark  uint32
+	networkMonitor          tun.NetworkUpdateMonitor
+	interfaceMonitor        tun.DefaultInterfaceMonitor
+	packageManager          tun.PackageManager
+	powerListener           winpowrprof.EventListener
+	pauseManager            pause.Manager
+	platformInterface       adapter.PlatformInterface
+	connectionManager       adapter.ConnectionManager
+	connectionManagerAccess sync.RWMutex
+	endpoint                adapter.EndpointManager
+	inbound                 adapter.InboundManager
+	outbound                adapter.OutboundManager
+	needWIFIState           bool
+	wifiMonitor             settings.WIFIMonitor
+	wifiState               adapter.WIFIState
+	networkEnvironment      uint64
+	stateAccess             sync.RWMutex
+	environmentUpdateAccess sync.Mutex
+	environmentUpdateTimer  *time.Timer
+	interfaceUpdateAccess   sync.Mutex
+	interfaceUpdateCancel   context.CancelFunc
+	resetRunAccess          sync.Mutex
+	powerUpdateAccess       sync.Mutex
+	powerUpdateCancel       context.CancelFunc
+	tunRecoveryAccess       sync.Mutex
+	tunRecoveryCancel       context.CancelFunc
+	recoveryStateAccess     sync.Mutex
+	recoveryOfflinePending  bool
+	recoveryOfflineEpoch    uint64
+	recoveryEpoch           atomic.Uint64
+	started                 atomic.Bool
+	startFailure            func(string) error
 }
 
 func NewNetworkManager(ctx context.Context, logger logger.ContextLogger, options option.RouteOptions, dnsOptions option.DNSOptions) (*NetworkManager, error) {
@@ -144,12 +145,10 @@ func NewNetworkManager(ctx context.Context, logger logger.ContextLogger, options
 			if err != nil {
 				return nil, E.New("auto_detect_interface unsupported on current platform")
 			}
-			interfaceMonitor.RegisterCallback(nm.notifyInterfaceUpdate)
 			nm.interfaceMonitor = interfaceMonitor
 		}
 	} else {
 		interfaceMonitor := nm.platformInterface.CreateDefaultInterfaceMonitor(logger)
-		interfaceMonitor.RegisterCallback(nm.notifyInterfaceUpdate)
 		nm.interfaceMonitor = interfaceMonitor
 	}
 	return nm, nil
@@ -172,11 +171,19 @@ func (r *NetworkManager) generationManager() (TUNTCPGenerationManager, bool) {
 	return manager, loaded
 }
 
-func (r *NetworkManager) Start(stage adapter.StartStage) error {
+func (r *NetworkManager) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 	monitor := taskmonitor.New(r.logger, C.StartTimeout)
 	switch stage {
 	case adapter.StartStateInitialize:
 		r.router = service.FromContext[adapter.Router](r.ctx)
+		scope.Add(func() error {
+			r.environmentUpdateAccess.Lock()
+			if r.environmentUpdateTimer != nil {
+				r.environmentUpdateTimer.Stop()
+			}
+			r.environmentUpdateAccess.Unlock()
+			return nil
+		})
 		if r.networkMonitor != nil {
 			monitor.Start("initialize network monitor")
 			err := r.networkMonitor.Start()
@@ -184,6 +191,7 @@ func (r *NetworkManager) Start(stage adapter.StartStage) error {
 			if err != nil {
 				return err
 			}
+			scope.Add(r.networkMonitor.Close)
 		}
 		if r.interfaceMonitor != nil {
 			monitor.Start("initialize interface monitor")
@@ -191,6 +199,17 @@ func (r *NetworkManager) Start(stage adapter.StartStage) error {
 			monitor.Finish()
 			if err != nil {
 				return err
+			}
+			scope.Add(r.interfaceMonitor.Close)
+			interfaceUpdateElement := r.interfaceMonitor.RegisterCallback(r.notifyInterfaceUpdate)
+			scope.Add(func() error {
+				r.interfaceMonitor.UnregisterCallback(interfaceUpdateElement)
+				return nil
+			})
+			if r.startFailure != nil {
+				if err = r.startFailure("interface-monitor-callback"); err != nil {
+					return err
+				}
 			}
 		}
 	case adapter.StartStateStart:
@@ -209,6 +228,7 @@ func (r *NetworkManager) Start(stage adapter.StartStage) error {
 			if err != nil {
 				return E.Cause(err, "start power listener")
 			}
+			scope.Add(r.powerListener.Close)
 		}
 		if C.IsAndroid && r.platformInterface == nil {
 			monitor.Start("initialize package manager")
@@ -227,6 +247,7 @@ func (r *NetworkManager) Start(stage adapter.StartStage) error {
 				r.logger.Warn("initialize package manager: ", err)
 			} else {
 				r.packageManager = packageManager
+				scope.Add(packageManager.Close)
 			}
 		}
 	case adapter.StartStatePostStart:
@@ -238,12 +259,18 @@ func (r *NetworkManager) Start(stage adapter.StartStage) error {
 				}
 			} else {
 				r.wifiMonitor = wifiMonitor
+				scope.Add(wifiMonitor.Close)
 				err = r.wifiMonitor.Start()
 				if err != nil {
 					r.logger.Warn(E.Cause(err, "start WIFI monitor"))
 				}
 			}
 		}
+		scope.Add(func() error {
+			r.resetRunAccess.Lock()
+			defer r.resetRunAccess.Unlock()
+			return nil
+		})
 		r.started.Store(true)
 	}
 	return nil
@@ -611,8 +638,8 @@ func (r *NetworkManager) notifyInterfaceUpdate(defaultInterface *control.Interfa
 
 func (r *NetworkManager) updateInterface(ctx context.Context, defaultInterface *control.Interface, resetNetwork bool, tunGeneration uint64) {
 	epoch := r.recoveryEpoch.Load()
-	r.interfaceUpdateRunAccess.Lock()
-	defer r.interfaceUpdateRunAccess.Unlock()
+	r.resetRunAccess.Lock()
+	defer r.resetRunAccess.Unlock()
 	if ctx.Err() != nil {
 		return
 	}

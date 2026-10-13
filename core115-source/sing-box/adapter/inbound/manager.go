@@ -22,6 +22,7 @@ type Manager struct {
 	access       sync.Mutex
 	started      bool
 	stage        adapter.StartStage
+	scope        *adapter.Scope
 	inbounds     []adapter.Inbound
 	inboundByTag map[string]adapter.Inbound
 }
@@ -35,22 +36,18 @@ func NewManager(logger log.ContextLogger, registry adapter.InboundRegistry, endp
 	}
 }
 
-func (m *Manager) Start(stage adapter.StartStage) error {
+func (m *Manager) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 	m.access.Lock()
-	if m.started && m.stage >= stage {
-		panic("already started")
-	}
 	m.started = true
 	m.stage = stage
+	m.scope = scope
 	inbounds := m.inbounds
 	m.access.Unlock()
 	for _, inbound := range inbounds {
 		name := "inbound/" + inbound.Type() + "[" + inbound.Tag() + "]"
-		done := adapter.LogElapsed(m.logger, stage, " ", name)
-		err := adapter.LegacyStart(inbound, stage)
-		done()
+		err := scope.Start(name, inbound, stage)
 		if err != nil {
-			return E.Cause(err, stage, " ", name)
+			return err
 		}
 	}
 	return nil
@@ -71,7 +68,7 @@ func (m *Manager) Close() error {
 		name := "inbound/" + inbound.Type() + "[" + inbound.Tag() + "]"
 		done := adapter.LogElapsed(m.logger, "close ", name)
 		monitor.Start("close ", name)
-		err = E.Append(err, inbound.Close(), func(err error) error {
+		err = E.Append(err, common.Close(inbound), func(err error) error {
 			return E.Cause(err, "close ", name)
 		})
 		monitor.Finish()
@@ -112,9 +109,10 @@ func (m *Manager) Remove(tag string) error {
 	}
 	m.inbounds = append(m.inbounds[:index], m.inbounds[index+1:]...)
 	started := m.started
+	scope := m.scope
 	m.access.Unlock()
 	if started {
-		return inbound.Close()
+		return scope.Remove(inbound)
 	}
 	return nil
 }
@@ -129,17 +127,16 @@ func (m *Manager) Create(ctx context.Context, router adapter.Router, logger log.
 	if m.started {
 		name := "inbound/" + inbound.Type() + "[" + inbound.Tag() + "]"
 		for _, stage := range adapter.ListStartStages {
-			done := adapter.LogElapsed(m.logger, stage, " ", name)
-			err = adapter.LegacyStart(inbound, stage)
-			done()
+			err = m.scope.Start(name, inbound, stage)
 			if err != nil {
-				return E.Cause(err, stage, " ", name)
+				_ = m.scope.Remove(inbound)
+				return err
 			}
 		}
 	}
 	if existsInbound, loaded := m.inboundByTag[tag]; loaded {
 		if m.started {
-			err = existsInbound.Close()
+			err = m.scope.Remove(existsInbound)
 			if err != nil {
 				return E.Cause(err, "close inbound/", existsInbound.Type(), "[", existsInbound.Tag(), "]")
 			}

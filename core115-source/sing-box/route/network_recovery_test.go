@@ -59,8 +59,8 @@ func TestRecoveryContextSurvivesDispatchUntilNextNetwork(t *testing.T) {
 			t.Fatal("missing recovery dispatch")
 		}
 		<-router.resets
-		r.interfaceUpdateRunAccess.Lock()
-		r.interfaceUpdateRunAccess.Unlock()
+		r.resetRunAccess.Lock()
+		r.resetRunAccess.Unlock()
 		if got.Err() != nil {
 			t.Fatalf("%s recovery context canceled as soon as dispatch returned: %v", intf.Name, got.Err())
 		}

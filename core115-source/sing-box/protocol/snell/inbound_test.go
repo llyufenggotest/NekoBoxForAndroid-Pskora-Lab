@@ -120,7 +120,7 @@ func TestSnellInboundStartsQUICProxyListener(t *testing.T) {
 			require.NoError(t, err)
 			inbound := created.(*Inbound)
 			t.Cleanup(func() { require.NoError(t, inbound.Close()) })
-			require.NoError(t, inbound.Start(adapter.StartStateStart))
+			require.NoError(t, inbound.Start(adapter.StartStateStart, adapter.NewScope(context.Background(), log.NewNOPFactory().NewLogger("test"))))
 			require.NotNil(t, inbound.listener.TCPListener())
 			require.NotNil(t, inbound.listener.UDPConn())
 		})
