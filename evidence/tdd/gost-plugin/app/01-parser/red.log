@@ -1,0 +1,257 @@
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors
+> Task :buildSrc:compileKotlin UP-TO-DATE
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:pluginDescriptors UP-TO-DATE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :app:buildHevTun
+> Task :app:verifyBundledGeoAssets
+
+> Task :app:verifyBundledNativeCore
+{
+  "status": "PASS",
+  "aar_sha256": "d926cb816b561e72504e8603b8a8eaf9361d510277383a379932c1198366669c",
+  "attested_aar_sha256": "933d2030622e1d365bb7bc10fe871cde371653ccdc77892c98ec615ce15a1ae9",
+  "aar_content_sha256": "74c60cfbb8608bbd820e93e908bcc7270c0ea492f8be97bcd17395a957316331",
+  "abis": [
+    "arm64-v8a"
+  ],
+  "apk": null,
+  "scope": "canonical AAR content/binary identity/static protocol evidence only; no live network verification"
+}
+
+> Task :app:preBuild
+> Task :app:preOssDebugBuild
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:dataBindingMergeDependencyArtifactsOssDebug
+> Task :app:generateOssDebugResValues
+> Task :app:extractOssDebugSupportedLocales
+> Task :app:compileOssDebugAidl
+> Task :app:generateOssDebugResources
+> Task :app:generateOssDebugLocaleConfig
+> Task :app:generateOssDebugBuildConfig
+
+> Task :app:mergeOssDebugResources
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml:32:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml:159:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml:585:4: Multiple substitutions specified in non-positional format of string resource string/please_update. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml:587:4: Multiple substitutions specified in non-positional format of string resource string/please_update_force. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml:474:4: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml:427:4: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml:407:4: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-in\strings.xml:80:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-in\strings.xml:193:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-nb-rNO\strings.xml:69:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-nb-rNO\strings.xml:253:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-nb-rNO\strings.xml:168:4: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-nb-rNO\strings.xml:82:4: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-nb-rNO\strings.xml:135:4: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rHK\strings.xml:8:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\tools\gradle-home\caches\8.10.2\transforms\8f459ecc6be4ce0a9dcf800015ea1330\transformed\material-1.8.0\res\values-zh-rHK\values-zh-rHK.xml:16:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-be\strings.xml:96:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-be\strings.xml:12:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ja\strings.xml:36:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ja\strings.xml:138:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ja\strings.xml:463:4: Multiple substitutions specified in non-positional format of string resource string/please_update. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ja\strings.xml:273:4: Multiple substitutions specified in non-positional format of string resource string/please_update_force. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ja\strings.xml:276:4: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ja\strings.xml:402:4: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ja\strings.xml:329:4: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ru\strings.xml:211:0: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ru\strings.xml:215:0: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ru\strings.xml:584:4: Multiple substitutions specified in non-positional format of string resource string/please_update. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ru\strings.xml:321:0: Multiple substitutions specified in non-positional format of string resource string/please_update_force. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ru\strings.xml:326:0: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ru\strings.xml:345:0: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ru\strings.xml:449:0: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-fa\strings.xml:30:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-fa\strings.xml:128:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-fa\strings.xml:493:4: Multiple substitutions specified in non-positional format of string resource string/please_update. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-fa\strings.xml:287:4: Multiple substitutions specified in non-positional format of string resource string/please_update_force. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-fa\strings.xml:290:4: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-fa\strings.xml:429:4: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-fa\strings.xml:348:4: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-uk\strings.xml:30:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-uk\strings.xml:120:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-uk\strings.xml:467:4: Multiple substitutions specified in non-positional format of string resource string/please_update. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-uk\strings.xml:283:4: Multiple substitutions specified in non-positional format of string resource string/please_update_force. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-uk\strings.xml:286:4: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-uk\strings.xml:411:4: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-uk\strings.xml:338:4: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-es\strings.xml:27:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-es\strings.xml:116:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-es\strings.xml:262:4: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-es\strings.xml:393:4: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-es\strings.xml:314:4: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rCN\strings.xml:21:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rCN\strings.xml:210:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rCN\strings.xml:467:4: Multiple substitutions specified in non-positional format of string resource string/please_update. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rCN\strings.xml:168:4: Multiple substitutions specified in non-positional format of string resource string/please_update_force. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rCN\strings.xml:396:4: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rCN\strings.xml:439:4: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rCN\strings.xml:327:4: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ar\strings.xml:20:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ar\strings.xml:50:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ar\strings.xml:307:4: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ar\strings.xml:11:4: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ar\strings.xml:261:4: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ko\strings.xml:26:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ko\strings.xml:131:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ko\strings.xml:457:4: Multiple substitutions specified in non-positional format of string resource string/please_update. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ko\strings.xml:267:4: Multiple substitutions specified in non-positional format of string resource string/please_update_force. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ko\strings.xml:270:4: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ko\strings.xml:396:4: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-ko\strings.xml:323:4: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-tr\strings.xml:67:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-tr\strings.xml:356:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-tr\strings.xml:259:4: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-tr\strings.xml:382:4: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-tr\strings.xml:215:4: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rTW\strings.xml:18:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rTW\strings.xml:177:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rTW\strings.xml:481:4: Multiple substitutions specified in non-positional format of string resource string/please_update. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rTW\strings.xml:161:4: Multiple substitutions specified in non-positional format of string resource string/please_update_force. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rTW\strings.xml:164:4: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rTW\strings.xml:405:4: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-zh-rTW\strings.xml:313:4: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-fr\strings.xml:55:4: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-fr\strings.xml:243:4: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-fr\strings.xml:73:4: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values-fr\strings.xml:232:4: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+
+> Task :app:mapOssDebugSourceSetPaths
+> Task :app:createOssDebugCompatibleScreenManifests
+> Task :app:checkOssDebugAarMetadata
+> Task :app:extractDeepLinksOssDebug
+> Task :app:processOssDebugMainManifest
+> Task :app:dataBindingGenBaseClassesOssDebug
+> Task :app:processOssDebugManifest
+> Task :app:preOssDebugUnitTestBuild
+> Task :app:javaPreCompileOssDebugUnitTest
+> Task :app:mergeOssDebugShaders
+> Task :app:compileOssDebugShaders NO-SOURCE
+> Task :app:generateOssDebugAssets UP-TO-DATE
+> Task :app:mergeOssDebugAssets
+> Task :app:processOssDebugManifestForPackage
+> Task :app:javaPreCompileOssDebug
+> Task :app:processOssDebugResources
+> Task :app:packageOssDebugUnitTestForUnitTest
+> Task :app:generateOssDebugUnitTestConfig
+> Task :app:kspOssDebugKotlin
+> Task :app:compileOssDebugKotlin
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/com/github/shadowsocks/plugin/fragment/AlertDialogFragment.kt:29:85 'fun <T : Parcelable!> getParcelable(p0: String?): T?' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/com/github/shadowsocks/plugin/fragment/AlertDialogFragment.kt:39:52 'fun <T : Parcelable!> getParcelable(p0: String?): T?' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/bg/GuardedProcessPool.kt:118:22 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/bg/ServiceNotification.kt:217:34 'fun stopForeground(p0: Boolean): Unit' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/bg/proto/BoxInstance.kt:286:56 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/database/preference/PublicDatabase.kt:23:37 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/group/GroupUpdater.kt:44:26 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/group/GroupUpdater.kt:61:28 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ktx/Asyncs.kt:14:5 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ktx/Asyncs.kt:23:5 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ktx/Asyncs.kt:29:5 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ktx/Asyncs.kt:36:9 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ktx/Utils.kt:97:64 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ktx/Utils.kt:99:9 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/plugin/PluginManager.kt:89:76 'fun get(p0: String!): Any?' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/AppListActivity.kt:177:33 'fun launchWhenCreated(block: suspend CoroutineScope.() -> Unit): Job' is deprecated. launchWhenCreated is deprecated as it can lead to wasted resources in some cases. Replace with suspending repeatOnLifecycle to run the block whenever the Lifecycle state is at least Lifecycle.State.CREATED.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/AppManagerActivity.kt:183:33 'fun launchWhenCreated(block: suspend CoroutineScope.() -> Unit): Job' is deprecated. launchWhenCreated is deprecated as it can lead to wasted resources in some cases. Replace with suspending repeatOnLifecycle to run the block whenever the Lifecycle state is at least Lifecycle.State.CREATED.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/AppManagerActivity.kt:223:29 'fun setOnCheckedChangeListener(p0: ChipGroup.OnCheckedChangeListener?): Unit' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/AssetsActivity.kt:387:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/BackupFragment.kt:85:84 'constructor(): ActivityResultContracts.CreateDocument' is deprecated. Using a wildcard mime type with CreateDocument is not recommended as it breaks the automatic handling of file extensions. Instead, specify the mime type by using the constructor that takes an concrete mime type (e.g.., CreateDocument("image/png")).
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/BackupFragment.kt:119:66 'fun toLocaleString(): String!' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/BackupFragment.kt:134:60 'fun toLocaleString(): String!' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt:1126:9 'fun setHasOptionsMenu(p0: Boolean): Unit' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt:1237:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt:1239:15 'fun onPrepareOptionsMenu(p0: Menu): Unit' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt:2389:33 'fun <T : Parcelable!> getParcelable(p0: String?): T?' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt:3617:59 'constructor(): ActivityResultContracts.CreateDocument' is deprecated. Using a wildcard mime type with CreateDocument is not recommended as it breaks the automatic handling of file extensions. Instead, specify the mime type by using the constructor that takes an concrete mime type (e.g.., CreateDocument("image/png")).
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/GroupFragment.kt:166:59 'constructor(): ActivityResultContracts.CreateDocument' is deprecated. Using a wildcard mime type with CreateDocument is not recommended as it breaks the automatic handling of file extensions. Instead, specify the mime type by using the constructor that takes an concrete mime type (e.g.., CreateDocument("image/png")).
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt:501:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt:504:22 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/GroupSettingsActivity.kt:548:22 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/ProfileSelectActivity.kt:19:31 'fun <T : Parcelable!> getParcelableExtra(p0: String!): T?' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/RouteSettingsActivity.kt:303:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/RouteSettingsActivity.kt:306:22 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/RouteSettingsActivity.kt:355:22 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/SmartRouteActivity.kt:217:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/SmartRouteActivity.kt:219:31 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/profile/ConfigEditActivity.kt:168:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/profile/ConfigEditActivity.kt:170:60 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/profile/ProfileSettingsActivity.kt:177:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/profile/ProfileSettingsActivity.kt:179:60 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/profile/ProfileSettingsActivity.kt:258:22 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/utils/CrashHandler.kt:136:57 Java type mismatch: inferred type is 'kotlin.String?', but 'kotlin.CharSequence' was expected.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/utils/CrashHandler.kt:138:27 Java type mismatch: inferred type is 'kotlin.String?', but 'kotlin.String' was expected.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/utils/CrashHandler.kt:139:29 Java type mismatch: inferred type is 'kotlin.String?', but 'kotlin.String' was expected.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/utils/CrashHandler.kt:140:25 Condition is always 'true'.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/utils/CrashHandler.kt:140:40 Condition is always 'true'.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/utils/DefaultNetworkListener.kt:34:32 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/utils/DefaultNetworkListener.kt:34:44 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ObsoleteCoroutinesApi' or '@OptIn(kotlinx.coroutines.ObsoleteCoroutinesApi::class)'
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/utils/DefaultNetworkListener.kt:38:25 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ObsoleteCoroutinesApi' or '@OptIn(kotlinx.coroutines.ObsoleteCoroutinesApi::class)'
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/utils/LanAddressProvider.kt:14:13 'val allNetworks: (Array<Network!>..Array<out Network!>)' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/utils/Subnet.kt:63:67 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'kotlin.String?'.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/widget/ServiceButton.kt:65:75 'fun launchWhenStarted(block: suspend CoroutineScope.() -> Unit): Job' is deprecated. launchWhenStarted is deprecated as it can lead to wasted resources in some cases. Replace with suspending repeatOnLifecycle to run the block whenever the Lifecycle state is at least Lifecycle.State.STARTED.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/widget/StatsBar.kt:248:22 'suspend fun <T> LifecycleOwner.whenStarted(block: suspend CoroutineScope.() -> T): T' is deprecated. whenStarted has been deprecated because it runs the block on a pausing dispatcher that suspends, rather than cancels work when the lifecycle state goes below the given state. Use withStarted for non-suspending work that needs to run only once when the Lifecycle changes.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/moe/matsuri/nb4a/AndroidNetworkMonitor.kt:141:32 'val allNetworks: (Array<Network!>..Array<out Network!>)' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/moe/matsuri/nb4a/NativeInterface.kt:79:42 'val connectionInfo: WifiInfo!' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/moe/matsuri/nb4a/TempDatabase.kt:20:37 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+
+> Task :app:compileOssDebugJavaWithJavac
+Java compiler version 21 has deprecated support for compiling with source/target version 8.
+Try one of the following options:
+    1. [Recommended] Use Java toolchain with a lower language version
+    2. Set a higher source/target version
+    3. Use a lower version of the JDK running the build (if you're not using Java toolchain)
+For more details on how to configure these settings, see https://developer.android.com/build/jdks.
+To suppress this warning, set android.javaCompile.suppressSourceTargetDeprecationWarning=true in gradle.properties.
+警告: [options] 源值 8 已过时，将在未来发行版中删除
+警告: [options] 目标值 8 已过时，将在未来发行版中删除
+警告: [options] 要隐藏有关已过时选项的警告, 请使用 -Xlint:-options。
+注: F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\java\moe\matsuri\nb4a\SingBoxOptions.java使用了未经检查或不安全的操作。
+注: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+3 个警告
+
+> Task :app:processOssDebugJavaRes
+> Task :app:bundleOssDebugClassesToRuntimeJar
+> Task :app:bundleOssDebugClassesToCompileJar
+> Task :app:kspOssDebugUnitTestKotlin
+
+> Task :app:compileOssDebugUnitTestKotlin FAILED
+e: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/test/java/io/nekohasekai/sagernet/fmt/shadowsocks/GostPluginRoundTripTest.kt:16:22 Unresolved reference 'GostPluginOptions'.
+e: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/test/java/io/nekohasekai/sagernet/fmt/shadowsocks/GostPluginRoundTripTest.kt:20:62 Unresolved reference 'GostPluginOptions'.
+e: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/test/java/io/nekohasekai/sagernet/fmt/shadowsocks/GostPluginRoundTripTest.kt:21:62 Unresolved reference 'GostPluginOptions'.
+e: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/test/java/io/nekohasekai/sagernet/fmt/shadowsocks/GostPluginRoundTripTest.kt:22:62 Unresolved reference 'GostPluginOptions'.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileOssDebugUnitTestKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 2m 49s
+38 actionable tasks: 35 executed, 3 up-to-date

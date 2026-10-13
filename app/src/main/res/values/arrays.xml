@@ -640,6 +640,17 @@
         <item></item>
         <item>obfs-local</item>
         <item>v2ray-plugin</item>
+        <item>gost-plugin</item>
+    </string-array>
+
+    <string-array name="gost_plugin_modes" translatable="false">
+        <item>WebSocket</item>
+        <item>Multiplexed WebSocket</item>
+    </string-array>
+
+    <string-array name="gost_plugin_mode_values" translatable="false">
+        <item>ws</item>
+        <item>mws</item>
     </string-array>
 
     <string-array name="log_level" translatable="false">

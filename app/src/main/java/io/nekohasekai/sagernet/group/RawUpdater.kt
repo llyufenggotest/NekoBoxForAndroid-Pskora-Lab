@@ -13,6 +13,7 @@ import io.nekohasekai.sagernet.fmt.oppa.parseOppaProvider
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1Json
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
+import io.nekohasekai.sagernet.fmt.shadowsocks.buildGostPlugin
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
 import io.nekohasekai.sagernet.fmt.shadowsocksr.ShadowsocksRBean
 import io.nekohasekai.sagernet.fmt.shadowsocksr.parseShadowsocksR
@@ -736,28 +737,31 @@ object RawUpdater : GroupUpdater() {
 
                         "ss" -> {
                             val ssPlugin = mutableListOf<String>()
-                            if (proxy.contains("plugin")) {
-                                val opts = proxy["plugin-opts"] as Map<String, Any?>
-                                when (proxy["plugin"]) {
-                                    "obfs" -> {
-                                        ssPlugin.apply {
-                                            add("obfs-local")
-                                            add("obfs=" + (opts["mode"]?.toString() ?: ""))
-                                            add("obfs-host=" + (opts["host"]?.toString() ?: ""))
-                                        }
-                                    }
-
-                                    "v2ray-plugin" -> {
-                                        ssPlugin.apply {
-                                            add("v2ray-plugin")
-                                            add("mode=" + (opts["mode"]?.toString() ?: ""))
-                                            if (opts["mode"]?.toString() == "true") add("tls")
-                                            add("host=" + (opts["host"]?.toString() ?: ""))
-                                            add("path=" + (opts["path"]?.toString() ?: ""))
-                                            if (opts["mux"]?.toString() == "true") add("mux=8")
-                                        }
+                            val pluginName = proxy["plugin"]?.toString()
+                            val pluginOptions = proxy["plugin-opts"]
+                            when (pluginName) {
+                                "obfs" -> {
+                                    val opts = pluginOptions as? Map<*, *> ?: emptyMap<Any?, Any?>()
+                                    ssPlugin.apply {
+                                        add("obfs-local")
+                                        add("obfs=" + (opts["mode"]?.toString() ?: ""))
+                                        add("obfs-host=" + (opts["host"]?.toString() ?: ""))
                                     }
                                 }
+
+                                "v2ray-plugin" -> {
+                                    val opts = pluginOptions as? Map<*, *> ?: emptyMap<Any?, Any?>()
+                                    ssPlugin.apply {
+                                        add("v2ray-plugin")
+                                        add("mode=" + (opts["mode"]?.toString() ?: ""))
+                                        if (opts["mode"]?.toString() == "true") add("tls")
+                                        add("host=" + (opts["host"]?.toString() ?: ""))
+                                        add("path=" + (opts["path"]?.toString() ?: ""))
+                                        if (opts["mux"]?.toString() == "true") add("mux=8")
+                                    }
+                                }
+
+                                "gost-plugin" -> ssPlugin.add(buildGostPlugin(pluginOptions))
                             }
                             proxies.add(ShadowsocksBean().apply {
                                 serverAddress = proxy["server"] as String

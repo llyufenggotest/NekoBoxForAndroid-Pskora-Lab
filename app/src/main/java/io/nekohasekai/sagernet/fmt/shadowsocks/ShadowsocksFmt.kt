@@ -116,10 +116,16 @@ fun buildSingBoxOutboundShadowsocksBean(bean: ShadowsocksBean): SingBoxOptions.O
         method = bean.method
         if (bean.plugin.isNotBlank()) {
             plugin = bean.plugin.substringBefore(";")
-            plugin_opts = bean.plugin.substringAfter(";")
+            plugin_opts = bean.plugin.substringAfter(";", "").ifBlank { null }
             if (plugin == "none") {
                 plugin = null
                 plugin_opts = null
+            }
+        }
+        if (bean.sUoT == true) {
+            udp_over_tcp = SingBoxOptions.UDPOverTCPOptions().apply {
+                enabled = true
+                version = 2
             }
         }
     }

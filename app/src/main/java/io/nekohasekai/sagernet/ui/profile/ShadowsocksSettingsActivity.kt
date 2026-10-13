@@ -28,6 +28,16 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
         pbm.add(PreferenceBinding(Type.Text, "pluginName").apply { disable = true })
     private val pluginConfig =
         pbm.add(PreferenceBinding(Type.Text, "pluginConfig").apply { disable = true })
+    private val gostPluginMode =
+        pbm.add(PreferenceBinding(Type.Text, "gostPluginMode").apply { disable = true })
+    private val gostPluginHost =
+        pbm.add(PreferenceBinding(Type.Text, "gostPluginHost").apply { disable = true })
+    private val gostPluginPath =
+        pbm.add(PreferenceBinding(Type.Text, "gostPluginPath").apply { disable = true })
+    private val gostPluginTls =
+        pbm.add(PreferenceBinding(Type.Bool, "gostPluginTls").apply { disable = true })
+    private val gostPluginMux =
+        pbm.add(PreferenceBinding(Type.Text, "gostPluginMux").apply { disable = true })
     private val sUoT = pbm.add(PreferenceBinding(Type.Bool, "sUoT"))
     private val enableMux = pbm.add(PreferenceBinding(Type.Bool, "enableMux"))
     private val muxType = pbm.add(PreferenceBinding(Type.TextToInt, "muxType"))
@@ -43,8 +53,17 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
     override fun ShadowsocksBean.init() {
         pbm.writeToCacheAll(this)
 
-        DataStore.profileCacheStore.putString("pluginName", plugin.substringBefore(";"))
-        DataStore.profileCacheStore.putString("pluginConfig", plugin.substringAfter(";"))
+        val pluginName = plugin.substringBefore(";")
+        val state = GostPluginUiState.fromPlugin(plugin)
+        DataStore.profileCacheStore.putString("pluginName", pluginName)
+        DataStore.profileCacheStore.putString("pluginConfig", plugin.substringAfter(";", ""))
+        if (state.enabled) {
+            DataStore.profileCacheStore.putString("gostPluginMode", state.mode)
+            DataStore.profileCacheStore.putString("gostPluginHost", state.host)
+            DataStore.profileCacheStore.putString("gostPluginPath", state.path)
+            DataStore.profileCacheStore.putBoolean("gostPluginTls", state.tls)
+            DataStore.profileCacheStore.putString("gostPluginMux", state.mux)
+        }
     }
 
     override fun ShadowsocksBean.serialize() {
@@ -52,7 +71,22 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
 
         val pn = pluginName.readStringFromCache()
         val pc = pluginConfig.readStringFromCache()
-        plugin = if (pn.isNotBlank()) "$pn;$pc" else ""
+        plugin = if (pn == "gost-plugin") {
+            GostPluginUiState(
+                enabled = true,
+                originalPlugin = "gost-plugin;$pc",
+                rawOptions = pc,
+                mode = gostPluginMode.readStringFromCache().ifBlank { "ws" },
+                host = gostPluginHost.readStringFromCache(),
+                path = gostPluginPath.readStringFromCache(),
+                tls = gostPluginTls.readBoolFromCache(),
+                mux = gostPluginMux.readStringFromCache(),
+            ).toPlugin(pn)
+        } else if (pn.isNotBlank()) {
+            if (pc.isBlank()) pn else "$pn;$pc"
+        } else {
+            ""
+        }
     }
 
     override fun PreferenceFragmentCompat.createPreferences(
@@ -69,6 +103,26 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
         password.preference.apply {
             this as EditTextPreference
             summaryProvider = PasswordSummaryProvider
+        }
+
+        val preferenceFragment = this
+        val selectedPlugin = pluginName.readStringFromCache()
+        configureGostPluginPreferences(preferenceFragment, selectedPlugin)
+        pluginName.preference.apply {
+            this as SimpleMenuPreference
+            setOnPreferenceChangeListener { _, newValue ->
+                val plugin = newValue.toString()
+                configureGostPluginPreferences(preferenceFragment, plugin)
+                if (plugin == "gost-plugin") {
+                    val state = GostPluginUiState.fromPlugin("gost-plugin;${pluginConfig.readStringFromCache()}")
+                    DataStore.profileCacheStore.putString("gostPluginMode", state.mode)
+                    DataStore.profileCacheStore.putString("gostPluginHost", state.host)
+                    DataStore.profileCacheStore.putString("gostPluginPath", state.path)
+                    DataStore.profileCacheStore.putBoolean("gostPluginTls", state.tls)
+                    DataStore.profileCacheStore.putString("gostPluginMux", state.mux)
+                }
+                true
+            }
         }
 
         // Mux mode visibility control

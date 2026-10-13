@@ -1,0 +1,1 @@
+./gradlew.bat :app:testOssDebugUnitTest --tests *GostPluginYamlImportTest --tests *GostPluginRoundTripTest

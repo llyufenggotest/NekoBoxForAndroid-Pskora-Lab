@@ -1,0 +1,91 @@
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors
+> Task :buildSrc:compileKotlin UP-TO-DATE
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:pluginDescriptors UP-TO-DATE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :app:buildHevTun
+> Task :app:verifyBundledGeoAssets
+
+> Task :app:verifyBundledNativeCore
+{
+  "status": "PASS",
+  "aar_sha256": "d926cb816b561e72504e8603b8a8eaf9361d510277383a379932c1198366669c",
+  "attested_aar_sha256": "933d2030622e1d365bb7bc10fe871cde371653ccdc77892c98ec615ce15a1ae9",
+  "aar_content_sha256": "74c60cfbb8608bbd820e93e908bcc7270c0ea492f8be97bcd17395a957316331",
+  "abis": [
+    "arm64-v8a"
+  ],
+  "apk": null,
+  "scope": "canonical AAR content/binary identity/static protocol evidence only; no live network verification"
+}
+
+> Task :app:preBuild
+> Task :app:preOssDebugBuild
+> Task :app:compileOssDebugAidl UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:dataBindingMergeDependencyArtifactsOssDebug UP-TO-DATE
+> Task :app:generateOssDebugResValues UP-TO-DATE
+> Task :app:extractOssDebugSupportedLocales
+> Task :app:generateOssDebugLocaleConfig UP-TO-DATE
+> Task :app:generateOssDebugResources
+> Task :app:generateOssDebugBuildConfig UP-TO-DATE
+> Task :app:checkOssDebugAarMetadata UP-TO-DATE
+> Task :app:mapOssDebugSourceSetPaths
+> Task :app:createOssDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksOssDebug UP-TO-DATE
+> Task :app:processOssDebugMainManifest UP-TO-DATE
+> Task :app:processOssDebugManifest UP-TO-DATE
+> Task :app:processOssDebugManifestForPackage UP-TO-DATE
+> Task :app:javaPreCompileOssDebug UP-TO-DATE
+> Task :app:preOssDebugUnitTestBuild
+> Task :app:javaPreCompileOssDebugUnitTest UP-TO-DATE
+> Task :app:mergeOssDebugShaders UP-TO-DATE
+> Task :app:compileOssDebugShaders NO-SOURCE
+> Task :app:generateOssDebugAssets UP-TO-DATE
+> Task :app:mergeOssDebugAssets UP-TO-DATE
+
+> Task :app:mergeOssDebugResources
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml: Multiple substitutions specified in non-positional format of string resource string/group_status_proxies_subscription. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml: Multiple substitutions specified in non-positional format of string resource string/group_updated. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml: Multiple substitutions specified in non-positional format of string resource string/please_update. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml: Multiple substitutions specified in non-positional format of string resource string/please_update_force. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml: Multiple substitutions specified in non-positional format of string resource string/plugin_exists_but_on_shit_system. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml: Multiple substitutions specified in non-positional format of string resource string/profile_requiring_plugin. Did you mean to add the formatted="false" attribute?
+F:\pskora-lab\alpha12-migration\worktrees\gost-app\app\src\main\res\values\strings.xml: Multiple substitutions specified in non-positional format of string resource string/subscription_traffic. Did you mean to add the formatted="false" attribute?
+
+> Task :app:dataBindingGenBaseClassesOssDebug UP-TO-DATE
+> Task :app:processOssDebugResources
+> Task :app:packageOssDebugUnitTestForUnitTest
+> Task :app:generateOssDebugUnitTestConfig
+> Task :app:kspOssDebugKotlin
+
+> Task :app:compileOssDebugKotlin
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt:1126:9 'fun setHasOptionsMenu(p0: Boolean): Unit' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt:1237:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Please add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt:1239:15 'fun onPrepareOptionsMenu(p0: Menu): Unit' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt:2389:33 'fun <T : Parcelable!> getParcelable(p0: String?): T?' is deprecated. Deprecated in Java.
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app/app/src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt:3617:59 'constructor(): ActivityResultContracts.CreateDocument' is deprecated. Using a wildcard mime type with CreateDocument is not recommended as it breaks the automatic handling of file extensions. Instead, specify the mime type by using the constructor that takes an concrete mime type (e.g.., CreateDocument("image/png")).
+
+> Task :app:compileOssDebugJavaWithJavac UP-TO-DATE
+Java compiler version 21 has deprecated support for compiling with source/target version 8.
+Try one of the following options:
+    1. [Recommended] Use Java toolchain with a lower language version
+    2. Set a higher source/target version
+    3. Use a lower version of the JDK running the build (if you're not using Java toolchain)
+For more details on how to configure these settings, see https://developer.android.com/build/jdks.
+To suppress this warning, set android.javaCompile.suppressSourceTargetDeprecationWarning=true in gradle.properties.
+
+> Task :app:processOssDebugJavaRes
+> Task :app:bundleOssDebugClassesToCompileJar
+> Task :app:bundleOssDebugClassesToRuntimeJar
+> Task :app:kspOssDebugUnitTestKotlin
+> Task :app:compileOssDebugUnitTestKotlin
+> Task :app:compileOssDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processOssDebugUnitTestJavaRes
+> Task :app:testOssDebugUnitTest
+
+BUILD SUCCESSFUL in 38s
+40 actionable tasks: 20 executed, 20 up-to-date

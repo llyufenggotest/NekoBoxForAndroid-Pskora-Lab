@@ -470,13 +470,15 @@ fun buildConfig(
 
                 // internal & external
                 currentOutbound.apply {
-                    // udp over tcp
-                    try {
-                        val sUoT = bean.javaClass.getField("sUoT").get(bean)
-                        if (sUoT is Boolean && sUoT) {
-                            _hack_config_map["udp_over_tcp"] = true
+                    // UDP over TCP is emitted by protocol builders when they support it.
+                    if (bean !is ShadowsocksBean) {
+                        try {
+                            val sUoT = bean.javaClass.getField("sUoT").get(bean)
+                            if (sUoT is Boolean && sUoT) {
+                                _hack_config_map["udp_over_tcp"] = true
+                            }
+                        } catch (_: Exception) {
                         }
-                    } catch (_: Exception) {
                     }
 
                     // domain_strategy

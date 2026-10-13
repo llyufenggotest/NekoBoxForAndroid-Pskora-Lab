@@ -1,0 +1,67 @@
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors
+> Task :buildSrc:compileKotlin UP-TO-DATE
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:pluginDescriptors UP-TO-DATE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :app:buildHevTun
+> Task :app:verifyBundledGeoAssets
+
+> Task :app:verifyBundledNativeCore
+{
+  "status": "PASS",
+  "aar_sha256": "d926cb816b561e72504e8603b8a8eaf9361d510277383a379932c1198366669c",
+  "attested_aar_sha256": "933d2030622e1d365bb7bc10fe871cde371653ccdc77892c98ec615ce15a1ae9",
+  "aar_content_sha256": "74c60cfbb8608bbd820e93e908bcc7270c0ea492f8be97bcd17395a957316331",
+  "abis": [
+    "arm64-v8a"
+  ],
+  "apk": null,
+  "scope": "canonical AAR content/binary identity/static protocol evidence only; no live network verification"
+}
+
+> Task :app:preBuild
+> Task :app:preOssDebugBuild
+> Task :app:compileOssDebugAidl UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:dataBindingMergeDependencyArtifactsOssDebug UP-TO-DATE
+> Task :app:generateOssDebugResValues UP-TO-DATE
+> Task :app:extractOssDebugSupportedLocales UP-TO-DATE
+> Task :app:generateOssDebugLocaleConfig UP-TO-DATE
+> Task :app:generateOssDebugResources UP-TO-DATE
+> Task :app:mergeOssDebugResources UP-TO-DATE
+> Task :app:dataBindingGenBaseClassesOssDebug UP-TO-DATE
+> Task :app:generateOssDebugBuildConfig UP-TO-DATE
+> Task :app:checkOssDebugAarMetadata UP-TO-DATE
+> Task :app:mapOssDebugSourceSetPaths UP-TO-DATE
+> Task :app:createOssDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksOssDebug UP-TO-DATE
+> Task :app:processOssDebugMainManifest UP-TO-DATE
+> Task :app:processOssDebugManifest UP-TO-DATE
+> Task :app:processOssDebugManifestForPackage UP-TO-DATE
+> Task :app:processOssDebugResources UP-TO-DATE
+> Task :app:kspOssDebugKotlin UP-TO-DATE
+> Task :app:compileOssDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileOssDebug UP-TO-DATE
+> Task :app:compileOssDebugJavaWithJavac UP-TO-DATE
+> Task :app:bundleOssDebugClassesToRuntimeJar UP-TO-DATE
+> Task :app:bundleOssDebugClassesToCompileJar UP-TO-DATE
+> Task :app:kspOssDebugUnitTestKotlin UP-TO-DATE
+> Task :app:compileOssDebugUnitTestKotlin UP-TO-DATE
+> Task :app:preOssDebugUnitTestBuild
+> Task :app:javaPreCompileOssDebugUnitTest UP-TO-DATE
+> Task :app:compileOssDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:mergeOssDebugShaders UP-TO-DATE
+> Task :app:compileOssDebugShaders NO-SOURCE
+> Task :app:generateOssDebugAssets UP-TO-DATE
+> Task :app:mergeOssDebugAssets UP-TO-DATE
+> Task :app:packageOssDebugUnitTestForUnitTest UP-TO-DATE
+> Task :app:generateOssDebugUnitTestConfig UP-TO-DATE
+> Task :app:processOssDebugJavaRes UP-TO-DATE
+> Task :app:processOssDebugUnitTestJavaRes UP-TO-DATE
+> Task :app:testOssDebugUnitTest
+
+BUILD SUCCESSFUL in 15s
+40 actionable tasks: 5 executed, 35 up-to-date

@@ -40,6 +40,28 @@
             app:key="pluginName"
             app:title="@string/plugin"
             app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="ws"
+            app:entries="@array/gost_plugin_modes"
+            app:entryValues="@array/gost_plugin_mode_values"
+            app:key="gostPluginMode"
+            app:title="Mode"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:key="gostPluginHost"
+            app:title="Host"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:key="gostPluginPath"
+            app:title="Path"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreference
+            app:key="gostPluginTls"
+            app:title="TLS" />
+        <EditTextPreference
+            app:key="gostPluginMux"
+            app:title="Mux"
+            app:useSimpleSummaryProvider="true" />
         <EditTextPreference
             app:icon="@drawable/ic_action_settings"
             app:key="pluginConfig"
