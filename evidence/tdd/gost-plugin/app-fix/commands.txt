@@ -1,0 +1,6 @@
+HEAD 744197c023de9b5eb755fec295a7040e96166fa3
+
+Commands:
+./gradlew :app:kspOssDebugKotlin -x :app:verifyBundledNativeCore -x :app:buildHevTun
+./gradlew :app:compileOssDebugKotlin :app:compileOssDebugUnitTestKotlin -x :app:verifyBundledNativeCore -x :app:buildHevTun
+./gradlew :app:testOssDebugUnitTest --tests ...

@@ -1,0 +1,53 @@
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors
+> Task :buildSrc:compileKotlin UP-TO-DATE
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:pluginDescriptors UP-TO-DATE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:verifyBundledGeoAssets
+> Task :app:preBuild
+> Task :app:preOssDebugBuild
+> Task :app:compileOssDebugAidl UP-TO-DATE
+> Task :app:dataBindingMergeDependencyArtifactsOssDebug UP-TO-DATE
+> Task :app:generateOssDebugResValues UP-TO-DATE
+> Task :app:extractOssDebugSupportedLocales UP-TO-DATE
+> Task :app:generateOssDebugLocaleConfig UP-TO-DATE
+> Task :app:generateOssDebugResources UP-TO-DATE
+> Task :app:mergeOssDebugResources UP-TO-DATE
+> Task :app:dataBindingGenBaseClassesOssDebug UP-TO-DATE
+> Task :app:generateOssDebugBuildConfig UP-TO-DATE
+> Task :app:checkOssDebugAarMetadata UP-TO-DATE
+> Task :app:mapOssDebugSourceSetPaths UP-TO-DATE
+> Task :app:createOssDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksOssDebug UP-TO-DATE
+> Task :app:processOssDebugMainManifest UP-TO-DATE
+> Task :app:processOssDebugManifest UP-TO-DATE
+> Task :app:processOssDebugManifestForPackage UP-TO-DATE
+> Task :app:processOssDebugResources UP-TO-DATE
+> Task :app:javaPreCompileOssDebug UP-TO-DATE
+> Task :app:kspOssDebugKotlin
+
+> Task :app:compileOssDebugKotlin FAILED
+e: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app-fix/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt:121:51 Unresolved reference 'cancelSpeedTest'.
+e: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app-fix/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt:249:45 Unresolved reference 'queryIPQuality'.
+e: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app-fix/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt:259:21 Unresolved reference 'startSpeedTest'.
+e: file:///F:/pskora-lab/alpha12-migration/worktrees/gost-app-fix/app/src/main/java/io/nekohasekai/sagernet/bg/BaseService.kt:290:31 Unresolved reference 'cancelSpeedTest'.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileOssDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 16s
+25 actionable tasks: 4 executed, 21 up-to-date

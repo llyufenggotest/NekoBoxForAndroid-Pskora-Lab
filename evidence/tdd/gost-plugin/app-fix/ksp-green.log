@@ -1,0 +1,33 @@
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors
+> Task :buildSrc:compileKotlin UP-TO-DATE
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:pluginDescriptors UP-TO-DATE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:verifyBundledGeoAssets
+> Task :app:preBuild
+> Task :app:preOssDebugBuild
+> Task :app:compileOssDebugAidl UP-TO-DATE
+> Task :app:dataBindingMergeDependencyArtifactsOssDebug UP-TO-DATE
+> Task :app:generateOssDebugResValues UP-TO-DATE
+> Task :app:extractOssDebugSupportedLocales UP-TO-DATE
+> Task :app:generateOssDebugLocaleConfig UP-TO-DATE
+> Task :app:generateOssDebugResources UP-TO-DATE
+> Task :app:mergeOssDebugResources UP-TO-DATE
+> Task :app:dataBindingGenBaseClassesOssDebug UP-TO-DATE
+> Task :app:generateOssDebugBuildConfig UP-TO-DATE
+> Task :app:checkOssDebugAarMetadata UP-TO-DATE
+> Task :app:mapOssDebugSourceSetPaths UP-TO-DATE
+> Task :app:createOssDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksOssDebug UP-TO-DATE
+> Task :app:processOssDebugMainManifest UP-TO-DATE
+> Task :app:processOssDebugManifest UP-TO-DATE
+> Task :app:processOssDebugManifestForPackage UP-TO-DATE
+> Task :app:processOssDebugResources UP-TO-DATE
+> Task :app:kspOssDebugKotlin UP-TO-DATE
+
+BUILD SUCCESSFUL in 5s
+23 actionable tasks: 2 executed, 21 up-to-date

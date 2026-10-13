@@ -9,9 +9,18 @@ class GostPluginOptions private constructor(
     fun contains(key: String): Boolean = entries.containsKey(key)
     fun keys(): Set<String> = entries.keys
 
-    fun with(key: String, value: String?): GostPluginOptions = fromEntries(entries.toMutableMap().apply {
+    fun withValue(key: String, value: String?): GostPluginOptions = fromEntries(entries.toMutableMap().apply {
         remove(key)
         if (value != null) put(key, value)
+    })
+
+    fun withFlag(key: String): GostPluginOptions = fromEntries(entries.toMutableMap().apply {
+        remove(key)
+        put(key, null)
+    })
+
+    fun without(key: String): GostPluginOptions = fromEntries(entries.toMutableMap().apply {
+        remove(key)
     })
 
     fun canonical(): String = entries.entries.joinToString(";") { (key, value) ->
@@ -50,11 +59,14 @@ class GostPluginOptions private constructor(
                     require(!result.containsKey(key)) { "Duplicate gost-plugin option: $key" }
                     when (rawValue) {
                         null -> result[key] = null
-                        is Boolean -> if (key == "tls") {
-                            result[key] = rawValue.toString()
-                        } else if (rawValue) {
-                            result[key] = null
+                        is Boolean -> when {
+                            key == "tls" -> result[key] = rawValue.toString()
+                            key in setOf("insecure", "nocomp") && rawValue -> result[key] = null
+                            else -> result[key] = rawValue.toString()
                         }
+                        is Map<*, *>, is Collection<*>, is Array<*> -> throw IllegalArgumentException(
+                            "gost-plugin option '$key' cannot be represented losslessly as SIP003",
+                        )
                         else -> result[key] = rawValue.toString()
                     }
                 }
@@ -80,6 +92,8 @@ class GostPluginOptions private constructor(
                     "mwss", "wss" -> result["mode"]
                     else -> result["mode"]
                 }
+            } else if (tls != null) {
+                result["tls"] = tls
             }
             return GostPluginOptions(order(result))
         }

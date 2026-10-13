@@ -3,6 +3,7 @@ package io.nekohasekai.sagernet.group
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -73,6 +74,29 @@ ${pluginOpts.prependIndent("              ")}
             val bean = RawUpdater.parseRaw(source).orEmpty().single() as ShadowsocksBean
             assertEquals("gost-plugin", bean.plugin)
         }
+    }
+
+    @Test fun unknownBooleansKeepExplicitTrueAndFalseValues() {
+        val bean = parse("""
+            mode: grpc
+            experimental-true: true
+            experimental-false: false
+        """.trimIndent())
+        assertEquals(
+            "gost-plugin;mode=grpc;experimental-true=true;experimental-false=false",
+            bean.plugin,
+        )
+    }
+
+    @Test fun nestedUnknownValuesAreRejectedWithTheirFieldName() {
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            parse("""
+                mode: ws
+                advanced:
+                  retries: 3
+            """.trimIndent())
+        }
+        assertTrue(error.message.orEmpty().contains("advanced"))
     }
 
     @Test fun ordinaryPluginsKeepTheirExistingSerialization() {

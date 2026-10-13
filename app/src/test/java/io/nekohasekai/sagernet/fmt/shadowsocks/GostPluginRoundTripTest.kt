@@ -71,6 +71,19 @@ class GostPluginRoundTripTest {
         assertEquals(plugin.substringAfter(';'), native["plugin_opts"].asString)
     }
 
+    @Test fun muxKeepsAbsentFlagAndTextAsThreeDistinctStates() {
+        val absent = GostPluginOptions.parse("mode=ws")
+        val flag = GostPluginOptions.parse("mode=mws;mux")
+        val number = GostPluginOptions.parse("mode=mws;mux=03")
+
+        assertFalse(absent.contains("mux"))
+        assertTrue(flag.flag("mux"))
+        assertEquals(null, flag.value("mux"))
+        assertEquals("03", number.value("mux"))
+        assertEquals("mode=mws;mux", flag.canonical())
+        assertEquals("mode=mws;mux=03", number.canonical())
+    }
+
     @Test fun ordinaryPluginsAreNotCanonicalizedAsGost() {
         val plugin = "v2ray-plugin;mode=websocket;host=cdn.invalid;path=/v;mux=8"
         val bean = ShadowsocksBean().apply {
