@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,6 +25,11 @@ type resolvedLifecycleTransport struct {
 	exchangeEntered chan struct{}
 	exchangeRelease chan struct{}
 	async           bool
+	syncPanic       any
+	asyncPanic      any
+	lateCallback    chan func()
+	lateError       error
+	asyncRecovered  chan any
 }
 
 func (t *resolvedLifecycleTransport) Start(stage adapter.StartStage, scope *adapter.Scope) error {
@@ -43,6 +49,9 @@ func (*resolvedLifecycleTransport) Tag() string            { return "" }
 func (*resolvedLifecycleTransport) Dependencies() []string { return nil }
 func (*resolvedLifecycleTransport) Reset()                 {}
 func (t *resolvedLifecycleTransport) Exchange(context.Context, *mDNS.Msg) (*mDNS.Msg, error) {
+	if t.syncPanic != nil {
+		panic(t.syncPanic)
+	}
 	if t.exchangeEntered == nil {
 		return nil, errors.New("unused")
 	}
@@ -51,10 +60,26 @@ func (t *resolvedLifecycleTransport) Exchange(context.Context, *mDNS.Msg) (*mDNS
 	return new(mDNS.Msg), nil
 }
 func (t *resolvedLifecycleTransport) ExchangeAsync(ctx context.Context, message *mDNS.Msg, callback func(*mDNS.Msg, error)) {
+	if t.asyncPanic != nil {
+		panic(t.asyncPanic)
+	}
+	if t.lateCallback != nil {
+		t.lateCallback <- func() {
+			if t.lateError != nil {
+				callback(nil, t.lateError)
+			} else {
+				callback(new(mDNS.Msg), nil)
+			}
+		}
+		return
+	}
 	if !t.async {
 		return
 	}
 	go func() {
+		if t.asyncRecovered != nil {
+			defer func() { t.asyncRecovered <- recover() }()
+		}
 		response, err := t.Exchange(ctx, message)
 		callback(response, err)
 	}()
@@ -241,6 +266,223 @@ func TestResolvedAsyncExchangeLeaseIncludesCallback(t *testing.T) {
 		require.NoError(t, <-closeDone)
 		require.Equal(t, 1, transport.closeCount)
 	}
+}
+
+func TestResolvedExchangeTransportPanicReleasesLeaseAndPropagates(t *testing.T) {
+	for range 100 {
+		panicValue := &struct{ name string }{"transport panic"}
+		transport := &resolvedLifecycleTransport{syncPanic: panicValue}
+		serverSet := newResolvedLifecycleSet(t, transport)
+		serverSet.servers = []resolvedServer{{primaryTransport: transport}}
+		resolver := &DBusResolvedResolver{ctx: context.Background()}
+		resolver.savedServerSet.Store(serverSet)
+		func() {
+			defer func() { require.Same(t, panicValue, recover()) }()
+			_, _ = resolver.Exchange(context.Background(), new(mDNS.Msg))
+		}()
+		require.NoError(t, resolver.Close())
+		require.Equal(t, 1, transport.closeCount)
+	}
+}
+
+func TestResolvedAsyncTransportPanicReleasesLeaseAndPropagates(t *testing.T) {
+	for range 100 {
+		panicValue := &struct{ name string }{"async transport panic"}
+		transport := &resolvedLifecycleTransport{asyncPanic: panicValue}
+		serverSet := newResolvedLifecycleSet(t, transport)
+		serverSet.servers = []resolvedServer{{primaryTransport: transport}}
+		resolver := &DBusResolvedResolver{ctx: context.Background()}
+		resolver.savedServerSet.Store(serverSet)
+		func() {
+			defer func() { require.Same(t, panicValue, recover()) }()
+			resolver.ExchangeAsync(context.Background(), new(mDNS.Msg), func(*mDNS.Msg, error) {
+				t.Fatal("callback must not run after transport panic")
+			})
+		}()
+		require.NoError(t, resolver.Close())
+		require.Equal(t, 1, transport.closeCount)
+	}
+}
+
+func TestResolvedAsyncCallbackPanicReleasesLeaseAndPropagates(t *testing.T) {
+	for range 100 {
+		panicValue := &struct{ name string }{"callback panic"}
+		panicResult := make(chan any, 1)
+		transport := &resolvedLifecycleTransport{
+			async:           true,
+			exchangeEntered: make(chan struct{}),
+			exchangeRelease: make(chan struct{}),
+			asyncRecovered:  panicResult,
+		}
+		serverSet := newResolvedLifecycleSet(t, transport)
+		serverSet.servers = []resolvedServer{{primaryTransport: transport}}
+		resolver := &DBusResolvedResolver{ctx: context.Background()}
+		resolver.savedServerSet.Store(serverSet)
+		resolver.ExchangeAsync(context.Background(), new(mDNS.Msg), func(*mDNS.Msg, error) { panic(panicValue) })
+		<-transport.exchangeEntered
+		close(transport.exchangeRelease)
+		require.Equal(t, panicValue, <-panicResult)
+		require.NoError(t, resolver.Close())
+		require.Equal(t, 1, transport.closeCount)
+	}
+}
+
+func TestResolvedAsyncCallbackPanicStopsCancellationCallback(t *testing.T) {
+	panicValue := &struct{ name string }{"callback panic"}
+	panicResult := make(chan any, 1)
+	transport := &resolvedLifecycleTransport{
+		async:           true,
+		exchangeEntered: make(chan struct{}),
+		exchangeRelease: make(chan struct{}),
+		asyncRecovered:  panicResult,
+	}
+	serverSet := newResolvedLifecycleSet(t, transport)
+	serverSet.servers = []resolvedServer{{primaryTransport: transport}}
+	resolver := &DBusResolvedResolver{ctx: context.Background()}
+	resolver.savedServerSet.Store(serverSet)
+	ctx, cancel := context.WithCancel(context.Background())
+	var callbackCount atomic.Int32
+	resolver.ExchangeAsync(ctx, new(mDNS.Msg), func(*mDNS.Msg, error) {
+		callbackCount.Add(1)
+		panic(panicValue)
+	})
+	<-transport.exchangeEntered
+	close(transport.exchangeRelease)
+	require.Equal(t, panicValue, <-panicResult)
+	cancel()
+	time.Sleep(10 * time.Millisecond)
+	require.Equal(t, int32(1), callbackCount.Load())
+	require.NoError(t, resolver.Close())
+	require.Equal(t, 1, transport.closeCount)
+}
+
+func TestResolvedAsyncNeverCallbackCancelReleasesLeaseAndDropsLateCallback(t *testing.T) {
+	baseline := runtime.NumGoroutine()
+	for range 100 {
+		late := make(chan func(), 1)
+		transport := &resolvedLifecycleTransport{lateCallback: late}
+		serverSet := newResolvedLifecycleSet(t, transport)
+		serverSet.servers = []resolvedServer{{primaryTransport: transport}}
+		resolver := &DBusResolvedResolver{ctx: context.Background()}
+		resolver.savedServerSet.Store(serverSet)
+		ctx, cancel := context.WithCancel(context.Background())
+		callbackCount := atomic.Int32{}
+		callbackResult := make(chan error, 2)
+		resolver.ExchangeAsync(ctx, new(mDNS.Msg), func(_ *mDNS.Msg, err error) {
+			callbackCount.Add(1)
+			callbackResult <- err
+		})
+		lateCallback := <-late
+		cancel()
+		require.ErrorIs(t, <-callbackResult, context.Canceled)
+		closeDone := make(chan error, 1)
+		go func() { closeDone <- resolver.Close() }()
+		select {
+		case err := <-closeDone:
+			require.NoError(t, err)
+		case <-time.After(time.Second):
+			t.Fatal("Close blocked after canceled never-callback exchange")
+		}
+		require.Equal(t, 1, transport.closeCount)
+		lateCallback()
+		time.Sleep(time.Millisecond)
+		require.Equal(t, int32(1), callbackCount.Load(), "late transport callback must be discarded")
+	}
+	require.Eventually(t, func() bool {
+		runtime.GC()
+		return runtime.NumGoroutine() <= baseline+8
+	}, 3*time.Second, 10*time.Millisecond)
+}
+
+func TestResolvedAsyncCanceledLateErrorDoesNotRefreshOrCallbackTwice(t *testing.T) {
+	late := make(chan func(), 1)
+	transportErr := errors.New("late transport failure")
+	transport := &resolvedLifecycleTransport{lateCallback: late, lateError: transportErr}
+	serverSet := newResolvedLifecycleSet(t, transport)
+	serverSet.servers = []resolvedServer{{primaryTransport: transport}}
+	resolver := &DBusResolvedResolver{ctx: context.Background()}
+	resolver.savedServerSet.Store(serverSet)
+	var refreshCount atomic.Int32
+	resolver.checkResolvedFunc = func(context.Context) (*resolvedServerSet, error) {
+		refreshCount.Add(1)
+		return nil, errors.New("must not refresh after canceled completion")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	callbackCount := atomic.Int32{}
+	callbackResult := make(chan error, 2)
+	resolver.ExchangeAsync(ctx, new(mDNS.Msg), func(_ *mDNS.Msg, err error) {
+		callbackCount.Add(1)
+		callbackResult <- err
+	})
+	lateCallback := <-late
+	cancel()
+	require.ErrorIs(t, <-callbackResult, context.Canceled)
+	lateCallback()
+	time.Sleep(10 * time.Millisecond)
+	require.Equal(t, int32(1), callbackCount.Load())
+	require.Zero(t, refreshCount.Load())
+	require.NoError(t, resolver.Close())
+	require.Equal(t, 1, transport.closeCount)
+}
+
+func TestResolvedAsyncCancelDuringRefreshCompletesExactlyOnce(t *testing.T) {
+	late := make(chan func(), 1)
+	transportErr := errors.New("transport failure before refresh")
+	transport := &resolvedLifecycleTransport{lateCallback: late, lateError: transportErr}
+	serverSet := newResolvedLifecycleSet(t, transport)
+	serverSet.servers = []resolvedServer{{primaryTransport: transport}}
+	refreshEntered := make(chan struct{})
+	refreshRelease := make(chan struct{})
+	resolver := &DBusResolvedResolver{
+		ctx:    context.Background(),
+		logger: log.NewNOPFactory().NewLogger("resolved-lifecycle"),
+	}
+	resolver.savedServerSet.Store(serverSet)
+	resolver.checkResolvedFunc = func(context.Context) (*resolvedServerSet, error) {
+		close(refreshEntered)
+		<-refreshRelease
+		return nil, errors.New("refresh unavailable")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	callbackCount := atomic.Int32{}
+	callbackResult := make(chan error, 2)
+	resolver.ExchangeAsync(ctx, new(mDNS.Msg), func(_ *mDNS.Msg, err error) {
+		callbackCount.Add(1)
+		callbackResult <- err
+	})
+	lateCallback := <-late
+	lateCallback()
+	<-refreshEntered
+	cancel()
+	select {
+	case err := <-callbackResult:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("cancellation must complete while refresh is blocked")
+	}
+	close(refreshRelease)
+	time.Sleep(10 * time.Millisecond)
+	require.Equal(t, int32(1), callbackCount.Load())
+	require.NoError(t, resolver.Close())
+	require.Equal(t, 1, transport.closeCount)
+}
+
+func TestResolvedCloseDoesNotWaitForeverForUncanceledNeverCallback(t *testing.T) {
+	late := make(chan func(), 1)
+	transport := &resolvedLifecycleTransport{lateCallback: late}
+	serverSet := newResolvedLifecycleSet(t, transport)
+	serverSet.servers = []resolvedServer{{primaryTransport: transport}}
+	resolver := &DBusResolvedResolver{ctx: context.Background()}
+	resolver.savedServerSet.Store(serverSet)
+	resolver.ExchangeAsync(context.Background(), new(mDNS.Msg), func(*mDNS.Msg, error) {})
+	lateCallback := <-late
+	started := time.Now()
+	err := resolver.Close()
+	require.ErrorIs(t, err, errResolvedServerSetDrainTimeout)
+	require.Less(t, time.Since(started), time.Second)
+	require.Zero(t, transport.closeCount)
+	lateCallback()
+	require.Eventually(t, func() bool { return transport.closeCount == 1 }, time.Second, time.Millisecond)
 }
 
 func TestResolvedUpdateDetachesBeforeWaitingForLease(t *testing.T) {

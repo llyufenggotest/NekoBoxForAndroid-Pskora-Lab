@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/dialer"
@@ -85,6 +86,78 @@ type resolvedServerSet struct {
 type resolvedServerSetLease struct {
 	serverSet *resolvedServerSet
 	once      sync.Once
+}
+
+const resolvedServerSetDrainTimeout = 250 * time.Millisecond
+
+var errResolvedServerSetDrainTimeout = errors.New("resolved server set drain timeout")
+
+type resolvedAsyncResult struct {
+	once        sync.Once
+	stopContext func() bool
+	callback    func(response *mDNS.Msg, err error)
+}
+
+func newResolvedAsyncResult(ctx context.Context, callback func(response *mDNS.Msg, err error)) *resolvedAsyncResult {
+	result := &resolvedAsyncResult{callback: callback}
+	result.stopContext = context.AfterFunc(ctx, func() {
+		result.complete(nil, ctx.Err())
+	})
+	return result
+}
+
+func (r *resolvedAsyncResult) complete(response *mDNS.Msg, err error) {
+	r.once.Do(func() {
+		if r.stopContext != nil {
+			r.stopContext()
+		}
+		r.callback(response, err)
+	})
+}
+
+func (r *resolvedAsyncResult) abort() {
+	r.once.Do(func() {
+		if r.stopContext != nil {
+			r.stopContext()
+		}
+	})
+}
+
+type resolvedAsyncAttempt struct {
+	once        sync.Once
+	stopContext func() bool
+	lease       *resolvedServerSetLease
+	callback    func(response *mDNS.Msg, err error)
+}
+
+func newResolvedAsyncAttempt(ctx context.Context, lease *resolvedServerSetLease, callback func(response *mDNS.Msg, err error)) *resolvedAsyncAttempt {
+	attempt := &resolvedAsyncAttempt{
+		lease:    lease,
+		callback: callback,
+	}
+	attempt.stopContext = context.AfterFunc(ctx, func() {
+		attempt.complete(nil, ctx.Err())
+	})
+	return attempt
+}
+
+func (a *resolvedAsyncAttempt) complete(response *mDNS.Msg, err error) {
+	a.once.Do(func() {
+		if a.stopContext != nil {
+			a.stopContext()
+		}
+		defer a.lease.Release()
+		a.callback(response, err)
+	})
+}
+
+func (a *resolvedAsyncAttempt) abort() {
+	a.once.Do(func() {
+		if a.stopContext != nil {
+			a.stopContext()
+		}
+		a.lease.Release()
+	})
 }
 
 func (l *resolvedServerSetLease) Release() {
@@ -268,8 +341,10 @@ func (t *DBusResolvedResolver) Exchange(ctx context.Context, message *mDNS.Msg) 
 			return nil, os.ErrClosed
 		}
 	}
-	response, err := t.exchangeServerSet(ctx, message, serverSet)
-	lease.Release()
+	response, err := func() (*mDNS.Msg, error) {
+		defer lease.Release()
+		return t.exchangeServerSet(ctx, message, serverSet)
+	}()
 	if err == nil {
 		return response, nil
 	}
@@ -300,13 +375,16 @@ func (t *DBusResolvedResolver) ExchangeAsync(ctx context.Context, message *mDNS.
 		}()
 		return
 	}
-	t.exchangeServerSetAsync(ctx, message, serverSet, func(response *mDNS.Msg, err error) {
+	result := newResolvedAsyncResult(ctx, callback)
+	attempt := newResolvedAsyncAttempt(ctx, lease, func(response *mDNS.Msg, err error) {
 		if err == nil {
-			callback(response, nil)
-			lease.Release()
+			result.complete(response, nil)
 			return
 		}
-		lease.Release()
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			result.complete(nil, ctxErr)
+			return
+		}
 		go func() {
 			t.updateStatus(t.ctx)
 			refreshedServerSet, refreshedLease := t.acquireCurrentServerSet()
@@ -314,15 +392,32 @@ func (t *DBusResolvedResolver) ExchangeAsync(ctx context.Context, message *mDNS.
 				if refreshedLease != nil {
 					refreshedLease.Release()
 				}
-				callback(nil, err)
+				result.complete(nil, err)
 				return
 			}
-			t.exchangeServerSetAsync(ctx, message, refreshedServerSet, func(response *mDNS.Msg, err error) {
-				callback(response, err)
-				refreshedLease.Release()
-			})
+			refreshedAttempt := newResolvedAsyncAttempt(ctx, refreshedLease, result.complete)
+			func() {
+				defer func() {
+					if panicValue := recover(); panicValue != nil {
+						refreshedAttempt.abort()
+						result.abort()
+						panic(panicValue)
+					}
+				}()
+				t.exchangeServerSetAsync(ctx, message, refreshedServerSet, refreshedAttempt.complete)
+			}()
 		}()
 	})
+	func() {
+		defer func() {
+			if panicValue := recover(); panicValue != nil {
+				attempt.abort()
+				result.abort()
+				panic(panicValue)
+			}
+		}()
+		t.exchangeServerSetAsync(ctx, message, serverSet, attempt.complete)
+	}()
 }
 
 func (t *DBusResolvedResolver) exchangeServerSetAsync(ctx context.Context, message *mDNS.Msg, serverSet *resolvedServerSet, callback func(response *mDNS.Msg, err error)) {
@@ -699,7 +794,16 @@ func closeResolvedServerSetContext(ctx context.Context, serverSet *resolvedServe
 }
 
 func closeResolvedServerSet(serverSet *resolvedServerSet) error {
-	return closeResolvedServerSetContext(context.Background(), serverSet)
+	if serverSet == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), resolvedServerSetDrainTimeout)
+	defer cancel()
+	err := closeResolvedServerSetContext(ctx, serverSet)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return errResolvedServerSetDrainTimeout
+	}
+	return err
 }
 
 func replaceResolvedServerSet(savedServerSet *atomic.Pointer[resolvedServerSet], serverSet *resolvedServerSet) error {
