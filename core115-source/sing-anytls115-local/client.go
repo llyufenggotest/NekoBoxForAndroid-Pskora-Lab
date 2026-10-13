@@ -67,11 +67,11 @@ func decodeClientPassword(password string) ([passwordLen]byte, error) {
 	if strings.HasSuffix(strings.ToLower(password), marker) {
 		raw := password[:len(password)-len(marker)]
 		if len(raw) != passwordLen*2 {
-			return decodedPassword, E.New("anytls: invalid Shanlian identity")
+			return decodedPassword, E.New("anytls: invalid Shanlian identity: expected 64 hexadecimal characters before #sl")
 		}
 		decoded, err := hex.DecodeString(raw)
 		if err != nil {
-			return decodedPassword, E.New("anytls: invalid Shanlian identity")
+			return decodedPassword, E.New("anytls: invalid Shanlian identity: expected 64 hexadecimal characters before #sl")
 		}
 		copy(decodedPassword[:], decoded)
 		return decodedPassword, nil
