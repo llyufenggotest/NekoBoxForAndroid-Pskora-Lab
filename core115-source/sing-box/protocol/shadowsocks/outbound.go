@@ -68,7 +68,14 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		}
 	}
 	uotOptions := common.PtrValueOrDefault(options.UDPOverTCP)
-	if !uotOptions.Enabled {
+	pluginMultiplex := false
+	if gostPlugin, isGostPlugin := outbound.plugin.(interface{ MultiplexEnabled() bool }); isGostPlugin {
+		pluginMultiplex = gostPlugin.MultiplexEnabled()
+	}
+	if pluginMultiplex && options.Multiplex != nil && options.Multiplex.Enabled {
+		return nil, E.New("shadowsocks multiplex cannot be combined with gost-plugin mux")
+	}
+	if !uotOptions.Enabled && !pluginMultiplex {
 		outbound.multiplexDialer, err = mux.NewClientWithOptions((*shadowsocksDialer)(outbound), logger, common.PtrValueOrDefault(options.Multiplex))
 		if err != nil {
 			return nil, err
@@ -135,18 +142,27 @@ func (h *Outbound) MultiplexEnabled() bool {
 }
 
 func (h *Outbound) InterfaceUpdated(ctx context.Context) {
+	if idlePlugin, isIdlePlugin := h.plugin.(sip003.IdlePlugin); isIdlePlugin {
+		idlePlugin.CloseIdleConnections()
+	}
 	if h.multiplexDialer != nil {
 		h.multiplexDialer.Reset()
 	}
 }
 
 func (h *Outbound) SetKeepIdleConnections(keep bool) {
+	if idlePlugin, isIdlePlugin := h.plugin.(sip003.IdlePlugin); isIdlePlugin {
+		idlePlugin.SetKeepIdleConnections(keep)
+	}
 	if h.multiplexDialer != nil {
 		h.multiplexDialer.SetKeepIdleConnections(keep)
 	}
 }
 
 func (h *Outbound) CloseIdleConnections() {
+	if idlePlugin, isIdlePlugin := h.plugin.(sip003.IdlePlugin); isIdlePlugin {
+		idlePlugin.CloseIdleConnections()
+	}
 	if h.multiplexDialer != nil {
 		h.multiplexDialer.CloseIdleConnections()
 	}
@@ -155,6 +171,9 @@ func (h *Outbound) CloseIdleConnections() {
 func (h *Outbound) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 	if stage != adapter.StartStateInitialize {
 		return nil
+	}
+	if closablePlugin, isClosablePlugin := h.plugin.(sip003.ClosablePlugin); isClosablePlugin {
+		scope.Add(closablePlugin.Close)
 	}
 	if h.multiplexDialer != nil {
 		scope.Add(h.multiplexDialer.Close)

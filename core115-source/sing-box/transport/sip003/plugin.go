@@ -16,6 +16,17 @@ type Plugin interface {
 	DialContext(ctx context.Context) (net.Conn, error)
 }
 
+type ClosablePlugin interface {
+	Plugin
+	Close() error
+}
+
+type IdlePlugin interface {
+	Plugin
+	SetKeepIdleConnections(keep bool)
+	CloseIdleConnections()
+}
+
 var plugins map[string]PluginConstructor
 
 func RegisterPlugin(name string, constructor PluginConstructor) {

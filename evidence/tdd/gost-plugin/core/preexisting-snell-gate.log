@@ -1,0 +1,3 @@
+$ go test -tags with_utls ./protocol/snell -count=1
+ok  	github.com/sagernet/sing-box/protocol/snell	1.109s
+exit=0

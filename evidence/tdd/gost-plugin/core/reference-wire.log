@@ -1,0 +1,8 @@
+$ GOST_PLUGIN_REFERENCE=F:/Temp/User/gost-plugin-ref/gost-plugin.exe go test ./transport/sip003 -run TestGostReference -count=1 -v
+=== RUN   TestGostReferencePluginWebsocketInterop
+--- PASS: TestGostReferencePluginWebsocketInterop (2.98s)
+=== RUN   TestGostReferencePluginMuxWebsocketInterop
+--- PASS: TestGostReferencePluginMuxWebsocketInterop (0.05s)
+PASS
+ok  	github.com/sagernet/sing-box/transport/sip003	3.140s
+exit=0
