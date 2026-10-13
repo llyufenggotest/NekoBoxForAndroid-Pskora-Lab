@@ -33,9 +33,6 @@ type Service struct {
 }
 
 func newService(options ServiceOptions) (*Service, error) {
-	if options.Handler == nil {
-		return nil, ErrMissingHandler
-	}
 	paddingScheme := options.PaddingScheme
 	if len(paddingScheme) == 0 {
 		paddingScheme = DefaultPaddingScheme
@@ -57,9 +54,6 @@ func newService(options ServiceOptions) (*Service, error) {
 }
 
 func NewService(password string, options ServiceOptions) (*Service, error) {
-	if password == "" {
-		return nil, ErrMissingPassword
-	}
 	service, err := newService(options)
 	if err != nil {
 		return nil, err
@@ -109,7 +103,7 @@ func (s *Service) handleConnection(ctx context.Context, conn net.Conn, source M.
 
 func (s *Service) NewConnection(ctx context.Context, conn net.Conn, source M.Socksaddr, onClose N.CloseHandlerFunc) error {
 	return s.handleConnection(ctx, conn, source, onClose, func(password []byte) (context.Context, bool) {
-		if s.password == [passwordLen]byte{} || [passwordLen]byte(password) != s.password {
+		if [passwordLen]byte(password) != s.password {
 			return nil, false
 		}
 		return ctx, true
@@ -185,20 +179,9 @@ func NewMultiService[U comparable](options ServiceOptions) (*MultiService[U], er
 }
 
 func (s *MultiService[U]) UpdateUsers(users []U, passwords []string) error {
-	if len(users) != len(passwords) {
-		return E.New("anytls: user/password count mismatch")
-	}
 	userMap := make(map[[passwordLen]byte]U, len(users))
 	for index, user := range users {
-		if passwords[index] == "" {
-			return ErrMissingPassword
-		}
-		key := sha256.Sum256([]byte(passwords[index]))
-		_, loaded := userMap[key]
-		if loaded {
-			return ErrDuplicateUser
-		}
-		userMap[key] = user
+		userMap[sha256.Sum256([]byte(passwords[index]))] = user
 	}
 	s.users.Store(userMap)
 	return nil

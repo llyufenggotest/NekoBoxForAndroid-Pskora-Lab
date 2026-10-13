@@ -1,0 +1,17 @@
+--- FAIL: TestPrivateLocalCloseEOF (0.00s)
+    private_close_test.go:15: local Read = use of closed network connection
+--- FAIL: TestShanlianPasswordSuffixUsesDirect32ByteAuthentication (0.00s)
+    shanlian_password_test.go:23: got cbb3d2333e16fd06e4a1f611203a5264db35036bf5763d38bddfb925606641c7, want direct bytes 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+--- FAIL: TestShanlianPasswordSuffixIsCaseInsensitive (0.00s)
+    shanlian_password_test.go:34: got c4778d4549c754b7ade5bceadbbfbff8abfe94109f6acf2bf5c41f479e2bc0bc, want direct bytes 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+--- FAIL: TestShanlianPasswordRejectsNon64HexIdentity (0.00s)
+    shanlian_password_test.go:42: accepted invalid Shanlian password "short#sl"
+--- FAIL: TestShanlianHandshakeWritesDecodedPasswordAsFirst32Bytes (0.00s)
+    shanlian_password_test.go:95: handshake prefix got cbb3d2333e16fd06e4a1f611203a5264db35036bf5763d38bddfb925606641c7 (64 bytes), want 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+--- FAIL: TestInvalidShanlianPasswordFailsBeforeDial (0.00s)
+    shanlian_password_test.go:115: err=<nil> dialed=false, expected validation before dial
+FAIL
+FAIL	github.com/sagernet/sing-anytls	0.033s
+FAIL
+
+exit_code=1

@@ -4,9 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"net"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -61,41 +59,13 @@ type Client struct {
 	idleTimer    *time.Timer
 }
 
-func decodeClientPassword(password string) ([passwordLen]byte, error) {
-	var result [passwordLen]byte
-	const marker = "#sl"
-	if strings.HasSuffix(strings.ToLower(password), marker) {
-		raw := password[:len(password)-len(marker)]
-		if len(raw) != passwordLen*2 {
-			return result, E.New("anytls: Shanlian AnyTLS password must be 64 hexadecimal characters before #sl")
-		}
-		decoded, err := hex.DecodeString(raw)
-		if err != nil {
-			return result, E.Cause(err, "anytls: invalid Shanlian hexadecimal password")
-		}
-		copy(result[:], decoded)
-		return result, nil
-	}
-	return sha256.Sum256([]byte(password)), nil
-}
-
 func NewClient(options ClientOptions) (*Client, error) {
-	if options.Password == "" {
-		return nil, ErrMissingPassword
-	}
-	if options.DialOut == nil {
-		return nil, ErrMissingDialer
-	}
-	password, err := decodeClientPassword(options.Password)
-	if err != nil {
-		return nil, err
-	}
 	factory, err := newPaddingFactory(DefaultPaddingScheme)
 	if err != nil {
 		return nil, err
 	}
 	client := &Client{
-		password:          password,
+		password:          sha256.Sum256([]byte(options.Password)),
 		clientMetadata:    options.ClientMetadata,
 		dialOut:           options.DialOut,
 		logger:            options.Logger,
@@ -266,14 +236,14 @@ func (c *Client) CloseIdleConnections() {
 		return
 	}
 	var closing []*session
-	for idle := range c.sessions {
+	for element := c.idleSessions.Front(); element != nil; {
+		idle := element.Value
+		element = element.Next()
 		if idle.hasStreams() {
 			continue
 		}
-		if idle.element != nil {
-			c.idleSessions.Remove(idle.element)
-			idle.element = nil
-		}
+		c.idleSessions.Remove(idle.element)
+		idle.element = nil
 		delete(c.sessions, idle)
 		closing = append(closing, idle)
 	}

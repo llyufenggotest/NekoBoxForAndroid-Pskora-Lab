@@ -157,8 +157,6 @@ func (s *stream) handshake(limit *pipe.Deadline) error {
 	return s.writeRequestLocked(limit)
 }
 
-// The reference implementation flushes the settings and SYN frames together with the
-// destination address and nothing else, so the first shaped record carries no payload.
 func (s *stream) writeRequestLocked(limit *pipe.Deadline) error {
 	if s.handshakeDone.Load() {
 		return nil
@@ -178,8 +176,7 @@ func (s *stream) writeRequestLocked(limit *pipe.Deadline) error {
 		request.Release()
 		return err
 	}
-	s.session.armOpenTimeout(s.id)
-	err = s.session.write(s, request, limit)
+	err = s.session.writeRequest(s, request, limit)
 	if err != nil {
 		return err
 	}
@@ -327,47 +324,9 @@ func (s *stream) writeBufferLocked(buffer *buf.Buffer) error {
 	return s.session.write(s, buffer, &s.writeDeadline)
 }
 
-func (s *stream) WriteVectorised(buffers []*buf.Buffer) error {
-	err := s.checkWrite()
-	if err != nil {
-		buf.ReleaseMulti(buffers)
-		return err
-	}
-	err = s.handshake(&s.writeDeadline)
-	if err != nil {
-		buf.ReleaseMulti(buffers)
-		return err
-	}
-	s.writeAccess.Lock()
-	defer s.writeAccess.Unlock()
-	frames := make([]*buf.Buffer, 0, len(buffers))
-	for _, buffer := range buffers {
-		dataLen := buffer.Len()
-		if dataLen == 0 {
-			buffer.Release()
-			continue
-		}
-		if dataLen <= maxFrameSize && buffer.Start() >= frameOverhead {
-			putFrameHeader(buffer.ExtendHeader(frameOverhead), commandPSH, s.id, dataLen)
-			frames = append(frames, buffer)
-			continue
-		}
-		for data := buffer.Bytes(); len(data) > 0; {
-			chunkLen := min(len(data), maxFrameSize)
-			frame := buf.NewSize(frameOverhead + chunkLen)
-			putFrameHeader(frame.Extend(frameOverhead), commandPSH, s.id, chunkLen)
-			common.Must1(frame.Write(data[:chunkLen]))
-			frames = append(frames, frame)
-			data = data[chunkLen:]
-		}
-		buffer.Release()
-	}
-	return s.session.writeFrames(s, frames)
-}
-
 func (s *stream) Close() error {
-	closing := s.closeLocally(io.EOF)
-	s.discardRead(io.EOF)
+	closing := s.closeLocally(net.ErrClosed)
+	s.discardRead(net.ErrClosed)
 	if !closing {
 		return nil
 	}
@@ -396,7 +355,7 @@ func (s *stream) closeWithError(err error) {
 	if s.closeLocally(err) {
 		s.session.finishStream(s.id, s.handshakeDone.Load())
 	}
-	s.discardRead(err)
+	s.endRead(err)
 }
 
 func (s *stream) closeLocally(err error) bool {
@@ -482,7 +441,6 @@ func (s *stream) SetDeadline(t time.Time) error {
 var (
 	_ N.ExtendedConn     = (*stream)(nil)
 	_ N.ReadWaiter       = (*stream)(nil)
-	_ N.VectorisedWriter = (*stream)(nil)
 	_ N.EarlyReader      = (*stream)(nil)
 	_ N.EarlyWriter      = (*stream)(nil)
 	_ N.FrontHeadroom    = (*stream)(nil)

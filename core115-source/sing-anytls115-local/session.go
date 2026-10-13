@@ -14,22 +14,19 @@ import (
 
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
-	"github.com/sagernet/sing/common/bufio"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
 	M "github.com/sagernet/sing/common/metadata"
-	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/common/pipe"
 	"github.com/sagernet/sing/common/x/list"
 )
 
 type session struct {
-	conn       net.Conn
-	reader     *std_bufio.Reader
-	vectorised N.VectorisedWriter
-	isClient   bool
-	padding    *common.TypedValue[*paddingFactory]
-	logger     logger.ContextLogger
+	conn     net.Conn
+	reader   *std_bufio.Reader
+	isClient bool
+	padding  *common.TypedValue[*paddingFactory]
+	logger   logger.ContextLogger
 
 	writeAccess chan struct{}
 	pending     *buf.Buffer
@@ -72,11 +69,9 @@ func newClientSession(client *Client, conn net.Conn) *session {
 	pending := buf.NewSize(frameOverhead + len(settingsData))
 	putFrameHeader(pending.Extend(frameOverhead), commandSettings, 0, len(settingsData))
 	common.Must1(pending.Write(settingsData))
-	vectorised, _ := bufio.CreateVectorisedWriter(conn)
 	return &session{
 		conn:        conn,
 		reader:      std_bufio.NewReaderSize(conn, sessionReadBufferSize),
-		vectorised:  vectorised,
 		isClient:    true,
 		padding:     &client.padding,
 		logger:      client.logger,
@@ -91,11 +86,9 @@ func newClientSession(client *Client, conn net.Conn) *session {
 }
 
 func newServerSession(ctx context.Context, service *Service, conn net.Conn, source M.Socksaddr) *session {
-	vectorised, _ := bufio.CreateVectorisedWriter(conn)
 	return &session{
 		conn:           conn,
 		reader:         std_bufio.NewReaderSize(conn, sessionReadBufferSize),
-		vectorised:     vectorised,
 		padding:        &service.padding,
 		logger:         service.logger,
 		writeAccess:    make(chan struct{}, 1),
@@ -242,6 +235,8 @@ func (s *session) readLoop() error {
 		if err != nil {
 			return err
 		}
+		// sing-box servers up to 1.14 never send cmdSYNACK for streams served by
+		// hijack-dns, so any frame from the peer has to disarm the watchdog.
 		if s.openTimeoutArmed.Load() {
 			s.stopOpenTimeout()
 		}
@@ -493,6 +488,32 @@ func (s *session) write(target *stream, buffer *buf.Buffer, limit *pipe.Deadline
 	return err
 }
 
+// sing-anytls 0.0.13 Session.OpenStream writes cmdSYN as its own padded record and
+// Client.CreateProxy writes the destination without any payload as the next one; only on
+// a new session are both still buffered behind the settings frame and flushed as one record.
+func (s *session) writeRequest(target *stream, request *buf.Buffer, limit *pipe.Deadline) error {
+	err := s.lockWriteUntil(target, limit)
+	if err != nil {
+		request.Release()
+		return err
+	}
+	s.armOpenTimeout(target.id)
+	if s.pending != nil {
+		err = s.writeLocked(request)
+	} else {
+		err = s.writePacketLocked(request.To(frameOverhead))
+		if err == nil {
+			err = s.writePacketLocked(request.From(frameOverhead))
+		}
+		request.Release()
+	}
+	s.unlockWrite()
+	if err != nil {
+		s.Close()
+	}
+	return err
+}
+
 func (s *session) writeData(target *stream, data []byte) (int, error) {
 	dataLen := len(data)
 	if dataLen == 0 {
@@ -513,37 +534,6 @@ func (s *session) writeData(target *stream, data []byte) (int, error) {
 	return dataLen, nil
 }
 
-func (s *session) writeFrames(target *stream, frames []*buf.Buffer) error {
-	if len(frames) == 0 {
-		return nil
-	}
-	err := s.lockWriteUntil(target, &target.writeDeadline)
-	if err != nil {
-		buf.ReleaseMulti(frames)
-		return err
-	}
-	if s.vectorised != nil && s.pending == nil && !s.sendPadding {
-		err = s.vectorised.WriteVectorised(frames)
-	} else {
-		var frontHeadroom int
-		if s.pending != nil {
-			frontHeadroom = s.pending.Len()
-		}
-		combined := buf.NewSize(frontHeadroom + buf.LenMulti(frames))
-		combined.Resize(frontHeadroom, 0)
-		for _, frame := range frames {
-			common.Must1(combined.Write(frame.Bytes()))
-		}
-		buf.ReleaseMulti(frames)
-		err = s.writeLocked(combined)
-	}
-	s.unlockWrite()
-	if err != nil {
-		s.Close()
-	}
-	return err
-}
-
 func (s *session) writeFrame(command byte, streamID uint32, data []byte) error {
 	if len(data) > maxFrameSize {
 		return E.New("anytls: control frame too large: ", len(data))
@@ -551,12 +541,12 @@ func (s *session) writeFrame(command byte, streamID uint32, data []byte) error {
 	frame := buf.NewSize(frameOverhead + len(data))
 	putFrameHeader(frame.Extend(frameOverhead), command, streamID, len(data))
 	common.Must1(frame.Write(data))
+	s.conn.SetWriteDeadline(time.Now().Add(controlFrameWriteTimeout))
 	err := s.lockWrite()
 	if err != nil {
 		frame.Release()
 		return err
 	}
-	s.conn.SetWriteDeadline(time.Now().Add(controlFrameWriteTimeout))
 	err = s.writeLocked(frame)
 	if err == nil {
 		s.conn.SetWriteDeadline(time.Time{})
@@ -586,13 +576,13 @@ func (s *session) writeLocked(buffer *buf.Buffer) error {
 	defer func() {
 		buffer.Release()
 	}()
-	if !s.sendPadding {
-		return common.Error(s.conn.Write(buffer.Bytes()))
-	}
-	return s.writePaddedLocked(buffer.Bytes())
+	return s.writePacketLocked(buffer.Bytes())
 }
 
-func (s *session) writePaddedLocked(data []byte) error {
+func (s *session) writePacketLocked(data []byte) error {
+	if !s.sendPadding {
+		return common.Error(s.conn.Write(data))
+	}
 	s.packetCount++
 	factory := s.padding.Load()
 	if s.packetCount >= factory.stop {

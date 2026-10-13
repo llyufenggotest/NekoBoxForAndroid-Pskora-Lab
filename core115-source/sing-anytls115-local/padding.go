@@ -12,7 +12,10 @@ import (
 	E "github.com/sagernet/sing/common/exceptions"
 )
 
-const paddingCheckMark = -1
+const (
+	paddingCheckMark = -1
+	maxPaddingSize   = 1 << 20
+)
 
 var DefaultPaddingScheme = []byte(`stop=8
 0=30-30
@@ -80,7 +83,7 @@ func newPaddingFactory(rawScheme []byte) (*paddingFactory, error) {
 			if minSize > maxSize {
 				minSize, maxSize = maxSize, minSize
 			}
-			if minSize <= 0 || maxSize <= 0 {
+			if minSize <= 0 || maxSize > maxPaddingSize {
 				continue
 			}
 			ranges = append(ranges, paddingRange{minSize: minSize, maxSize: maxSize})
