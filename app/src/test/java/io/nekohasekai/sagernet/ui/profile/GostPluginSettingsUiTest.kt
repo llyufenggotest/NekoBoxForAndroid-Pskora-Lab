@@ -3,6 +3,7 @@ package io.nekohasekai.sagernet.ui.profile
 import android.app.Application
 import android.content.Intent
 import android.os.Bundle
+import android.os.Looper
 import androidx.fragment.app.FragmentActivity
 import androidx.preference.EditTextPreference
 import androidx.preference.PreferenceFragmentCompat
@@ -13,8 +14,11 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
+import moe.matsuri.nb4a.TempDatabase
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -24,6 +28,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -31,6 +36,11 @@ import org.robolectric.annotation.Config
 class GostPluginSettingsUiTest {
     @get:Rule
     val roomLifecycle = RoomLifecycleRule()
+
+    @After
+    fun resetEditorHooks() {
+        ProfileSettingsActivity.resetTestHooks()
+    }
 
     @Test fun structuredStateRoundTripsAndPreservesAdvancedUnknownOptions() {
         val raw = "mode=mwss;host=cdn.invalid;path=/gost;mux=3;insecure;nocomp;future=value\\;semi"
@@ -77,6 +87,7 @@ class GostPluginSettingsUiTest {
         DataStore.profileCacheStore.putString("pluginName", "obfs-local")
         DataStore.profileCacheStore.putString("pluginConfig", "obfs=http;obfs-host=plain.invalid")
         val controller = Robolectric.buildActivity(ShadowsocksSettingsActivity::class.java).setup()
+        controller.get().awaitInitializationForTest()
         val activity = controller.get()
         val fragment = activity.supportFragmentManager.fragments.single() as PreferenceFragmentCompat
         val plugin = fragment.findPreference<SimpleMenuPreference>("pluginName")!!
@@ -114,6 +125,7 @@ class GostPluginSettingsUiTest {
         changeText(controller.get(), "gostPluginHost", "cdn.invalid")
 
         controller.recreate()
+        controller.get().awaitInitializationForTest()
         assertEditorState(controller.get(), "gost-plugin", "mode=grpc;host=cdn.invalid;mux;future=false")
         selectPlugin(controller.get(), "obfs-local")
         assertEditorState(controller.get(), "obfs-local", "obfs=http;obfs-host=plain.invalid")
@@ -138,7 +150,7 @@ class GostPluginSettingsUiTest {
         controller.pause().stop().destroy()
     }
 
-    @Test fun openingAnotherProfileCannotReadPreviousGostSession() = runBlocking {
+    @Test fun openingAnotherProfileCannotReadPreviousGostSession(): Unit = runBlocking {
         DataStore.profileCacheStore.reset()
         val group = createGroup("isolated")
         val gostId = createProfile(group.id, "gost-plugin;mode=mwss;host=a.invalid;future=a")
@@ -155,7 +167,7 @@ class GostPluginSettingsUiTest {
         controller.pause().stop().destroy()
     }
 
-    @Test fun openingNewProfileCannotReadPreviousGostSession() = runBlocking {
+    @Test fun openingNewProfileCannotReadPreviousGostSession(): Unit = runBlocking {
         DataStore.profileCacheStore.reset()
         val group = createGroup("new-isolated")
         val gostId = createProfile(group.id, "gost-plugin;mode=grpc;host=a.invalid;future=a")
@@ -166,13 +178,14 @@ class GostPluginSettingsUiTest {
 
         DataStore.selectedGroup = group.id
         controller = Robolectric.buildActivity(ShadowsocksSettingsActivity::class.java).setup()
+        controller.get().awaitInitializationForTest()
         assertEditorState(controller.get(), "", "")
         selectPlugin(controller.get(), "gost-plugin")
         assertEditorState(controller.get(), "gost-plugin", "")
         controller.pause().stop().destroy()
     }
 
-    @Test fun processDeathReloadsExistingProfileFromDatabaseWithoutChangingIdentity() = runBlocking {
+    @Test fun processDeathReloadsExistingProfileFromDatabaseWithoutChangingIdentity(): Unit = runBlocking {
         DataStore.profileCacheStore.reset()
         val group = createGroup("death-existing")
         val profileId = createProfile(group.id, "gost-plugin;mode=mwss;host=persisted.invalid;future=db")
@@ -220,7 +233,111 @@ class GostPluginSettingsUiTest {
         controller.pause().stop().destroy()
     }
 
-    @Test fun directSaveAfterGostEditPersistsRealBeanInsteadOfBarePlugin() = runBlocking {
+    @Test fun staleInitializationCannotOverwriteNewOwnerOrCommitFragment(): Unit = runBlocking {
+        DataStore.profileCacheStore.reset()
+        val group = createGroup("stale")
+        val firstId = createProfile(group.id, "gost-plugin;mode=mwss;host=first.invalid")
+        val secondId = createProfile(group.id, "gost-plugin;mode=grpc;host=second.invalid")
+        val firstEntered = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        ProfileSettingsActivity.testEntityLoader = { profileId ->
+            if (profileId == firstId) {
+                firstEntered.complete(Unit)
+                releaseFirst.await()
+            }
+            SagerDatabase.proxyDao.getById(profileId)
+        }
+
+        val first = Robolectric.buildActivity(
+            ShadowsocksSettingsActivity::class.java,
+            editorIntent(firstId),
+        ).create().start().resume().visible()
+        firstEntered.await()
+        val second = launchExisting(secondId)
+        assertEquals(secondId, second.get().currentEditingId())
+        assertEquals(group.id, second.get().currentEditingGroup())
+        val secondOwner = DataStore.profileCacheStore.getString("profileSettings.cacheSessionId")
+        val secondCache = TempDatabase.profileCacheDao.all().associate {
+            it.key to Pair(it.valueType, it.value.toList())
+        }
+        releaseFirst.complete(Unit)
+        first.get().awaitInitializationForTest()
+
+        assertEquals(secondId, DataStore.editingId)
+        assertEquals(secondOwner, DataStore.profileCacheStore.getString("profileSettings.cacheSessionId"))
+        assertEquals(
+            secondCache,
+            TempDatabase.profileCacheDao.all().associate {
+                it.key to Pair(it.valueType, it.value.toList())
+            },
+        )
+        assertTrue(first.get().supportFragmentManager.fragments.isEmpty())
+        first.pause().stop().destroy()
+        second.pause().stop().destroy()
+    }
+
+    @Test fun recreateWhileInitializationPendingTakesOverAndCreatesOneFragment(): Unit = runBlocking {
+        DataStore.profileCacheStore.reset()
+        val group = createGroup("recreate-pending")
+        val profileId = createProfile(group.id, "gost-plugin;mode=mwss;host=recreated.invalid")
+        val firstEntered = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        ProfileSettingsActivity.testEntityLoader = { id ->
+            if (!firstEntered.isCompleted) {
+                firstEntered.complete(Unit)
+                releaseFirst.await()
+            }
+            SagerDatabase.proxyDao.getById(id)
+        }
+
+        val controller = Robolectric.buildActivity(
+            ShadowsocksSettingsActivity::class.java,
+            editorIntent(profileId),
+        ).create().start().resume().visible()
+        firstEntered.await()
+        controller.recreate()
+        releaseFirst.complete(Unit)
+        controller.get().awaitInitializationForTest()
+
+        assertEquals(profileId, controller.get().currentEditingId())
+        assertEquals(group.id, controller.get().currentEditingGroup())
+        assertFalse(controller.get().isFinishing)
+        controller.pause().stop().destroy()
+    }
+
+    @Test fun concurrentEditorsSaveTheirOwnIdentityAndGroup(): Unit = runBlocking {
+        DataStore.profileCacheStore.reset()
+        val existingGroup = createGroup("save-existing")
+        val newGroup = createGroup("save-new")
+        val existingId = createProfile(existingGroup.id, "gost-plugin;mode=ws;host=old.invalid")
+        val existing = launchExisting(existingId)
+
+        DataStore.selectedGroup = newGroup.id
+        val fresh = Robolectric.buildActivity(ShadowsocksSettingsActivity::class.java).setup()
+        fresh.get().awaitInitializationForTest()
+
+        existing.get().claimOwnershipForTest(
+            mapOf(
+                "pluginName" to "gost-plugin",
+                "pluginConfig" to "mode=ws;host=updated.invalid",
+            )
+        )
+        existing.get().saveAndExit()
+        fresh.get().claimOwnershipForTest(
+            mapOf(
+                "pluginName" to "gost-plugin",
+                "pluginConfig" to "mode=mwss;host=created.invalid",
+            )
+        )
+        fresh.get().saveAndExit()
+
+        val updated = SagerDatabase.proxyDao.getById(existingId)!!
+        assertEquals(existingGroup.id, updated.groupId)
+        val created = SagerDatabase.proxyDao.getAll().single { it.id != existingId }
+        assertEquals(newGroup.id, created.groupId)
+    }
+
+    @Test fun directSaveAfterGostEditPersistsRealBeanInsteadOfBarePlugin(): Unit = runBlocking {
         DataStore.profileCacheStore.reset()
         val controller = launchEditor()
         selectPlugin(controller.get(), "gost-plugin")
@@ -257,16 +374,22 @@ class GostPluginSettingsUiTest {
     private fun launchExisting(profileId: Long) = Robolectric.buildActivity(
         ShadowsocksSettingsActivity::class.java,
         editorIntent(profileId),
-    ).setup()
+    ).setup().also { it.get().awaitInitializationForTest() }
 
     private fun launchEditor(): org.robolectric.android.controller.ActivityController<ShadowsocksSettingsActivity> {
         val group = createGroup("test")
         DataStore.selectedGroup = group.id
-        return Robolectric.buildActivity(ShadowsocksSettingsActivity::class.java).setup()
+        return Robolectric.buildActivity(ShadowsocksSettingsActivity::class.java).setup().also {
+            it.get().awaitInitializationForTest()
+        }
     }
 
-    private fun fragment(activity: ShadowsocksSettingsActivity) =
-        activity.supportFragmentManager.fragments.single() as PreferenceFragmentCompat
+    private fun fragment(activity: ShadowsocksSettingsActivity): PreferenceFragmentCompat {
+        activity.supportFragmentManager.executePendingTransactions()
+        shadowOf(Looper.getMainLooper()).idle()
+        activity.supportFragmentManager.executePendingTransactions()
+        return activity.supportFragmentManager.fragments.single() as PreferenceFragmentCompat
+    }
 
     private fun selectPlugin(activity: ShadowsocksSettingsActivity, name: String) {
         val preference = fragment(activity).findPreference<SimpleMenuPreference>("pluginName")!!
