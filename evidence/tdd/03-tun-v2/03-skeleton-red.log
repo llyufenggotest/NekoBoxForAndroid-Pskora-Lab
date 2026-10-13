@@ -1,0 +1,9 @@
+# github.com/sagernet/sing-tun [github.com/sagernet/sing-tun.test]
+.\diagnostic_nat_test.go:6:163: too many arguments in call to NewNat
+	have (context.Context, "time".Duration, *natCapture)
+	want (context.Context, "time".Duration)
+.\diagnostic_nat_test.go:6: n.Purge undefined (type *TCPNat has no field or method Purge)
+FAIL	github.com/sagernet/sing-tun [build failed]
+ok  	github.com/sagernet/sing-tun/diagnostic	(cached)
+ok  	github.com/sagernet/sing-tun/ping	(cached)
+FAIL

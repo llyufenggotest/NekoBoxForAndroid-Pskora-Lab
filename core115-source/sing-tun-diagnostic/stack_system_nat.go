@@ -2,21 +2,18 @@ package tun
 
 import (
 	"context"
-	D "github.com/sagernet/sing-tun/diagnostic"
 	"net/netip"
 	"sync"
 	"time"
 )
 
 type TCPNat struct {
-	diagnosticLogger D.Logger
-	diagnosticID     uint64
-	timeout          time.Duration
-	portIndex        uint16
-	portAccess       sync.RWMutex
-	addrAccess       sync.RWMutex
-	addrMap          map[tcpNatKey]uint16
-	portMap          map[uint16]*TCPSession
+	timeout    time.Duration
+	portIndex  uint16
+	portAccess sync.RWMutex
+	addrAccess sync.RWMutex
+	addrMap    map[tcpNatKey]uint16
+	portMap    map[uint16]*TCPSession
 }
 
 type tcpNatKey struct {
@@ -31,16 +28,12 @@ type TCPSession struct {
 	LastActive  time.Time
 }
 
-func NewNat(ctx context.Context, timeout time.Duration, diagnosticLogger ...D.Logger) *TCPNat {
+func NewNat(ctx context.Context, timeout time.Duration) *TCPNat {
 	natMap := &TCPNat{
 		timeout:   timeout,
 		portIndex: 10000,
 		addrMap:   make(map[tcpNatKey]uint16),
 		portMap:   make(map[uint16]*TCPSession),
-	}
-	if len(diagnosticLogger) > 0 {
-		natMap.diagnosticLogger = diagnosticLogger[0]
-		natMap.diagnosticID = D.Next()
 	}
 	go natMap.loopCheckTimeout(ctx)
 	return natMap
@@ -85,21 +78,10 @@ func (n *TCPNat) checkTimeout() {
 		e.session.Lock()
 		if now.Sub(e.session.LastActive) > n.timeout {
 			delete(n.addrMap, tcpNatKey{Source: e.session.Source, Destination: e.session.Destination})
-			D.Emit(n.diagnosticLogger, D.Record{Event: D.NATExpire, NAT: n.diagnosticID, Generation: D.Generation(), Port: e.port, Source: e.session.Source.Port()})
 			delete(n.portMap, e.port)
 		}
 		e.session.Unlock()
 	}
-	n.portAccess.Unlock()
-	n.addrAccess.Unlock()
-}
-
-func (n *TCPNat) Purge() {
-	n.addrAccess.Lock()
-	n.portAccess.Lock()
-	D.Emit(n.diagnosticLogger, D.Record{Event: D.NATPurge, NAT: n.diagnosticID, Generation: D.Generation(), Value: len(n.portMap)})
-	clear(n.addrMap)
-	clear(n.portMap)
 	n.portAccess.Unlock()
 	n.addrAccess.Unlock()
 }
@@ -158,7 +140,6 @@ func (n *TCPNat) Lookup(source netip.AddrPort, destination netip.AddrPort) uint1
 		Destination: destination,
 		LastActive:  time.Now(),
 	}
-	D.Emit(n.diagnosticLogger, D.Record{Event: D.NATCreate, NAT: n.diagnosticID, Generation: D.Generation(), Port: nextPort, Source: source.Port()})
 	n.addrMap[key] = nextPort
 	return nextPort
 }

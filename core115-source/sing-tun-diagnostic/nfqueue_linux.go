@@ -286,16 +286,20 @@ func (h *nfqueueHandler) handlePacket(attr nfqueue.Attribute) int {
 	case ActionReject:
 		if packet.protocol == uint8(unix.IPPROTO_TCP) {
 			h.setVerdict(attr, nfqueue.NfRepeat, h.resetMark)
-		} else if h.repeatOnAccept {
-			h.setVerdict(attr, nfqueue.NfRepeat, h.inputMark)
 		} else {
-			h.setVerdict(attr, nfqueue.NfAccept, 0)
+			h.setVerdict(attr, nfqueue.NfRepeat, h.inputMark)
 		}
 	case ActionDrop:
 		h.setVerdict(attr, nfqueue.NfDrop, 0)
+	case ActionFlow, ActionHijackDNS:
+		h.setVerdict(attr, nfqueue.NfRepeat, h.inputMark)
 	default:
-		acceptVerdict, acceptMark := h.acceptVerdict(packet)
-		h.setVerdict(attr, acceptVerdict, acceptMark)
+		if packet.protocol == uint8(unix.IPPROTO_TCP) {
+			acceptVerdict, acceptMark := h.acceptVerdict(packet)
+			h.setVerdict(attr, acceptVerdict, acceptMark)
+		} else {
+			h.setVerdict(attr, nfqueue.NfRepeat, h.inputMark)
+		}
 	}
 
 	return 0

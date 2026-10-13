@@ -1,0 +1,59 @@
+name: test
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+      - '!.github/workflows/debug.yml'
+      - '!.github/workflows/test.yml'
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  test:
+    name: ${{ matrix.os }} (Go ${{ matrix.go }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        go: ['1.25.x', '1.26.x', stable]
+        include:
+          - os: windows-latest
+            go: stable
+          - os: macos-latest
+            go: stable
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Install network test tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iproute2
+      - name: Test
+        env:
+          TEST_FLAGS: ${{ runner.os != 'Windows' && '-exec sudo' || '' }}
+        run: make test
+      - name: Test unprivileged ping
+        if: runner.os != 'Linux'
+        run: go test -v ./ping
+      - name: Test privileged ping
+        if: runner.os != 'Windows'
+        run: |
+          go test -c -o ping_test ./ping
+          sudo ./ping_test -test.v

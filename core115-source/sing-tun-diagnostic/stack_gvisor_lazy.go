@@ -153,15 +153,6 @@ func (c *gLazyConn) Close() error {
 	return c.tcpConn.Close()
 }
 
-// AbortiveClose resets an established app-facing TCP endpoint. Before the
-// handshake is accepted, rejecting the ForwarderRequest is already abortive.
-func (c *gLazyConn) AbortiveClose() error {
-	if c.closeBeforeHandshake() {
-		return nil
-	}
-	return c.tcpConn.AbortiveClose()
-}
-
 func (c *gLazyConn) CloseRead() error {
 	if c.closeBeforeHandshake() {
 		return nil

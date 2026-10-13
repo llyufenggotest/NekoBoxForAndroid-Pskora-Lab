@@ -90,7 +90,7 @@ func (r *autoRedirect) nftablesCreateLoopbackAddressSets(
 }
 
 func (r *autoRedirect) nftablesCreateExcludeRules(nft *nftables.Conn, table *nftables.Table, chain *nftables.Chain) error {
-	if r.tunOptions.AutoRedirectMarkMode && chain.Hooknum == nftables.ChainHookOutput && chain.Type != nftables.ChainTypeFilter {
+	if r.tunOptions.AutoRedirectMarkMode && chain.Hooknum == nftables.ChainHookOutput && chain.Type != nftables.ChainTypeFilter && chain.Name != "output_prematch" {
 		if chain.Type == nftables.ChainTypeRoute {
 			ipProto := &nftables.Set{
 				Table:     table,
@@ -167,47 +167,19 @@ func (r *autoRedirect) nftablesCreateExcludeRules(nft *nftables.Conn, table *nft
 			})
 		}
 	}
-	if chain.Hooknum == nftables.ChainHookPrerouting && chain.Type == nftables.ChainTypeNAT {
-		nft.AddRule(&nftables.Rule{
-			Table: table,
-			Chain: chain,
-			Exprs: []expr.Any{
-				&expr.Ct{
-					Key:      expr.CtKeyMARK,
-					Register: 1,
+	if chain.Type == nftables.ChainTypeNAT {
+		for _, mark := range []uint32{r.tunOptions.AutoRedirectOutputMark, r.tunOptions.AutoRedirectInputMark} {
+			nft.AddRule(&nftables.Rule{
+				Table: table,
+				Chain: chain,
+				Exprs: []expr.Any{
+					&expr.Ct{Key: expr.CtKeyMARK, Register: 1},
+					&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: binaryutil.NativeEndian.PutUint32(mark)},
+					&expr.Counter{},
+					&expr.Verdict{Kind: expr.VerdictReturn},
 				},
-				&expr.Cmp{
-					Op:       expr.CmpOpEq,
-					Register: 1,
-					Data:     binaryutil.NativeEndian.PutUint32(r.tunOptions.AutoRedirectOutputMark),
-				},
-				&expr.Counter{},
-				&expr.Verdict{
-					Kind: expr.VerdictReturn,
-				},
-			},
-		})
-	}
-	if chain.Hooknum == nftables.ChainHookOutput && chain.Type == nftables.ChainTypeNAT {
-		nft.AddRule(&nftables.Rule{
-			Table: table,
-			Chain: chain,
-			Exprs: []expr.Any{
-				&expr.Ct{
-					Key:      expr.CtKeyMARK,
-					Register: 1,
-				},
-				&expr.Cmp{
-					Op:       expr.CmpOpEq,
-					Register: 1,
-					Data:     binaryutil.NativeEndian.PutUint32(r.tunOptions.AutoRedirectOutputMark),
-				},
-				&expr.Counter{},
-				&expr.Verdict{
-					Kind: expr.VerdictReturn,
-				},
-			},
-		})
+			})
+		}
 	}
 	if chain.Hooknum == nftables.ChainHookPrerouting {
 		nft.AddRule(&nftables.Rule{
@@ -229,6 +201,7 @@ func (r *autoRedirect) nftablesCreateExcludeRules(nft *nftables.Conn, table *nft
 				},
 			},
 		})
+		r.nftablesAddBridgeIngressReturn(nft, table, chain)
 		if len(r.tunOptions.IncludeInterface) > 0 {
 			if len(r.tunOptions.IncludeInterface) > 1 {
 				includeInterface := &nftables.Set{
@@ -634,7 +607,7 @@ func (r *autoRedirect) nftablesCreateExcludeRules(nft *nftables.Conn, table *nft
 	}
 
 	if r.tunOptions.DNSModeOrDefault() == DNSModeHijack &&
-		(chain.Type == nftables.ChainTypeNAT || chain.Type == nftables.ChainTypeFilter) &&
+		(chain.Type == nftables.ChainTypeNAT || chain.Type == nftables.ChainTypeFilter || chain.Name == "output_prematch") &&
 		(chain.Hooknum == nftables.ChainHookPrerouting ||
 			(r.tunOptions.AutoRedirectMarkMode && chain.Hooknum == nftables.ChainHookOutput)) {
 		if r.enableIPv4 {
@@ -658,7 +631,7 @@ func (r *autoRedirect) nftablesCreateExcludeRules(nft *nftables.Conn, table *nft
 		nftablesCreateExcludeDestinationIPSet(nft, table, chain, 6, "inet6_local_address_set", nftables.TableFamilyIPv6, false)
 	}
 
-	if chain.Type == nftables.ChainTypeNAT || (chain.Type == nftables.ChainTypeFilter && r.tunOptions.ExcludeMPTCP) {
+	if chain.Type == nftables.ChainTypeNAT || r.tunOptions.ExcludeMPTCP {
 		mptcpVerdict := expr.VerdictDrop
 		if r.tunOptions.ExcludeMPTCP {
 			mptcpVerdict = expr.VerdictReturn
@@ -1084,7 +1057,7 @@ func (r *autoRedirect) nftablesCreateDNSHijackRulesForFamily(
 		},
 		&expr.Counter{},
 	)
-	if chain.Type == nftables.ChainTypeFilter {
+	if chain.Type != nftables.ChainTypeNAT {
 		exprs = append(exprs, &expr.Verdict{
 			Kind: expr.VerdictReturn,
 		})

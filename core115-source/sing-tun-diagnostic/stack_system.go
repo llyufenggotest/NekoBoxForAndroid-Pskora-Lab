@@ -3,7 +3,6 @@ package tun
 import (
 	"context"
 	"errors"
-	D "github.com/sagernet/sing-tun/diagnostic"
 	"net"
 	"net/netip"
 	"os"
@@ -53,6 +52,7 @@ type System struct {
 	udpNat               *UDPNat
 	udpNATOptions        UDPNatOptions
 	dispatcher           *ForwardDispatcher
+	dispatchStage        *ForwardStage
 	bindInterface        bool
 	interfaceFinder      control.InterfaceFinder
 	frontHeadroom        int
@@ -84,12 +84,11 @@ func NewSystem(options StackOptions) (Stack, error) {
 		inet6Prefixes:        options.TunOptions.Inet6Address,
 		broadcastAddr:        BroadcastAddr(options.TunOptions.Inet4Address),
 		udpNATOptions: UDPNatOptions{
-			Timeout:          options.UDPTimeout,
-			Mapping:          options.UDPMapping,
-			Filtering:        options.UDPFiltering,
-			MaxSize:          options.UDPNATMax,
-			InterfaceFinder:  options.InterfaceFinder,
-			ExcludeInterface: []string{options.TunOptions.Name},
+			Timeout:         options.UDPTimeout,
+			Mapping:         options.UDPMapping,
+			Filtering:       options.UDPFiltering,
+			MaxSize:         options.UDPNATMax,
+			InterfaceFinder: options.InterfaceFinder,
 		},
 		bindInterface:       options.ForwarderBindInterface,
 		interfaceFinder:     options.InterfaceFinder,
@@ -116,12 +115,6 @@ func NewSystem(options StackOptions) (Stack, error) {
 }
 
 func (s *System) ResetNetwork() {
-	if s.tcpNat4 != nil {
-		s.tcpNat4.Purge()
-	}
-	if s.tcpNat6 != nil {
-		s.tcpNat6.Purge()
-	}
 	if s.udpNat != nil {
 		s.udpNat.Purge()
 	}
@@ -175,7 +168,7 @@ func (s *System) start() error {
 		}
 		s.tcpListener = tcpListener
 		s.tcpPort = M.SocksaddrFromNet(tcpListener.Addr()).Port
-		s.tcpNat4 = NewNat(s.ctx, s.udpTimeout, s.logger)
+		s.tcpNat4 = NewNat(s.ctx, s.udpTimeout)
 		go s.acceptLoop(tcpListener, s.tcpNat4)
 	}
 	if s.inet6NextAddress.IsValid() {
@@ -191,7 +184,7 @@ func (s *System) start() error {
 		}
 		s.tcpListener6 = tcpListener
 		s.tcpPort6 = M.SocksaddrFromNet(tcpListener.Addr()).Port
-		s.tcpNat6 = NewNat(s.ctx, s.udpTimeout, s.logger)
+		s.tcpNat6 = NewNat(s.ctx, s.udpTimeout)
 		go s.acceptLoop(tcpListener, s.tcpNat6)
 	}
 	udpNATOptions := s.udpNATOptions
@@ -207,7 +200,8 @@ func (s *System) start() error {
 		s.txChecksumOffload = linuxTUN.TXChecksumOffload()
 	}
 	if s.handler != nil {
-		s.dispatcher = NewForwardDispatcher(s.handler, newSystemWriteback(s.tun, s.frontHeadroom), s.logger, s.udpTimeout, s.icmpTimeout)
+		s.dispatcher = NewForwardDispatcher(s.handler, newSystemWriteback(s.tun, s.frontHeadroom), s.logger, s.udpNATOptions, s.icmpTimeout)
+		s.dispatchStage = s.dispatcher.NewStage(nil)
 	}
 	return nil
 }
@@ -229,15 +223,22 @@ func (s *System) tunLoop() {
 		return
 	}
 	packetBuffer := make([]byte, s.mtu+PacketOffset)
+	var readRetry ReadRetry
 	for {
 		n, err := s.tun.Read(packetBuffer)
 		if err != nil {
-			if E.IsClosed(err) {
-				return
+			if IsRecoverableReadError(err) {
+				s.logger.Debug(E.Cause(err, "read packet"))
+				readRetry.Wait(err)
+				continue
 			}
-			s.logger.Error(E.Cause(err, "read packet"))
+			if !E.IsClosed(err) {
+				s.logger.Error(E.Cause(err, "read packet"))
+			}
+			return
 		}
-		if n < header.IPv4MinimumSize {
+		readRetry.Reset()
+		if n-PacketOffset < header.IPv4MinimumSize {
 			continue
 		}
 		rawPacket := packetBuffer[:n]
@@ -248,7 +249,7 @@ func (s *System) tunLoop() {
 				s.logger.Trace(E.Cause(err, "write packet"))
 			}
 		}
-		s.dispatcher.Flush()
+		s.dispatchStage.Flush()
 	}
 }
 
@@ -268,7 +269,7 @@ func (s *System) wintunLoop(winTun WinTun) {
 				s.logger.Trace(E.Cause(err, "write packet"))
 			}
 		}
-		s.dispatcher.Flush()
+		s.dispatchStage.Flush()
 		release()
 	}
 }
@@ -280,13 +281,20 @@ func (s *System) batchLoopLinux(linuxTUN LinuxTUN, batchSize int) {
 	for i := range packetBuffers {
 		packetBuffers[i] = make([]byte, s.mtu+s.frontHeadroom)
 	}
+	var readRetry ReadRetry
 	for {
 		n, err := linuxTUN.BatchRead(packetBuffers, s.frontHeadroom, packetSizes)
 		if err != nil {
-			if E.IsClosed(err) {
+			if !IsRecoverableReadError(err) {
+				if !E.IsClosed(err) {
+					s.logger.Error(E.Cause(err, "batch read packet"))
+				}
 				return
 			}
-			s.logger.Error(E.Cause(err, "batch read packet"))
+			s.logger.Debug(E.Cause(err, "batch read packet"))
+			readRetry.Wait(err)
+		} else {
+			readRetry.Reset()
 		}
 		if n == 0 {
 			continue
@@ -309,20 +317,27 @@ func (s *System) batchLoopLinux(linuxTUN LinuxTUN, batchSize int) {
 			}
 			writeBuffers = writeBuffers[:0]
 		}
-		s.dispatcher.Flush()
+		s.dispatchStage.Flush()
 	}
 }
 
 func (s *System) batchLoopDarwin(darwinTUN DarwinTUN) {
 	var writeBuffers []*buf.Buffer
 	var releaseBuffers []*buf.Buffer
+	var readRetry ReadRetry
 	for {
-		buffers, err := darwinTUN.BatchRead()
+		buffers, err := darwinTUN.BatchRead(0, 0)
 		if err != nil {
-			if E.IsClosed(err) || errors.Is(err, syscall.EBADF) {
+			if !IsRecoverableReadError(err) {
+				if !E.IsClosed(err) && !errors.Is(err, syscall.EBADF) {
+					s.logger.Error(E.Cause(err, "batch read packet"))
+				}
 				return
 			}
-			s.logger.Error(E.Cause(err, "batch read packet"))
+			s.logger.Debug(E.Cause(err, "batch read packet"))
+			readRetry.Wait(err)
+		} else {
+			readRetry.Reset()
 		}
 		if len(buffers) == 0 {
 			continue
@@ -348,7 +363,7 @@ func (s *System) batchLoopDarwin(darwinTUN DarwinTUN) {
 			}
 			buf.ReleaseMulti(writeBuffers)
 		}
-		s.dispatcher.Flush()
+		s.dispatchStage.Flush()
 		buf.ReleaseMulti(releaseBuffers)
 	}
 }
@@ -406,7 +421,7 @@ func (s *System) dispatchIPv4(ipHdr header.IPv4, destination netip.Addr) bool {
 			return false
 		}
 	}
-	return s.dispatcher.Dispatch(ipHdr)
+	return s.dispatchStage.Dispatch(ipHdr)
 }
 
 func (s *System) dispatchIPv6(ipHdr header.IPv6, destination netip.Addr) bool {
@@ -425,10 +440,14 @@ func (s *System) dispatchIPv6(ipHdr header.IPv6, destination netip.Addr) bool {
 			return false
 		}
 	}
-	return s.dispatcher.Dispatch(ipHdr)
+	return s.dispatchStage.Dispatch(ipHdr)
 }
 
 func (s *System) processIPv4(ipHdr header.IPv4) (writeBack bool, err error) {
+	if !ipHdr.IsValid(len(ipHdr)) {
+		return false, E.New("ipv4: invalid packet")
+	}
+	ipHdr = ipHdr[:ipHdr.TotalLength()]
 	destination := ipHdr.DestinationAddr()
 	if destination == s.broadcastAddr || !destination.IsGlobalUnicast() {
 		return
@@ -453,6 +472,10 @@ func (s *System) processIPv4(ipHdr header.IPv4) (writeBack bool, err error) {
 }
 
 func (s *System) processIPv6(ipHdr header.IPv6) (writeBack bool, err error) {
+	if !ipHdr.IsValid(len(ipHdr)) {
+		return false, E.New("ipv6: invalid packet")
+	}
+	ipHdr = ipHdr[:header.IPv6MinimumSize+int(ipHdr.PayloadLength())]
 	destination := ipHdr.DestinationAddr()
 	if !destination.IsGlobalUnicast() {
 		return
@@ -480,6 +503,12 @@ func (s *System) processIPv4TCP(ipHdr header.IPv4, tcpHdr header.TCP) (bool, err
 	if s.tcpNat4 == nil {
 		return false, nil
 	}
+	if ipHdr.Flags()&header.IPv4FlagMoreFragments != 0 || ipHdr.FragmentOffset() != 0 {
+		return false, E.New("ipv4: tcp: fragment dropped")
+	}
+	if len(tcpHdr) < header.TCPMinimumSize || int(tcpHdr.DataOffset()) < header.TCPMinimumSize || int(tcpHdr.DataOffset()) > len(tcpHdr) {
+		return false, E.New("ipv4: tcp: invalid packet")
+	}
 	source := netip.AddrPortFrom(ipHdr.SourceAddr(), tcpHdr.SourcePort())
 	destination := netip.AddrPortFrom(ipHdr.DestinationAddr(), tcpHdr.DestinationPort())
 	if !destination.Addr().IsGlobalUnicast() {
@@ -487,7 +516,6 @@ func (s *System) processIPv4TCP(ipHdr header.IPv4, tcpHdr header.TCP) (bool, err
 	} else if source.Addr() == s.inet4Address && source.Port() == s.tcpPort {
 		session := s.tcpNat4.LookupBack(destination.Port())
 		if session == nil {
-			D.Emit(s.logger, D.Record{Event: D.NATMiss, NAT: s.tcpNat4.diagnosticID, Generation: D.Generation(), Port: destination.Port(), Flags: uint8(tcpHdr.Flags())})
 			return false, E.New("ipv4: tcp: session not found: ", destination.Port())
 		}
 		rewriteIPv4TCP(ipHdr, tcpHdr, s.txChecksumOffload,
@@ -521,6 +549,9 @@ func (s *System) processIPv6TCP(ipHdr header.IPv6, tcpHdr header.TCP) (bool, err
 	if s.tcpNat6 == nil {
 		return false, nil
 	}
+	if len(tcpHdr) < header.TCPMinimumSize || int(tcpHdr.DataOffset()) < header.TCPMinimumSize || int(tcpHdr.DataOffset()) > len(tcpHdr) {
+		return false, E.New("ipv6: tcp: invalid packet")
+	}
 	source := netip.AddrPortFrom(ipHdr.SourceAddr(), tcpHdr.SourcePort())
 	destination := netip.AddrPortFrom(ipHdr.DestinationAddr(), tcpHdr.DestinationPort())
 	if !destination.Addr().IsGlobalUnicast() {
@@ -528,7 +559,6 @@ func (s *System) processIPv6TCP(ipHdr header.IPv6, tcpHdr header.TCP) (bool, err
 	} else if source.Addr() == s.inet6Address && source.Port() == s.tcpPort6 {
 		session := s.tcpNat6.LookupBack(destination.Port())
 		if session == nil {
-			D.Emit(s.logger, D.Record{Event: D.NATMiss, NAT: s.tcpNat6.diagnosticID, Generation: D.Generation(), Port: destination.Port(), Flags: uint8(tcpHdr.Flags())})
 			return false, E.New("ipv6: tcp: session not found: ", destination.Port())
 		}
 		rewriteIPv6TCP(ipHdr, tcpHdr, s.txChecksumOffload,
@@ -635,11 +665,11 @@ func rewriteIPv6TCP(ipHdr header.IPv6, tcpHdr header.TCP, txChecksumOffload bool
 }
 
 func (s *System) processIPv4UDP(ipHdr header.IPv4, udpHdr header.UDP) error {
-	if ipHdr.Flags()&header.IPv4FlagMoreFragments != 0 {
+	if ipHdr.Flags()&header.IPv4FlagMoreFragments != 0 || ipHdr.FragmentOffset() != 0 {
 		return E.New("ipv4: fragment dropped")
 	}
-	if ipHdr.FragmentOffset() != 0 {
-		return E.New("ipv4: udp: fragment dropped")
+	if len(udpHdr) < header.UDPMinimumSize {
+		return E.New("ipv4: udp: invalid packet")
 	}
 	source := M.SocksaddrFrom(ipHdr.SourceAddr(), udpHdr.SourcePort())
 	destination := M.SocksaddrFrom(ipHdr.DestinationAddr(), udpHdr.DestinationPort())
@@ -651,6 +681,9 @@ func (s *System) processIPv4UDP(ipHdr header.IPv4, udpHdr header.UDP) error {
 }
 
 func (s *System) processIPv6UDP(ipHdr header.IPv6, udpHdr header.UDP) error {
+	if len(udpHdr) < header.UDPMinimumSize {
+		return E.New("ipv6: udp: invalid packet")
+	}
 	source := M.SocksaddrFrom(ipHdr.SourceAddr(), udpHdr.SourcePort())
 	destination := M.SocksaddrFrom(ipHdr.DestinationAddr(), udpHdr.DestinationPort())
 	if !destination.Addr.IsGlobalUnicast() {
@@ -691,8 +724,25 @@ func (s *System) preparePacketConnection(source M.Socksaddr, destination M.Socks
 }
 
 func (s *System) processIPv4ICMP(ipHdr header.IPv4, icmpHdr header.ICMPv4) (bool, error) {
+	if ipHdr.Flags()&header.IPv4FlagMoreFragments != 0 || ipHdr.FragmentOffset() != 0 {
+		return false, E.New("ipv4: icmp: fragment dropped")
+	}
+	if len(icmpHdr) < header.ICMPv4MinimumSize {
+		return false, E.New("ipv4: icmp: invalid packet")
+	}
+	return rewriteEchoReplyIPv4(ipHdr, icmpHdr), nil
+}
+
+func (s *System) processIPv6ICMP(ipHdr header.IPv6, icmpHdr header.ICMPv6) (bool, error) {
+	if len(icmpHdr) < header.ICMPv6MinimumSize {
+		return false, E.New("ipv6: icmp: invalid packet")
+	}
+	return rewriteEchoReplyIPv6(ipHdr, icmpHdr), nil
+}
+
+func rewriteEchoReplyIPv4(ipHdr header.IPv4, icmpHdr header.ICMPv4) bool {
 	if icmpHdr.Type() != header.ICMPv4Echo || icmpHdr.Code() != 0 {
-		return false, nil
+		return false
 	}
 	icmpHdr.SetType(header.ICMPv4EchoReply)
 	sourceAddress := ipHdr.SourceAddr()
@@ -700,12 +750,12 @@ func (s *System) processIPv4ICMP(ipHdr header.IPv4, icmpHdr header.ICMPv4) (bool
 	ipHdr.SetDestinationAddr(sourceAddress)
 	icmpHdr.SetChecksum(header.ICMPv4Checksum(icmpHdr, 0))
 	ipHdr.SetChecksum(^ipHdr.CalculateChecksum())
-	return true, nil
+	return true
 }
 
-func (s *System) processIPv6ICMP(ipHdr header.IPv6, icmpHdr header.ICMPv6) (bool, error) {
+func rewriteEchoReplyIPv6(ipHdr header.IPv6, icmpHdr header.ICMPv6) bool {
 	if icmpHdr.Type() != header.ICMPv6EchoRequest || icmpHdr.Code() != 0 {
-		return false, nil
+		return false
 	}
 	icmpHdr.SetType(header.ICMPv6EchoReply)
 	sourceAddress := ipHdr.SourceAddr()
@@ -716,7 +766,7 @@ func (s *System) processIPv6ICMP(ipHdr header.IPv6, icmpHdr header.ICMPv6) (bool
 		Src:    ipHdr.SourceAddressSlice(),
 		Dst:    ipHdr.DestinationAddressSlice(),
 	}))
-	return true, nil
+	return true
 }
 
 type systemUDPPacketWriter4 struct {
@@ -731,9 +781,8 @@ func (w *systemUDPPacketWriter4) FrontHeadroom() int {
 	return w.frontHeadroom + len(w.header)
 }
 
-func (w *systemUDPPacketWriter4) preparePacket(buffer *buf.Buffer, destination M.Socksaddr) *buf.Buffer {
+func (w *systemUDPPacketWriter4) preparePacket(buffer *buf.Buffer, destination M.Socksaddr) {
 	payloadLen := buffer.Len()
-	buffer = (N.ReadWaitOptions{FrontHeadroom: w.FrontHeadroom()}).Copy(buffer)
 	copy(buffer.ExtendHeader(len(w.header)), w.header)
 	ipHdr := header.IPv4(buffer.Bytes())
 	ipHdr.SetTotalLength(uint16(buffer.Len()))
@@ -744,29 +793,31 @@ func (w *systemUDPPacketWriter4) preparePacket(buffer *buf.Buffer, destination M
 	udpHdr.SetSourcePort(destination.Port)
 	udpHdr.SetLength(uint16(payloadLen + header.UDPMinimumSize))
 	if !w.txChecksumOffload {
-		udpHdr.SetChecksum(^checksum.Checksum(udpHdr.Payload(), udpHdr.CalculateChecksum(
+		udpChecksum := ^checksum.Checksum(udpHdr.Payload(), udpHdr.CalculateChecksum(
 			header.PseudoHeaderChecksum(header.UDPProtocolNumber, ipHdr.SourceAddressSlice(), ipHdr.DestinationAddressSlice(), ipHdr.PayloadLength()),
-		)))
+		))
+		if udpChecksum == 0 {
+			udpChecksum = 0xffff
+		}
+		udpHdr.SetChecksum(udpChecksum)
 	} else {
 		udpHdr.SetChecksum(0)
 	}
 	ipHdr.SetChecksum(^ipHdr.CalculateChecksum())
-	return buffer
 }
 
-func (w *systemUDPPacketWriter4) prepareWritePacket(buffer *buf.Buffer, destination M.Socksaddr) *buf.Buffer {
-	buffer = w.preparePacket(buffer, destination)
+func (w *systemUDPPacketWriter4) prepareWritePacket(buffer *buf.Buffer, destination M.Socksaddr) {
+	w.preparePacket(buffer, destination)
 	if PacketOffset > 0 {
 		PacketFillHeader(buffer.ExtendHeader(PacketOffset), header.IPv4Version)
 	}
 	if remainingHeadroom := w.frontHeadroom - PacketOffset; remainingHeadroom > 0 {
 		buffer.Advance(-remainingHeadroom)
 	}
-	return buffer
 }
 
 func (w *systemUDPPacketWriter4) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
-	buffer = w.prepareWritePacket(buffer, destination)
+	w.prepareWritePacket(buffer, destination)
 	defer buffer.Release()
 	return common.Error(w.tun.Write(buffer.Bytes()))
 }
@@ -792,15 +843,14 @@ func (w *systemUDPPacketWriter4) WritePacketBatch(buffers []*buf.Buffer, destina
 	case LinuxTUN:
 		packets := make([][]byte, len(buffers))
 		for index, buffer := range buffers {
-			buffer = w.preparePacket(buffer, destinations[index])
+			w.preparePacket(buffer, destinations[index])
 			buffer.Advance(-w.frontHeadroom)
-			buffers[index] = buffer
 			packets[index] = buffer.Bytes()
 		}
 		return common.Error(tunInterface.BatchWrite(packets, w.frontHeadroom))
 	case DarwinTUN:
 		for index, buffer := range buffers {
-			buffers[index] = w.preparePacket(buffer, destinations[index])
+			w.preparePacket(buffer, destinations[index])
 		}
 		return tunInterface.BatchWrite(buffers)
 	default:
@@ -820,9 +870,8 @@ func (w *systemUDPPacketWriter6) FrontHeadroom() int {
 	return w.frontHeadroom + len(w.header)
 }
 
-func (w *systemUDPPacketWriter6) preparePacket(buffer *buf.Buffer, destination M.Socksaddr) *buf.Buffer {
+func (w *systemUDPPacketWriter6) preparePacket(buffer *buf.Buffer, destination M.Socksaddr) {
 	payloadLen := buffer.Len()
-	buffer = (N.ReadWaitOptions{FrontHeadroom: w.FrontHeadroom()}).Copy(buffer)
 	copy(buffer.ExtendHeader(len(w.header)), w.header)
 	ipHdr := header.IPv6(buffer.Bytes())
 	udpLen := uint16(header.UDPMinimumSize + payloadLen)
@@ -834,28 +883,30 @@ func (w *systemUDPPacketWriter6) preparePacket(buffer *buf.Buffer, destination M
 	udpHdr.SetSourcePort(destination.Port)
 	udpHdr.SetLength(udpLen)
 	if !w.txChecksumOffload {
-		udpHdr.SetChecksum(^checksum.Checksum(udpHdr.Payload(), udpHdr.CalculateChecksum(
+		udpChecksum := ^checksum.Checksum(udpHdr.Payload(), udpHdr.CalculateChecksum(
 			header.PseudoHeaderChecksum(header.UDPProtocolNumber, ipHdr.SourceAddressSlice(), ipHdr.DestinationAddressSlice(), ipHdr.PayloadLength()),
-		)))
+		))
+		if udpChecksum == 0 {
+			udpChecksum = 0xffff
+		}
+		udpHdr.SetChecksum(udpChecksum)
 	} else {
 		udpHdr.SetChecksum(0)
 	}
-	return buffer
 }
 
-func (w *systemUDPPacketWriter6) prepareWritePacket(buffer *buf.Buffer, destination M.Socksaddr) *buf.Buffer {
-	buffer = w.preparePacket(buffer, destination)
+func (w *systemUDPPacketWriter6) prepareWritePacket(buffer *buf.Buffer, destination M.Socksaddr) {
+	w.preparePacket(buffer, destination)
 	if PacketOffset > 0 {
 		PacketFillHeader(buffer.ExtendHeader(PacketOffset), header.IPv6Version)
 	}
 	if remainingHeadroom := w.frontHeadroom - PacketOffset; remainingHeadroom > 0 {
 		buffer.Advance(-remainingHeadroom)
 	}
-	return buffer
 }
 
 func (w *systemUDPPacketWriter6) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
-	buffer = w.prepareWritePacket(buffer, destination)
+	w.prepareWritePacket(buffer, destination)
 	defer buffer.Release()
 	return common.Error(w.tun.Write(buffer.Bytes()))
 }
@@ -881,15 +932,14 @@ func (w *systemUDPPacketWriter6) WritePacketBatch(buffers []*buf.Buffer, destina
 	case LinuxTUN:
 		packets := make([][]byte, len(buffers))
 		for index, buffer := range buffers {
-			buffer = w.preparePacket(buffer, destinations[index])
+			w.preparePacket(buffer, destinations[index])
 			buffer.Advance(-w.frontHeadroom)
-			buffers[index] = buffer
 			packets[index] = buffer.Bytes()
 		}
 		return common.Error(tunInterface.BatchWrite(packets, w.frontHeadroom))
 	case DarwinTUN:
 		for index, buffer := range buffers {
-			buffers[index] = w.preparePacket(buffer, destinations[index])
+			w.preparePacket(buffer, destinations[index])
 		}
 		return tunInterface.BatchWrite(buffers)
 	default:

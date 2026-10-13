@@ -18,10 +18,7 @@ import (
 	N "github.com/sagernet/sing/common/network"
 )
 
-var (
-	_ net.Conn     = (*gTCPConn)(nil)
-	_ N.ReadWaiter = (*gTCPConn)(nil)
-)
+var _ N.ReadWaiter = (*gTCPConn)(nil)
 
 type gTCPConn struct {
 	gTCPDeadline
@@ -199,14 +196,6 @@ func (c *gTCPConn) Write(b []byte) (int, error) {
 
 func (c *gTCPConn) Close() error {
 	c.ep.Close()
-	return nil
-}
-
-// AbortiveClose tears down an established app-facing gVisor TCP endpoint with
-// a reset. It is intentionally separate from Close, whose contract is orderly
-// FIN teardown.
-func (c *gTCPConn) AbortiveClose() error {
-	c.ep.Abort()
 	return nil
 }
 
