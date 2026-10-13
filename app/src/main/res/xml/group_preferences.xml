@@ -52,7 +52,6 @@
         app:icon="@drawable/ic_baseline_manage_search_24"
         app:key="groupCustomDns"
         app:title="@string/server_dns"
-        app:summary="@string/server_dns_subscription_sum"
         app:useSimpleSummaryProvider="true" />
 
     <PreferenceCategory
@@ -68,7 +67,6 @@
         <EditTextPreference
             app:icon="@drawable/ic_action_dns"
             app:key="subscriptionServerDns"
-            app:summary="@string/server_dns_subscription_sum"
             app:title="@string/server_dns"
             app:useSimpleSummaryProvider="true" />
 

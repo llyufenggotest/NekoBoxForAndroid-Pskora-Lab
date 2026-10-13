@@ -67,6 +67,9 @@ android {
         aidl = true
     }
     namespace = "io.nekohasekai.sagernet"
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
     packaging {
         jniLibs {
             useLegacyPackaging = true

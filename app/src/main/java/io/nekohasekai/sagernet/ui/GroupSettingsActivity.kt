@@ -44,6 +44,15 @@ import kotlinx.parcelize.Parcelize
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
 import java.util.zip.ZipInputStream
 
+internal fun configureGroupDnsPreferencePresentation(
+    legacyGroupDns: EditTextPreference,
+    subscriptionServerDns: EditTextPreference,
+) {
+    subscriptionServerDns.isVisible = false
+    legacyGroupDns.title = legacyGroupDns.context.getString(R.string.server_dns)
+    legacyGroupDns.dialogMessage = legacyGroupDns.context.getString(R.string.server_dns_subscription_sum)
+}
+
 @Suppress("UNCHECKED_CAST")
 class GroupSettingsActivity(
     @LayoutRes resId: Int = R.layout.layout_config_settings,
@@ -339,9 +348,7 @@ class GroupSettingsActivity(
 
         val subscriptionServerDns =
             findPreference<EditTextPreference>(Key.SUBSCRIPTION_SERVER_DNS)!!
-        subscriptionServerDns.isVisible = false
-        legacyGroupDns.title = getString(R.string.server_dns)
-        legacyGroupDns.summary = getString(R.string.server_dns_subscription_sum)
+        configureGroupDnsPreferencePresentation(legacyGroupDns, subscriptionServerDns)
         legacyGroupDns.setOnPreferenceChangeListener { pref, newValue ->
             val raw = newValue as String
             val value = normalizeGroupDnsInput(raw)
