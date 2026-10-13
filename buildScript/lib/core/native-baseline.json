@@ -304,7 +304,7 @@
     "Dynamic 500/1500 ms recovery: host and build verification only; physical multi-round device acceptance pending.",
     "Stable recovery rollback: unvalidated route-ready 500 ms path removed; only VALIDATED uses 500 ms, all other recovery uses 1500 ms. Physical multi-round acceptance pending."
   ],
-  "core_version": "1.15.0-alpha.2-private-lab",
+  "core_version": "1.15.0-alpha.12-private-lab",
   "build_tags": "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api",
   "build_goos": "android",
   "build_goarch": "arm64",
