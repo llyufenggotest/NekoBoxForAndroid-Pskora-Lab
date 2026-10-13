@@ -163,7 +163,11 @@ def verify_provenance(baseline, root, verify_source_content=True, verify_attesta
             raise ValueError('Current attestation HEAD must be the direct child of built source HEAD')
         if git(root, 'rev-list', '--count', source_head + '..' + attestation_head) != '1':
             raise ValueError('Current attestation HEAD chain mismatch')
-    if git(root, 'rev-parse', source_head + '^{tree}') != source_tree:
+    try:
+        actual_source_tree = git(root, 'rev-parse', source_head + '^{tree}')
+    except subprocess.CalledProcessError as error:
+        raise ValueError('Built source HEAD is not a local commit') from error
+    if actual_source_tree != source_tree:
         raise ValueError('Built source tree mismatch')
 
     if verify_source_content:
