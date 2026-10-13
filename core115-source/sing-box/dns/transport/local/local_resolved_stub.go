@@ -1,4 +1,4 @@
-//go:build !linux
+//go:build !linux && !resolved_lifecycle_test
 
 //nolint:unused
 package local

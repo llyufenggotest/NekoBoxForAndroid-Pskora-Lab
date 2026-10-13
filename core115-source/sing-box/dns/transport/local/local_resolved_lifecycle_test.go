@@ -5,8 +5,10 @@ package local
 import (
 	"context"
 	"errors"
+	"os"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/log"
@@ -106,4 +108,107 @@ func TestResolvedServerSetLifecycleFailedStartRollsBackChild(t *testing.T) {
 	require.Equal(t, 1, transport.closeCount, "failed child must be removed immediately")
 	require.NoError(t, serverScope.Close())
 	require.Equal(t, 1, transport.closeCount, "failed child must not remain owned by the parent scope")
+}
+
+func TestResolvedExchangeCloseDuringLazyInitialization(t *testing.T) {
+	for range 100 {
+		created := make(chan *resolvedServerSet, 1)
+		release := make(chan struct{})
+		resolver := &DBusResolvedResolver{
+			ctx:    context.Background(),
+			logger: log.NewNOPFactory().NewLogger("resolved-lifecycle"),
+		}
+		var transport *resolvedLifecycleTransport
+		resolver.checkResolvedFunc = func(context.Context) (*resolvedServerSet, error) {
+			transport = &resolvedLifecycleTransport{}
+			serverSet := newResolvedLifecycleSet(t, transport)
+			created <- serverSet
+			<-release
+			return serverSet, nil
+		}
+
+		exchangeDone := make(chan error, 1)
+		go func() {
+			_, err := resolver.Exchange(context.Background(), new(mDNS.Msg))
+			exchangeDone <- err
+		}()
+		serverSet := <-created
+		closeDone := make(chan error, 1)
+		go func() { closeDone <- resolver.Close() }()
+
+		select {
+		case err := <-closeDone:
+			require.NoError(t, err)
+		case <-time.After(time.Second):
+			t.Fatal("Close blocked behind lazy resolved construction")
+		}
+		close(release)
+		require.ErrorIs(t, <-exchangeDone, os.ErrClosed)
+		require.Nil(t, resolver.savedServerSet.Load(), "Close must prevent lazy Exchange publication")
+		require.Equal(t, 1, transport.closeCount, "stale lazy server set must be closed immediately")
+		require.NoError(t, closeResolvedServerSet(serverSet))
+		require.Equal(t, 1, transport.closeCount)
+	}
+}
+
+func TestResolvedExchangeAfterCloseIsStable(t *testing.T) {
+	resolver := &DBusResolvedResolver{ctx: context.Background()}
+	require.NoError(t, resolver.Close())
+	for range 100 {
+		_, err := resolver.Exchange(context.Background(), new(mDNS.Msg))
+		require.ErrorIs(t, err, os.ErrClosed)
+		require.Nil(t, resolver.savedServerSet.Load())
+	}
+}
+
+func TestResolvedLazyExchangeAndUpdateUseGenerationGate(t *testing.T) {
+	lazyEntered := make(chan struct{})
+	releaseLazy := make(chan struct{})
+	updateEntered := make(chan struct{})
+	resolver := &DBusResolvedResolver{
+		ctx:    context.Background(),
+		logger: log.NewNOPFactory().NewLogger("resolved-lifecycle"),
+	}
+	var callCount atomic.Int32
+	var updateSet *resolvedServerSet
+	resolver.checkResolvedFunc = func(context.Context) (*resolvedServerSet, error) {
+		switch callCount.Add(1) {
+		case 1:
+			close(lazyEntered)
+			<-releaseLazy
+			return newResolvedLifecycleSet(t), nil
+		case 2:
+			updateSet = newResolvedLifecycleSet(t)
+			updateSet.servers = []resolvedServer{{primaryTransport: &resolvedLifecycleTransport{}}}
+			close(updateEntered)
+			return updateSet, nil
+		case 3:
+			return updateSet, nil
+		default:
+			t.Fatal("unexpected checkResolved call")
+			return nil, nil
+		}
+	}
+
+	exchangeDone := make(chan error, 1)
+	go func() {
+		_, err := resolver.Exchange(context.Background(), new(mDNS.Msg))
+		exchangeDone <- err
+	}()
+	<-lazyEntered
+	updateDone := make(chan struct{})
+	go func() {
+		resolver.updateStatus(context.Background())
+		close(updateDone)
+	}()
+	select {
+	case <-updateEntered:
+	case <-time.After(time.Second):
+		t.Fatal("update construction blocked behind lazy Exchange construction")
+	}
+	<-updateDone
+	close(releaseLazy)
+	require.Error(t, <-exchangeDone)
+	require.Equal(t, int32(3), callCount.Load(), "stale lazy initialization must recheck after the update generation")
+	require.NoError(t, resolver.Close())
 }

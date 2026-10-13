@@ -1,3 +1,5 @@
+//go:build linux || resolved_lifecycle_test
+
 package local
 
 import (
@@ -61,7 +63,9 @@ type DBusResolvedResolver struct {
 	updateAccess      sync.Mutex
 	updateCancel      context.CancelFunc
 	updateRunAccess   sync.Mutex
+	generation        uint64
 	closed            bool
+	checkResolvedFunc func(context.Context) (*resolvedServerSet, error)
 	closeOnce         sync.Once
 }
 
@@ -136,6 +140,7 @@ func (t *DBusResolvedResolver) Close() error {
 		}
 		t.updateRunAccess.Lock()
 		t.closed = true
+		t.generation++
 		serverSet := t.savedServerSet.Swap(nil)
 		t.updateRunAccess.Unlock()
 		if serverSet != nil {
@@ -173,16 +178,18 @@ func (t *DBusResolvedResolver) Environment() []string {
 }
 
 func (t *DBusResolvedResolver) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, error) {
+	t.updateRunAccess.Lock()
+	if t.closed {
+		t.updateRunAccess.Unlock()
+		return nil, os.ErrClosed
+	}
 	serverSet := t.savedServerSet.Load()
+	t.updateRunAccess.Unlock()
 	if serverSet == nil {
 		var err error
-		serverSet, err = t.checkResolved(context.Background())
+		serverSet, err = t.initializeServerSet(ctx)
 		if err != nil {
 			return nil, err
-		}
-		previousServerSet := t.savedServerSet.Swap(serverSet)
-		if previousServerSet != nil {
-			_ = closeResolvedServerSet(previousServerSet)
 		}
 	}
 	response, err := t.exchangeServerSet(ctx, message, serverSet)
@@ -198,6 +205,13 @@ func (t *DBusResolvedResolver) Exchange(ctx context.Context, message *mDNS.Msg) 
 }
 
 func (t *DBusResolvedResolver) ExchangeAsync(ctx context.Context, message *mDNS.Msg, callback func(response *mDNS.Msg, err error)) {
+	t.updateRunAccess.Lock()
+	closed := t.closed
+	t.updateRunAccess.Unlock()
+	if closed {
+		callback(nil, os.ErrClosed)
+		return
+	}
 	serverSet := t.savedServerSet.Load()
 	if serverSet == nil {
 		go func() {
@@ -280,21 +294,77 @@ func (t *DBusResolvedResolver) postUpdateStatus() {
 	}()
 }
 
+func (t *DBusResolvedResolver) initializeServerSet(ctx context.Context) (*resolvedServerSet, error) {
+	for {
+		t.updateRunAccess.Lock()
+		if t.closed {
+			t.updateRunAccess.Unlock()
+			return nil, os.ErrClosed
+		}
+		if serverSet := t.savedServerSet.Load(); serverSet != nil {
+			t.updateRunAccess.Unlock()
+			return serverSet, nil
+		}
+		generation := t.generation
+		t.updateRunAccess.Unlock()
+
+		serverSet, err := t.loadResolved(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		t.updateRunAccess.Lock()
+		if t.closed || ctx.Err() != nil {
+			t.updateRunAccess.Unlock()
+			_ = closeResolvedServerSet(serverSet)
+			if t.closed {
+				return nil, os.ErrClosed
+			}
+			return nil, ctx.Err()
+		}
+		if t.generation != generation {
+			currentServerSet := t.savedServerSet.Load()
+			t.updateRunAccess.Unlock()
+			_ = closeResolvedServerSet(serverSet)
+			if currentServerSet != nil {
+				return currentServerSet, nil
+			}
+			continue
+		}
+		if currentServerSet := t.savedServerSet.Load(); currentServerSet != nil {
+			t.updateRunAccess.Unlock()
+			_ = closeResolvedServerSet(serverSet)
+			return currentServerSet, nil
+		}
+		t.savedServerSet.Store(serverSet)
+		t.updateRunAccess.Unlock()
+		return serverSet, nil
+	}
+}
+
 func (t *DBusResolvedResolver) updateStatus(ctx context.Context) {
 	t.updateRunAccess.Lock()
-	defer t.updateRunAccess.Unlock()
 	if t.closed || ctx.Err() != nil {
+		t.updateRunAccess.Unlock()
 		return
 	}
-	serverSet, err := t.checkResolved(ctx)
-	if t.closed || ctx.Err() != nil {
+	generation := t.generation
+	t.updateRunAccess.Unlock()
+
+	serverSet, err := t.loadResolved(ctx)
+
+	t.updateRunAccess.Lock()
+	if t.closed || t.generation != generation || ctx.Err() != nil {
+		t.updateRunAccess.Unlock()
 		if serverSet != nil {
 			_ = closeResolvedServerSet(serverSet)
 		}
 		return
 	}
 	oldServerSet := t.savedServerSet.Load()
+	t.generation++
 	_ = replaceResolvedServerSet(&t.savedServerSet, serverSet)
+	t.updateRunAccess.Unlock()
 	if err != nil {
 		var dbusErr dbus.Error
 		if !errors.As(err, &dbusErr) || dbusErr.Name != "org.freedesktop.DBus.Error.NameHasNoOwner" {
@@ -326,6 +396,13 @@ func (t *DBusResolvedResolver) exchangeServerSet(ctx context.Context, message *m
 		return response, nil
 	}
 	return nil, lastError
+}
+
+func (t *DBusResolvedResolver) loadResolved(ctx context.Context) (*resolvedServerSet, error) {
+	if t.checkResolvedFunc != nil {
+		return t.checkResolvedFunc(ctx)
+	}
+	return t.checkResolved(ctx)
 }
 
 func (t *DBusResolvedResolver) checkResolved(ctx context.Context) (*resolvedServerSet, error) {
