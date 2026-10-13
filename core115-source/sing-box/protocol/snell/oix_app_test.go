@@ -11,6 +11,9 @@ import (
 )
 
 func TestSnellOIXAppConstruct(t *testing.T) {
+	if !testWithUTLS {
+		t.Skip("OIX ECH construction requires -tags with_utls")
+	}
 	for _, tc := range []struct{ name, fields, wantError string }{
 		{"old profile", "", ""},
 		{"identity enabled", `,"oix_identity":true`, ""},

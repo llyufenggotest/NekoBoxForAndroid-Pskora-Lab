@@ -123,6 +123,9 @@ func TestValidateSnellOIXOptions(t *testing.T) {
 }
 
 func TestSnellOIXTransportFactoryBuildsStrictECHDialer(t *testing.T) {
+	if !testWithUTLS {
+		t.Skip("OIX ECH construction requires -tags with_utls")
+	}
 	dialer, err := buildSnellOutboundTransport(context.Background(), log.NewNOPFactory().NewLogger("snell"), nil, M.ParseSocksaddr("127.0.0.1:443"), option.SnellObfsClientOptions{
 		ObfsMode: "oix-ech-tls", OIXECH: true, OIXALPN: "snell-ech/1", OIXSNI: "front.example", OIXConfig: "AQID",
 	})

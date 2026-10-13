@@ -31,6 +31,9 @@ func (c *lifecycleWarmer) Close() error { c.closed.Store(true); return nil }
 func (c *lifecycleWarmer) Reset()       { c.reset.Store(true) }
 
 func TestOIXPreconnectOutboundLifecycle(t *testing.T) {
+	if !testWithUTLS {
+		t.Skip("OIX ECH construction requires -tags with_utls")
+	}
 	for _, closeBefore := range []bool{false, true} {
 		created, err := NewOutbound(context.Background(), nil, log.NewNOPFactory().NewLogger("snell"), "oix", option.SnellOutboundOptions{
 			Version: 4, AbstractSnellOutboundOptions: option.AbstractSnellOutboundOptions{ServerOptions: option.ServerOptions{Server: "127.0.0.1", ServerPort: 443}, PSK: "password"},
