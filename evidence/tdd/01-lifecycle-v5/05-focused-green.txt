@@ -1,0 +1,13 @@
+COMMAND: go test -count=1 ./adapter ./adapter/certificate ./adapter/endpoint ./adapter/inbound ./adapter/outbound ./adapter/service ./common/certificate ./service/api ./service/origin_ca ./route ./protocol/http
+ok  	github.com/sagernet/sing-box/adapter	0.068s
+ok  	github.com/sagernet/sing-box/adapter/certificate	0.148s
+ok  	github.com/sagernet/sing-box/adapter/endpoint	0.155s
+ok  	github.com/sagernet/sing-box/adapter/inbound	0.063s
+ok  	github.com/sagernet/sing-box/adapter/outbound	0.193s
+ok  	github.com/sagernet/sing-box/adapter/service	0.078s
+ok  	github.com/sagernet/sing-box/common/certificate	0.286s
+ok  	github.com/sagernet/sing-box/service/api	0.082s
+ok  	github.com/sagernet/sing-box/service/origin_ca	0.144s
+ok  	github.com/sagernet/sing-box/route	0.485s
+ok  	github.com/sagernet/sing-box/protocol/http	0.521s
+EXIT_CODE=0

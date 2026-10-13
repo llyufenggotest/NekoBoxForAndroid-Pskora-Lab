@@ -133,7 +133,11 @@ func (m *Manager) Create(ctx context.Context, logger log.ContextLogger, tag stri
 		if m.started {
 			err = m.scope.Remove(existsService)
 			if err != nil {
-				return E.Cause(err, "close service/", existsService.Type(), "[", existsService.Tag(), "]")
+				closeErr := E.Cause(err, "close service/", existsService.Type(), "[", existsService.Tag(), "]")
+				rollbackErr := m.scope.Remove(service)
+				return E.Append(closeErr, rollbackErr, func(err error) error {
+					return E.Cause(err, "rollback service/", service.Type(), "[", service.Tag(), "]")
+				})
 			}
 		}
 		existsIndex := common.Index(m.services, func(it adapter.Service) bool {

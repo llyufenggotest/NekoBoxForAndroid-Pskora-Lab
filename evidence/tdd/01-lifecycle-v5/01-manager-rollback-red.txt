@@ -1,0 +1,12 @@
+COMMAND: copy the five manager replacement tests onto parent ebc8d80, then run:
+  go test -count=1 ./adapter/certificate ./adapter/endpoint ./adapter/inbound ./adapter/outbound ./adapter/service
+EXIT_CODE=1
+
+Observed failures on unmodified v4 production code:
+- certificate TestCreateReplacementRollsBackNewProviderWhenOldCloseFails: expected new closeCount 1, actual 0
+- endpoint TestCreateReplacementRollsBackNewEndpointWhenOldCloseFails: expected new closeCount 1, actual 0
+- inbound TestCreateReplacementRollsBackNewInboundWhenOldCloseFails: expected new closeCount 1, actual 0
+- outbound TestCreateReplacementRollsBackNewOutboundWhenOldCloseFails: expected new closeCount 1, actual 0
+- service TestCreateReplacementRollsBackNewServiceWhenOldCloseFails: expected new closeCount 1, actual 0
+
+All five tests prove the started replacement leaked when retiring the old instance failed.

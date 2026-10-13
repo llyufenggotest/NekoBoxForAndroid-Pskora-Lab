@@ -140,7 +140,11 @@ func (m *Manager) Create(ctx context.Context, router adapter.Router, logger log.
 		if m.started {
 			err = m.scope.Remove(existsEndpoint)
 			if err != nil {
-				return E.Cause(err, "close endpoint/", existsEndpoint.Type(), "[", existsEndpoint.Tag(), "]")
+				closeErr := E.Cause(err, "close endpoint/", existsEndpoint.Type(), "[", existsEndpoint.Tag(), "]")
+				rollbackErr := m.scope.Remove(endpoint)
+				return E.Append(closeErr, rollbackErr, func(err error) error {
+					return E.Cause(err, "rollback endpoint/", endpoint.Type(), "[", endpoint.Tag(), "]")
+				})
 			}
 		}
 		existsIndex := common.Index(m.endpoints, func(it adapter.Endpoint) bool {

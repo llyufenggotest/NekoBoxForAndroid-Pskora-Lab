@@ -1,0 +1,5 @@
+ok  	github.com/sagernet/sing-box/adapter/certificate	0.124s
+ok  	github.com/sagernet/sing-box/adapter/endpoint	0.113s
+ok  	github.com/sagernet/sing-box/adapter/inbound	0.107s
+ok  	github.com/sagernet/sing-box/adapter/outbound	0.077s
+ok  	github.com/sagernet/sing-box/adapter/service	0.054s

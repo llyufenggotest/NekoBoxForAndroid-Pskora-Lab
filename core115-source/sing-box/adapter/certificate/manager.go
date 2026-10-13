@@ -136,7 +136,11 @@ func (m *Manager) Create(ctx context.Context, logger log.ContextLogger, tag stri
 		if m.started {
 			err = m.scope.Remove(existsProvider)
 			if err != nil {
-				return E.Cause(err, "close certificate-provider/", existsProvider.Type(), "[", existsProvider.Tag(), "]")
+				closeErr := E.Cause(err, "close certificate-provider/", existsProvider.Type(), "[", existsProvider.Tag(), "]")
+				rollbackErr := m.scope.Remove(provider)
+				return E.Append(closeErr, rollbackErr, func(err error) error {
+					return E.Cause(err, "rollback certificate-provider/", provider.Type(), "[", provider.Tag(), "]")
+				})
 			}
 		}
 		existsIndex := common.Index(m.providers, func(it adapter.CertificateProviderService) bool {

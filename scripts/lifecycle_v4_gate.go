@@ -1,4 +1,6 @@
-// Command lifecycle_v4_gate proves alpha.12 lifecycle cleanup parity without count fallbacks.
+// Command lifecycle_v4_gate compares alpha.12 lifecycle cleanup structure and
+// rejects obvious unreachable/no-op registrations. It is an auxiliary gate,
+// not semantic proof; production failure-injection tests remain authoritative.
 package main
 
 import (
@@ -186,13 +188,28 @@ func main() {
 		for _, add := range actual.Registrations {
 			actualByExpression[add.Expression] = append(actualByExpression[add.Expression], add)
 		}
+		actualByCategory := make(map[string][]registration)
+		for _, add := range actual.Registrations {
+			if category := cleanupCategory(actual.Path, add.Expression); category != "" {
+				actualByCategory[category] = append(actualByCategory[category], add)
+			}
+		}
 		used := make(map[string]int)
+		usedCategory := make(map[string]int)
 		for _, add := range expected.Registrations {
 			index := used[add.Expression]
 			if index < len(actualByExpression[add.Expression]) {
 				used[add.Expression]++
 				r.MappedScopeAddCount++
 				continue
+			}
+			if category := cleanupCategory(expected.Path, add.Expression); category != "" {
+				categoryIndex := usedCategory[category]
+				if categoryIndex < len(actualByCategory[category]) {
+					usedCategory[category]++
+					r.MappedScopeAddCount++
+					continue
+				}
 			}
 			if exemptionIndex := matchExemption(exemptions, usedExemptions, expected.Path, add.Expression, actual.Registrations); exemptionIndex >= 0 {
 				usedExemptions[exemptionIndex] = true
@@ -311,13 +328,23 @@ func scanStarts(tree sourceTree) (map[string]startFunction, []issue, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("parse %s: %w", path, err)
 		}
+		parents := parentMap(file)
 		ast.Inspect(file, func(node ast.Node) bool {
 			call, ok := node.(*ast.CallExpr)
 			if !ok || !isScopeAdd(call) || len(call.Args) != 1 {
 				return true
 			}
-			if isNoopCleanup(call.Args[0]) {
-				noops = append(noops, issue{Path: path, Kind: "ast_noop_scope_add", Line: fset.Position(call.Pos()).Line, Expression: nodeString(fset, call.Args[0])})
+			kind := ""
+			switch {
+			case !isStaticallyReachable(call, parents):
+				kind = "unreachable_scope_add"
+			case isNoopCleanup(call.Args[0]):
+				kind = "ast_noop_scope_add"
+			case !cleanupHasReachableEffect(path, call.Args[0]):
+				kind = "semantic_noop_scope_add"
+			}
+			if kind != "" {
+				noops = append(noops, issue{Path: path, Kind: kind, Line: fset.Position(call.Pos()).Line, Expression: nodeString(fset, call.Args[0])})
 			}
 			return true
 		})
@@ -335,7 +362,7 @@ func scanStarts(tree sourceTree) (map[string]startFunction, []issue, error) {
 			counts := make(map[string]int)
 			ast.Inspect(fn.Body, func(node ast.Node) bool {
 				call, ok := node.(*ast.CallExpr)
-				if !ok || !isScopeAdd(call) || len(call.Args) != 1 {
+				if !ok || !isScopeAdd(call) || len(call.Args) != 1 || !isStaticallyReachable(call, parents) || !cleanupHasReachableEffect(path, call.Args[0]) {
 					return true
 				}
 				expression := nodeString(fset, call.Args[0])
@@ -418,6 +445,107 @@ func isScopeAdd(call *ast.CallExpr) bool {
 	id, ok := sel.X.(*ast.Ident)
 	return ok && id.Name == "scope"
 }
+func parentMap(root ast.Node) map[ast.Node]ast.Node {
+	parents := make(map[ast.Node]ast.Node)
+	var stack []ast.Node
+	ast.Inspect(root, func(node ast.Node) bool {
+		if node == nil {
+			stack = stack[:len(stack)-1]
+			return true
+		}
+		if len(stack) > 0 {
+			parents[node] = stack[len(stack)-1]
+		}
+		stack = append(stack, node)
+		return true
+	})
+	return parents
+}
+
+func isStaticallyReachable(node ast.Node, parents map[ast.Node]ast.Node) bool {
+	for current := node; current != nil; current = parents[current] {
+		parent := parents[current]
+		ifStmt, ok := parent.(*ast.IfStmt)
+		if !ok || !isFalseExpr(ifStmt.Cond) {
+			continue
+		}
+		if current != ifStmt.Else {
+			return false
+		}
+	}
+	return true
+}
+
+func isFalseExpr(expr ast.Expr) bool {
+	switch value := expr.(type) {
+	case *ast.ParenExpr:
+		return isFalseExpr(value.X)
+	case *ast.Ident:
+		return value.Name == "false"
+	}
+	return false
+}
+
+func cleanupHasReachableEffect(path string, expr ast.Expr) bool {
+	if call, ok := expr.(*ast.CallExpr); ok {
+		return isWaitForDoneCall(path, call)
+	}
+	if _, ok := expr.(*ast.SelectorExpr); ok {
+		return true
+	}
+	fn, ok := expr.(*ast.FuncLit)
+	if !ok {
+		// Named cleanup functions are checked by production failure tests; the
+		// structural gate can only prove inline cleanup bodies.
+		return true
+	}
+	parents := parentMap(fn.Body)
+	hasEffect := false
+	ast.Inspect(fn.Body, func(node ast.Node) bool {
+		if hasEffect || node == nil || !isStaticallyReachable(node, parents) {
+			return !hasEffect
+		}
+		switch current := node.(type) {
+		case *ast.CallExpr:
+			hasEffect = true
+			return false
+		case *ast.SendStmt, *ast.IncDecStmt:
+			hasEffect = true
+			return false
+		case *ast.UnaryExpr:
+			if current.Op == token.ARROW {
+				hasEffect = true
+				return false
+			}
+		case *ast.AssignStmt:
+			for _, left := range current.Lhs {
+				if id, ok := left.(*ast.Ident); ok && id.Name == "_" {
+					continue
+				}
+				hasEffect = true
+				return false
+			}
+		}
+		return true
+	})
+	return hasEffect
+}
+
+func cleanupCategory(path, expression string) string {
+	if path == "service/origin_ca/service.go" && (expression == "waitForDone(done)" || expression == "func()error{<-donereturnnil}") {
+		return "wait_for_done"
+	}
+	return ""
+}
+
+func isWaitForDoneCall(path string, call *ast.CallExpr) bool {
+	if path != "service/origin_ca/service.go" {
+		return false
+	}
+	id, ok := call.Fun.(*ast.Ident)
+	return ok && id.Name == "waitForDone" && len(call.Args) == 1
+}
+
 func isNoopCleanup(expr ast.Expr) bool {
 	fn, ok := expr.(*ast.FuncLit)
 	if !ok || len(fn.Body.List) != 1 {

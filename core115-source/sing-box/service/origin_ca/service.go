@@ -189,11 +189,15 @@ func (s *Service) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 	}
 	done := make(chan struct{})
 	go s.refreshLoop(ctx, done)
-	scope.Add(func() error {
+	scope.Add(waitForDone(done))
+	return nil
+}
+
+func waitForDone(done <-chan struct{}) func() error {
+	return func() error {
 		<-done
 		return nil
-	})
-	return nil
+	}
 }
 
 func (s *Service) GetCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {

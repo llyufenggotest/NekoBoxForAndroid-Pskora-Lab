@@ -1,0 +1,10 @@
+--- FAIL: TestGateRejectsUnreachableScopeRegistration (0.00s)
+    lifecycle_v4_gate_test.go:37: unreachable registration counted as cleanup: []main.registration{main.registration{Expression:"c.Close", Line:7, Occurrence:1}}
+--- FAIL: TestGateRejectsSemanticNoopCleanup (0.00s)
+    --- FAIL: TestGateRejectsSemanticNoopCleanup/unreachable_close (0.00s)
+        lifecycle_v4_gate_test.go:68: missing semantic_noop_scope_add issue: []main.issue(nil)
+    --- FAIL: TestGateRejectsSemanticNoopCleanup/zero_error_variable (0.00s)
+        lifecycle_v4_gate_test.go:68: missing semantic_noop_scope_add issue: []main.issue(nil)
+FAIL
+FAIL	command-line-arguments	0.208s
+FAIL

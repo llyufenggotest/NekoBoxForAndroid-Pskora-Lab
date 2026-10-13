@@ -257,7 +257,16 @@ func (m *Manager) Create(ctx context.Context, router adapter.Router, logger log.
 				err = common.Close(existsOutbound)
 			}
 			if err != nil {
-				return E.Cause(err, "close outbound/", existsOutbound.Type(), "[", existsOutbound.Tag(), "]")
+				closeErr := E.Cause(err, "close outbound/", existsOutbound.Type(), "[", existsOutbound.Tag(), "]")
+				var rollbackErr error
+				if lifecycle, isLifecycle := outbound.(adapter.Lifecycle); isLifecycle {
+					rollbackErr = m.scope.Remove(lifecycle)
+				} else {
+					rollbackErr = common.Close(outbound)
+				}
+				return E.Append(closeErr, rollbackErr, func(err error) error {
+					return E.Cause(err, "rollback outbound/", outbound.Type(), "[", outbound.Tag(), "]")
+				})
 			}
 		}
 		existsIndex := common.Index(m.outbounds, func(it adapter.Outbound) bool {

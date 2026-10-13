@@ -1,0 +1,14 @@
+COMMAND: go test -tags with_utls,with_oix -count=1 ./protocol/snell ./route ./adapter ./adapter/certificate ./adapter/endpoint ./adapter/inbound ./adapter/outbound ./adapter/service ./common/certificate ./service/api ./service/origin_ca ./protocol/http
+ok  	github.com/sagernet/sing-box/protocol/snell	1.237s
+ok  	github.com/sagernet/sing-box/route	0.526s
+ok  	github.com/sagernet/sing-box/adapter	0.050s
+ok  	github.com/sagernet/sing-box/adapter/certificate	0.053s
+ok  	github.com/sagernet/sing-box/adapter/endpoint	0.055s
+ok  	github.com/sagernet/sing-box/adapter/inbound	0.051s
+ok  	github.com/sagernet/sing-box/adapter/outbound	0.048s
+ok  	github.com/sagernet/sing-box/adapter/service	0.048s
+ok  	github.com/sagernet/sing-box/common/certificate	0.276s
+ok  	github.com/sagernet/sing-box/service/api	0.076s
+ok  	github.com/sagernet/sing-box/service/origin_ca	0.113s
+ok  	github.com/sagernet/sing-box/protocol/http	0.353s
+EXIT_CODE=0
