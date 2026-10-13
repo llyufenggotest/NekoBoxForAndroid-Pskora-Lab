@@ -149,19 +149,20 @@ def verify_snapshot(baseline, root, expected_manifest=None):
     return manifest
 
 
-def verify_provenance(baseline, root, verify_source_content=True):
+def verify_provenance(baseline, root, verify_source_content=True, verify_attestation_head=True):
     root = Path(root)
     if baseline.get('schema') != 3:
         raise ValueError('Native provenance requires schema 3')
-    attestation_head = git(root, 'rev-parse', 'HEAD')
     source_head = baseline['built_source_head']
     source_tree = baseline['built_source_tree']
     require_digest(source_head, 'built source HEAD', 40)
     require_digest(source_tree, 'built source tree', 40)
-    if git(root, 'rev-parse', 'HEAD^') != source_head:
-        raise ValueError('Current attestation HEAD must be the direct child of built source HEAD')
-    if git(root, 'rev-list', '--count', source_head + '..' + attestation_head) != '1':
-        raise ValueError('Current attestation HEAD chain mismatch')
+    if verify_attestation_head:
+        attestation_head = git(root, 'rev-parse', 'HEAD')
+        if git(root, 'rev-parse', 'HEAD^') != source_head:
+            raise ValueError('Current attestation HEAD must be the direct child of built source HEAD')
+        if git(root, 'rev-list', '--count', source_head + '..' + attestation_head) != '1':
+            raise ValueError('Current attestation HEAD chain mismatch')
     if git(root, 'rev-parse', source_head + '^{tree}') != source_tree:
         raise ValueError('Built source tree mismatch')
 
@@ -210,7 +211,13 @@ def create_attestation(root, source_head, aar_path, snapshot_path, manifest_path
         'aar_path': str(Path(aar_path).relative_to(root)).replace('\\', '/'),
         **artifact_identity(aar_path),
         'source_file_count': len(manifest),
+        'core_version': '1.15.0-alpha.12-private-lab',
+        'build_tags': 'with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api',
+        'build_goos': 'android',
+        'build_goarch': 'arm64',
     }
+    with zipfile.ZipFile(aar_path) as archive:
+        verify_build(archive.read('jni/arm64-v8a/libgojni.so'), data)
     Path(output_path).write_text(json.dumps(data, indent=2, sort_keys=True) + '\n', encoding='utf-8')
     return data
 

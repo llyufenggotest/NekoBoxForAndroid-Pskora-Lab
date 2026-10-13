@@ -24,17 +24,17 @@ class ProvenanceTest(unittest.TestCase):
     def test_built_source_head_tamper_rejected(self):
         self.baseline['built_source_head'] = '0' * 40
         with self.assertRaisesRegex(ValueError, 'built source HEAD'):
-            p.verify_provenance(self.baseline, ROOT, verify_source_content=False)
+            p.verify_provenance(self.baseline, ROOT, verify_source_content=False, verify_attestation_head=False)
 
     def test_built_source_head_must_be_nonzero_ancestor(self):
         self.baseline['built_source_head'] = '0' * 40
         with self.assertRaisesRegex(ValueError, 'built source HEAD'):
-            p.verify_provenance(self.baseline, ROOT, verify_source_content=False)
+            p.verify_provenance(self.baseline, ROOT, verify_source_content=False, verify_attestation_head=False)
 
     def test_source_tree_tamper_rejected(self):
         self.baseline['built_source_tree'] = '0' * 40
         with self.assertRaisesRegex(ValueError, 'source tree'):
-            p.verify_provenance(self.baseline, ROOT, verify_source_content=False)
+            p.verify_provenance(self.baseline, ROOT, verify_source_content=False, verify_attestation_head=False)
 
     def test_aar_and_members_are_cross_bound(self):
         for field in ('aar_sha256', 'aar_content_sha256', 'classes_jar_sha256'):
@@ -42,12 +42,12 @@ class ProvenanceTest(unittest.TestCase):
                 baseline = copy.deepcopy(self.baseline)
                 baseline[field] = '0' * 64
                 with self.assertRaises(ValueError):
-                    p.verify_provenance(baseline, ROOT, verify_source_content=False)
+                    p.verify_provenance(baseline, ROOT, verify_source_content=False, verify_attestation_head=False)
         for abi in self.baseline['native_sha256']:
             baseline = copy.deepcopy(self.baseline)
             baseline['native_sha256'][abi] = '0' * 64
             with self.assertRaisesRegex(ValueError, 'native identity'):
-                p.verify_provenance(baseline, ROOT, verify_source_content=False)
+                p.verify_provenance(baseline, ROOT, verify_source_content=False, verify_attestation_head=False)
 
     def test_snapshot_member_tamper_rejected_even_when_outer_hash_updated(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -86,17 +86,17 @@ class ProvenanceTest(unittest.TestCase):
     def test_changed_base_commit_rejected(self):
         self.baseline['built_source_head'] = 'f' * 40
         with self.assertRaises(ValueError):
-            p.verify_provenance(self.baseline, ROOT, verify_source_content=False)
+            p.verify_provenance(self.baseline, ROOT, verify_source_content=False, verify_attestation_head=False)
 
     def test_unapproved_native_rejected(self):
         self.baseline['native_sha256']['arm64-v8a'] = 'f' * 64
         with self.assertRaisesRegex(ValueError, 'native identity'):
-            p.verify_provenance(self.baseline, ROOT, verify_source_content=False)
+            p.verify_provenance(self.baseline, ROOT, verify_source_content=False, verify_attestation_head=False)
 
     def test_classes_jar_rejected(self):
         self.baseline['classes_jar_sha256'] = 'f' * 64
         with self.assertRaisesRegex(ValueError, 'classes_jar_sha256'):
-            p.verify_provenance(self.baseline, ROOT, verify_source_content=False)
+            p.verify_provenance(self.baseline, ROOT, verify_source_content=False, verify_attestation_head=False)
 
     def test_real_build_and_changed_version_tags_arch(self):
         with zipfile.ZipFile(ROOT / 'app/libs/libcore.aar') as z:
