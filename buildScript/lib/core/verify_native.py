@@ -88,14 +88,16 @@ def verify_diagnostics_bridge(classes_jar):
 
 def verify(aar, apk=None, lock=LOCK):
     baseline = json.loads(Path(lock).read_text(encoding='utf-8'))
-    if baseline.get('source_kind') == 'local-core115-snapshot' and baseline.get('schema') != 2:
+    if baseline.get('source_kind') == 'local-core115-snapshot' and baseline.get('schema') not in (2, 3):
         raise ValueError('Local core115 cannot bypass provenance schema')
-    if baseline.get('schema') == 2:
+    if baseline.get('schema') == 3:
         import importlib.util
         spec = importlib.util.spec_from_file_location('provenance', Path(__file__).with_name('verify_provenance.py'))
         provenance = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(provenance)
         provenance.verify_provenance(baseline, ROOT)
+    elif baseline.get('schema') == 2:
+        raise ValueError('Legacy schema-2 provenance is not accepted for rebuilt native artifacts')
     if 'dependency_pins' in baseline:
         pins = (ROOT / 'buildScript/lib/core/get_source_env.sh').read_text(encoding='utf-8')
         for dependency, commit in baseline['dependency_pins'].items():
@@ -110,13 +112,11 @@ def verify(aar, apk=None, lock=LOCK):
         if actual_aar_sha256 != baseline['aar_sha256']:
             expected_content = baseline.get('aar_content_sha256')
             actual_content = canonical_zip_digest(Path(aar).read_bytes())
-            if not (expected_content and actual_content == expected_content) and baseline.get('schema') != 2:
+            if not (expected_content and actual_content == expected_content):
                 raise ValueError('Unattested AAR content: rebuild/recover and explicitly re-audit native-baseline.json')
         classes_jar = archive.read('classes.jar')
         if sha(classes_jar) != baseline['classes_jar_sha256']:
-            if baseline.get('schema') != 2:
-                raise ValueError('Java bridge identity mismatch')
-            verify_diagnostics_bridge(classes_jar)
+            raise ValueError('Java bridge identity mismatch')
         actual = sorted(n for n in names if n.endswith('/libgojni.so'))
         expected = sorted('jni/' + abi + '/libgojni.so' for abi in baseline['native_sha256'])
         if actual != expected:
@@ -125,12 +125,8 @@ def verify(aar, apk=None, lock=LOCK):
             data = archive.read('jni/' + abi + '/libgojni.so')
             actual_native = sha(data)
             if actual_native != digest:
-                if baseline.get('schema') != 2:
-                    raise ValueError('Native identity mismatch: ' + abi)
-                # A schema-2 build is accepted only after the reviewed source
-                # snapshot/provenance, Java bridge, ABI, build metadata, JNI API,
-                # and all static protocol markers have independently passed.
-            if baseline.get('schema') == 2:
+                raise ValueError('Native identity mismatch: ' + abi)
+            if baseline.get('schema') == 3:
                 provenance.verify_build(data, baseline)
             for protocol, markers in MARKERS.items():
                 for marker in markers:

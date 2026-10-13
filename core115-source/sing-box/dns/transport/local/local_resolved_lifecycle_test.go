@@ -18,9 +18,12 @@ import (
 )
 
 type resolvedLifecycleTransport struct {
-	startErr   error
-	startCount int
-	closeCount int
+	startErr        error
+	startCount      int
+	closeCount      int
+	exchangeEntered chan struct{}
+	exchangeRelease chan struct{}
+	async           bool
 }
 
 func (t *resolvedLifecycleTransport) Start(stage adapter.StartStage, scope *adapter.Scope) error {
@@ -39,10 +42,22 @@ func (*resolvedLifecycleTransport) Type() string           { return "test" }
 func (*resolvedLifecycleTransport) Tag() string            { return "" }
 func (*resolvedLifecycleTransport) Dependencies() []string { return nil }
 func (*resolvedLifecycleTransport) Reset()                 {}
-func (*resolvedLifecycleTransport) Exchange(context.Context, *mDNS.Msg) (*mDNS.Msg, error) {
-	return nil, errors.New("unused")
+func (t *resolvedLifecycleTransport) Exchange(context.Context, *mDNS.Msg) (*mDNS.Msg, error) {
+	if t.exchangeEntered == nil {
+		return nil, errors.New("unused")
+	}
+	close(t.exchangeEntered)
+	<-t.exchangeRelease
+	return new(mDNS.Msg), nil
 }
-func (*resolvedLifecycleTransport) ExchangeAsync(context.Context, *mDNS.Msg, func(*mDNS.Msg, error)) {
+func (t *resolvedLifecycleTransport) ExchangeAsync(ctx context.Context, message *mDNS.Msg, callback func(*mDNS.Msg, error)) {
+	if !t.async {
+		return
+	}
+	go func() {
+		response, err := t.Exchange(ctx, message)
+		callback(response, err)
+	}()
 }
 
 func newResolvedLifecycleSet(t *testing.T, transports ...adapter.DNSTransport) *resolvedServerSet {
@@ -159,6 +174,131 @@ func TestResolvedExchangeAfterCloseIsStable(t *testing.T) {
 		require.ErrorIs(t, err, os.ErrClosed)
 		require.Nil(t, resolver.savedServerSet.Load())
 	}
+}
+
+func TestResolvedExchangeLeaseDrainsBeforeClose(t *testing.T) {
+	for range 100 {
+		entered := make(chan struct{})
+		release := make(chan struct{})
+		transport := &resolvedLifecycleTransport{exchangeEntered: entered, exchangeRelease: release}
+		serverSet := newResolvedLifecycleSet(t, transport)
+		serverSet.servers = []resolvedServer{{primaryTransport: transport}}
+		resolver := &DBusResolvedResolver{ctx: context.Background()}
+		resolver.savedServerSet.Store(serverSet)
+		exchangeDone := make(chan error, 1)
+		go func() {
+			_, err := resolver.Exchange(context.Background(), new(mDNS.Msg))
+			exchangeDone <- err
+		}()
+		<-entered
+		closeDone := make(chan error, 1)
+		go func() { closeDone <- resolver.Close() }()
+		require.Eventually(t, func() bool { return resolver.savedServerSet.Load() == nil }, time.Second, time.Millisecond)
+		require.Zero(t, transport.closeCount, "active synchronous exchange transport must remain open")
+		select {
+		case <-closeDone:
+			t.Fatal("Close returned before the synchronous lease drained")
+		default:
+		}
+		close(release)
+		require.NoError(t, <-exchangeDone)
+		require.NoError(t, <-closeDone)
+		require.Equal(t, 1, transport.closeCount)
+	}
+}
+
+func TestResolvedAsyncExchangeLeaseIncludesCallback(t *testing.T) {
+	for range 100 {
+		entered := make(chan struct{})
+		release := make(chan struct{})
+		callbackEntered := make(chan struct{})
+		callbackRelease := make(chan struct{})
+		transport := &resolvedLifecycleTransport{exchangeEntered: entered, exchangeRelease: release, async: true}
+		serverSet := newResolvedLifecycleSet(t, transport)
+		serverSet.servers = []resolvedServer{{primaryTransport: transport}}
+		resolver := &DBusResolvedResolver{ctx: context.Background()}
+		resolver.savedServerSet.Store(serverSet)
+		callbackDone := make(chan struct{})
+		resolver.ExchangeAsync(context.Background(), new(mDNS.Msg), func(*mDNS.Msg, error) {
+			close(callbackEntered)
+			<-callbackRelease
+			close(callbackDone)
+		})
+		<-entered
+		closeDone := make(chan error, 1)
+		go func() { closeDone <- resolver.Close() }()
+		require.Eventually(t, func() bool { return resolver.savedServerSet.Load() == nil }, time.Second, time.Millisecond)
+		close(release)
+		<-callbackEntered
+		require.Zero(t, transport.closeCount, "asynchronous lease must include caller callback")
+		select {
+		case <-closeDone:
+			t.Fatal("Close returned before the asynchronous callback completed")
+		default:
+		}
+		close(callbackRelease)
+		<-callbackDone
+		require.NoError(t, <-closeDone)
+		require.Equal(t, 1, transport.closeCount)
+	}
+}
+
+func TestResolvedUpdateDetachesBeforeWaitingForLease(t *testing.T) {
+	for range 100 {
+		entered := make(chan struct{})
+		release := make(chan struct{})
+		oldTransport := &resolvedLifecycleTransport{exchangeEntered: entered, exchangeRelease: release}
+		oldSet := newResolvedLifecycleSet(t, oldTransport)
+		oldSet.servers = []resolvedServer{{primaryTransport: oldTransport}}
+		newSet := newResolvedLifecycleSet(t)
+		resolver := &DBusResolvedResolver{ctx: context.Background(), logger: log.NewNOPFactory().NewLogger("resolved-lifecycle")}
+		resolver.savedServerSet.Store(oldSet)
+		resolver.checkResolvedFunc = func(context.Context) (*resolvedServerSet, error) { return newSet, nil }
+		exchangeDone := make(chan error, 1)
+		go func() {
+			_, err := resolver.Exchange(context.Background(), new(mDNS.Msg))
+			exchangeDone <- err
+		}()
+		<-entered
+		updateDone := make(chan struct{})
+		go func() { resolver.updateStatus(context.Background()); close(updateDone) }()
+		require.Eventually(t, func() bool { return resolver.savedServerSet.Load() == newSet }, time.Second, time.Millisecond)
+		lockAcquired := make(chan struct{})
+		go func() {
+			resolver.updateRunAccess.Lock()
+			close(lockAcquired)
+			resolver.updateRunAccess.Unlock()
+		}()
+		select {
+		case <-lockAcquired:
+		case <-time.After(time.Second):
+			t.Fatal("update waits for leases while holding updateRunAccess")
+		}
+		require.Zero(t, oldTransport.closeCount)
+		select {
+		case <-updateDone:
+			t.Fatal("update returned before old server set lease drained")
+		default:
+		}
+		close(release)
+		require.NoError(t, <-exchangeDone)
+		<-updateDone
+		require.Equal(t, 1, oldTransport.closeCount)
+		require.NoError(t, resolver.Close())
+	}
+}
+
+func TestResolvedCloseContextReturnsButStillReclaims(t *testing.T) {
+	transport := &resolvedLifecycleTransport{}
+	serverSet := newResolvedLifecycleSet(t, transport)
+	lease, acquired := serverSet.acquire()
+	require.True(t, acquired)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, closeResolvedServerSetContext(ctx, serverSet), context.Canceled)
+	require.Zero(t, transport.closeCount)
+	lease.Release()
+	require.Eventually(t, func() bool { return transport.closeCount == 1 }, time.Second, time.Millisecond)
 }
 
 func TestResolvedLazyExchangeAndUpdateUseGenerationGate(t *testing.T) {

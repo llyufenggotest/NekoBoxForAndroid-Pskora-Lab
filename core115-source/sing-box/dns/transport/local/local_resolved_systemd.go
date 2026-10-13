@@ -73,6 +73,60 @@ type resolvedServerSet struct {
 	servers     []resolvedServer
 	signature   []string
 	serverScope *adapter.Scope
+
+	leaseAccess sync.Mutex
+	retired     bool
+	leases      int
+	drained     chan struct{}
+	closeOnce   sync.Once
+	closeErr    error
+}
+
+type resolvedServerSetLease struct {
+	serverSet *resolvedServerSet
+	once      sync.Once
+}
+
+func (l *resolvedServerSetLease) Release() {
+	if l == nil || l.serverSet == nil {
+		return
+	}
+	l.once.Do(l.serverSet.release)
+}
+
+func (s *resolvedServerSet) acquire() (*resolvedServerSetLease, bool) {
+	if s == nil {
+		return nil, false
+	}
+	s.leaseAccess.Lock()
+	defer s.leaseAccess.Unlock()
+	if s.retired {
+		return nil, false
+	}
+	s.leases++
+	return &resolvedServerSetLease{serverSet: s}, true
+}
+
+func (s *resolvedServerSet) release() {
+	s.leaseAccess.Lock()
+	s.leases--
+	if s.retired && s.leases == 0 {
+		close(s.drained)
+	}
+	s.leaseAccess.Unlock()
+}
+
+func (s *resolvedServerSet) retire() <-chan struct{} {
+	s.leaseAccess.Lock()
+	defer s.leaseAccess.Unlock()
+	if !s.retired {
+		s.retired = true
+		s.drained = make(chan struct{})
+		if s.leases == 0 {
+			close(s.drained)
+		}
+	}
+	return s.drained
 }
 
 type resolvedServer struct {
@@ -177,13 +231,31 @@ func (t *DBusResolvedResolver) Environment() []string {
 	return serverSet.signature
 }
 
+func (t *DBusResolvedResolver) acquireCurrentServerSet() (*resolvedServerSet, *resolvedServerSetLease) {
+	for attempts := 0; attempts < 2; attempts++ {
+		serverSet := t.savedServerSet.Load()
+		if serverSet == nil {
+			return nil, nil
+		}
+		lease, acquired := serverSet.acquire()
+		if !acquired {
+			continue
+		}
+		if t.savedServerSet.Load() == serverSet {
+			return serverSet, lease
+		}
+		lease.Release()
+	}
+	return nil, nil
+}
+
 func (t *DBusResolvedResolver) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, error) {
 	t.updateRunAccess.Lock()
 	if t.closed {
 		t.updateRunAccess.Unlock()
 		return nil, os.ErrClosed
 	}
-	serverSet := t.savedServerSet.Load()
+	serverSet, lease := t.acquireCurrentServerSet()
 	t.updateRunAccess.Unlock()
 	if serverSet == nil {
 		var err error
@@ -191,28 +263,37 @@ func (t *DBusResolvedResolver) Exchange(ctx context.Context, message *mDNS.Msg) 
 		if err != nil {
 			return nil, err
 		}
+		lease, _ = serverSet.acquire()
+		if lease == nil {
+			return nil, os.ErrClosed
+		}
 	}
 	response, err := t.exchangeServerSet(ctx, message, serverSet)
+	lease.Release()
 	if err == nil {
 		return response, nil
 	}
 	t.updateStatus(t.ctx)
-	refreshedServerSet := t.savedServerSet.Load()
+	refreshedServerSet, refreshedLease := t.acquireCurrentServerSet()
 	if refreshedServerSet == nil || refreshedServerSet == serverSet {
+		if refreshedLease != nil {
+			refreshedLease.Release()
+		}
 		return nil, err
 	}
+	defer refreshedLease.Release()
 	return t.exchangeServerSet(ctx, message, refreshedServerSet)
 }
 
 func (t *DBusResolvedResolver) ExchangeAsync(ctx context.Context, message *mDNS.Msg, callback func(response *mDNS.Msg, err error)) {
 	t.updateRunAccess.Lock()
-	closed := t.closed
-	t.updateRunAccess.Unlock()
-	if closed {
+	if t.closed {
+		t.updateRunAccess.Unlock()
 		callback(nil, os.ErrClosed)
 		return
 	}
-	serverSet := t.savedServerSet.Load()
+	serverSet, lease := t.acquireCurrentServerSet()
+	t.updateRunAccess.Unlock()
 	if serverSet == nil {
 		go func() {
 			callback(t.Exchange(ctx, message))
@@ -222,16 +303,24 @@ func (t *DBusResolvedResolver) ExchangeAsync(ctx context.Context, message *mDNS.
 	t.exchangeServerSetAsync(ctx, message, serverSet, func(response *mDNS.Msg, err error) {
 		if err == nil {
 			callback(response, nil)
+			lease.Release()
 			return
 		}
+		lease.Release()
 		go func() {
 			t.updateStatus(t.ctx)
-			refreshedServerSet := t.savedServerSet.Load()
+			refreshedServerSet, refreshedLease := t.acquireCurrentServerSet()
 			if refreshedServerSet == nil || refreshedServerSet == serverSet {
+				if refreshedLease != nil {
+					refreshedLease.Release()
+				}
 				callback(nil, err)
 				return
 			}
-			t.exchangeServerSetAsync(ctx, message, refreshedServerSet, callback)
+			t.exchangeServerSetAsync(ctx, message, refreshedServerSet, func(response *mDNS.Msg, err error) {
+				callback(response, err)
+				refreshedLease.Release()
+			})
 		}()
 	})
 }
@@ -363,8 +452,12 @@ func (t *DBusResolvedResolver) updateStatus(ctx context.Context) {
 	}
 	oldServerSet := t.savedServerSet.Load()
 	t.generation++
-	_ = replaceResolvedServerSet(&t.savedServerSet, serverSet)
+	t.savedServerSet.Store(serverSet)
+	if oldServerSet != nil {
+		oldServerSet.retire()
+	}
 	t.updateRunAccess.Unlock()
+	_ = closeResolvedServerSet(oldServerSet)
 	if err != nil {
 		var dbusErr dbus.Error
 		if !errors.As(err, &dbusErr) || dbusErr.Name != "org.freedesktop.DBus.Error.NameHasNoOwner" {
@@ -583,15 +676,37 @@ func startResolvedTransport(serverScope *adapter.Scope, serverTransport adapter.
 	return nil
 }
 
-func closeResolvedServerSet(serverSet *resolvedServerSet) error {
-	if serverSet == nil || serverSet.serverScope == nil {
+func closeResolvedServerSetContext(ctx context.Context, serverSet *resolvedServerSet) error {
+	if serverSet == nil {
 		return nil
 	}
-	return serverSet.serverScope.Close()
+	drained := serverSet.retire()
+	select {
+	case <-drained:
+	case <-ctx.Done():
+		go func() {
+			<-drained
+			_ = closeResolvedServerSetContext(context.Background(), serverSet)
+		}()
+		return ctx.Err()
+	}
+	serverSet.closeOnce.Do(func() {
+		if serverSet.serverScope != nil {
+			serverSet.closeErr = serverSet.serverScope.Close()
+		}
+	})
+	return serverSet.closeErr
+}
+
+func closeResolvedServerSet(serverSet *resolvedServerSet) error {
+	return closeResolvedServerSetContext(context.Background(), serverSet)
 }
 
 func replaceResolvedServerSet(savedServerSet *atomic.Pointer[resolvedServerSet], serverSet *resolvedServerSet) error {
 	oldServerSet := savedServerSet.Swap(serverSet)
+	if oldServerSet != nil {
+		oldServerSet.retire()
+	}
 	return closeResolvedServerSet(oldServerSet)
 }
 
