@@ -1,0 +1,5 @@
+# github.com/sagernet/sing-tun [github.com/sagernet/sing-tun.test]
+.\stack_system_diagnostic_integration_test.go:61:8: stack.newTCPNATs undefined (type *System has no field or method newTCPNATs)
+.\stack_system_diagnostic_integration_test.go:114:8: stack.newTCPNATs undefined (type *System has no field or method newTCPNATs)
+FAIL	github.com/sagernet/sing-tun [build failed]
+FAIL

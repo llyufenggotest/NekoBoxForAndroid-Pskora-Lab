@@ -1,0 +1,27 @@
+System-stack NAT diagnostic production wiring / timing-layer evidence
+
+RED
+- Baseline: e1409910106a3d75c36592b6d7b717495c4e1a60
+- Command: go test -vet=off . -run 'TestSystemStack(DiagnosticProductionWiring|LookupMissDiagnostic)$' -count=1
+- Result: build failed because the production-oriented helper newTCPNATs did not exist. This proves the new tests fail against the e140991 system-stack wiring rather than only exercising NewNat directly.
+- Full output: 47-system-stack-diagnostic-red.log (exit 1)
+
+Production closure
+- System TCP NAT construction now passes the System logger to NewNat for IPv4 and IPv6.
+- ResetNetwork purges tcpNat4, tcpNat6, and udpNat before resetting the dispatcher.
+- IPv4 and IPv6 reverse lookup misses emit bounded metadata-only NATMiss records.
+- Integration tests exercise a System created by NewSystem plus a production helper, verify NATCreate/NATExpire/NATPurge/NATMiss, reset all NAT families, and reject address leakage.
+
+Timing-layer clarification
+- Route/network recovery source of truth: core115-source/sing-box/route/network.go uses tunTCPRecoveryFastSettle = 500 ms and tunTCPRecoverySlowSettle = 1500 ms.
+- 250 ms values found in this tree belong to other layers, including Android monitor integration timeout/speed reporting and unrelated sampling/push/STUN timings.
+- Therefore 250 ms is historical observation/integration evidence, not the TUN route/network recovery constant. No TUN settle constant was changed.
+
+GREEN
+- 49: production integration tests pass.
+- 50/51: sing-tun all-package compile passes normal and with_gvisor.
+- 52: real Go stack/NAT/fragment/diagnostic tests pass.
+- 53/54: sing-box all-package compile passes normal and with_gvisor.
+- 55: sing-box bridge/TUN/route/adapter/log focused suite passes.
+- 56: related route generation/recovery suite passes.
+- 58: AndroidNetworkMonitor integration test was attempted but blocked before tests by missing ANDROID_NDK_HOME in buildHevTun; this does not change the source evidence separating 250 ms from route recovery.

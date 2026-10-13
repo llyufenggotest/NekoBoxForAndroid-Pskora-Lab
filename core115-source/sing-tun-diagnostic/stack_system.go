@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	D "github.com/sagernet/sing-tun/diagnostic"
 	"github.com/sagernet/sing-tun/gtcpip"
 	"github.com/sagernet/sing-tun/gtcpip/checksum"
 	"github.com/sagernet/sing-tun/gtcpip/header"
@@ -115,10 +116,25 @@ func NewSystem(options StackOptions) (Stack, error) {
 }
 
 func (s *System) ResetNetwork() {
+	if s.tcpNat4 != nil {
+		s.tcpNat4.Purge()
+	}
+	if s.tcpNat6 != nil {
+		s.tcpNat6.Purge()
+	}
 	if s.udpNat != nil {
 		s.udpNat.Purge()
 	}
 	s.dispatcher.ResetNetwork()
+}
+
+func (s *System) newTCPNATs() {
+	if s.inet4NextAddress.IsValid() && s.tcpNat4 == nil {
+		s.tcpNat4 = NewNat(s.ctx, s.udpTimeout, s.logger)
+	}
+	if s.inet6NextAddress.IsValid() && s.tcpNat6 == nil {
+		s.tcpNat6 = NewNat(s.ctx, s.udpTimeout, s.logger)
+	}
 }
 
 func (s *System) Close() error {
@@ -168,7 +184,7 @@ func (s *System) start() error {
 		}
 		s.tcpListener = tcpListener
 		s.tcpPort = M.SocksaddrFromNet(tcpListener.Addr()).Port
-		s.tcpNat4 = NewNat(s.ctx, s.udpTimeout)
+		s.newTCPNATs()
 		go s.acceptLoop(tcpListener, s.tcpNat4)
 	}
 	if s.inet6NextAddress.IsValid() {
@@ -184,7 +200,7 @@ func (s *System) start() error {
 		}
 		s.tcpListener6 = tcpListener
 		s.tcpPort6 = M.SocksaddrFromNet(tcpListener.Addr()).Port
-		s.tcpNat6 = NewNat(s.ctx, s.udpTimeout)
+		s.newTCPNATs()
 		go s.acceptLoop(tcpListener, s.tcpNat6)
 	}
 	udpNATOptions := s.udpNATOptions
@@ -516,6 +532,7 @@ func (s *System) processIPv4TCP(ipHdr header.IPv4, tcpHdr header.TCP) (bool, err
 	} else if source.Addr() == s.inet4Address && source.Port() == s.tcpPort {
 		session := s.tcpNat4.LookupBack(destination.Port())
 		if session == nil {
+			D.Emit(s.logger, D.Record{Event: D.NATMiss, NAT: s.tcpNat4.diagnosticID, Generation: D.Generation(), Port: destination.Port()})
 			return false, E.New("ipv4: tcp: session not found: ", destination.Port())
 		}
 		rewriteIPv4TCP(ipHdr, tcpHdr, s.txChecksumOffload,
@@ -559,6 +576,7 @@ func (s *System) processIPv6TCP(ipHdr header.IPv6, tcpHdr header.TCP) (bool, err
 	} else if source.Addr() == s.inet6Address && source.Port() == s.tcpPort6 {
 		session := s.tcpNat6.LookupBack(destination.Port())
 		if session == nil {
+			D.Emit(s.logger, D.Record{Event: D.NATMiss, NAT: s.tcpNat6.diagnosticID, Generation: D.Generation(), Port: destination.Port()})
 			return false, E.New("ipv6: tcp: session not found: ", destination.Port())
 		}
 		rewriteIPv6TCP(ipHdr, tcpHdr, s.txChecksumOffload,

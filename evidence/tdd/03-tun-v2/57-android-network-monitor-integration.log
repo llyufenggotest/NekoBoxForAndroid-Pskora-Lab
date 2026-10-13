@@ -1,0 +1,31 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors
+> Task :buildSrc:pluginDescriptors
+> Task :buildSrc:processResources NO-SOURCE
+
+> Task :buildSrc:compileKotlin
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/tun2/buildSrc/src/main/kotlin/Helpers.kt:8:40 'KotlinJvmOptions' is deprecated. The kotlinOptions types are deprecated, please migrate to the compilerOptions types. More details are here: https://kotl.in/u1r8ln
+w: file:///F:/pskora-lab/alpha12-migration/worktrees/tun2/buildSrc/src/main/kotlin/Helpers.kt:59:58 'KotlinJvmOptions' is deprecated. The kotlinOptions types are deprecated, please migrate to the compilerOptions types. More details are here: https://kotl.in/u1r8ln
+
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+
+> Task :buildSrc:jar
+:jar: No valid plugin descriptors were found in META-INF/gradle-plugins
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Cannot locate tasks that match ':app:testDebugUnitTest' as task 'testDebugUnitTest' is ambiguous in project ':app'. Candidates are: 'testFdroidDebugUnitTest', 'testOssDebugUnitTest', 'testPlayDebugUnitTest', 'testPreviewDebugUnitTest'.
+
+* Try:
+> Run gradlew tasks to get a list of available tasks.
+> For more on name expansion, please refer to https://docs.gradle.org/8.10.2/userguide/command_line_interface.html#sec:name_abbreviation in the Gradle documentation.
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 56s
+4 actionable tasks: 4 executed

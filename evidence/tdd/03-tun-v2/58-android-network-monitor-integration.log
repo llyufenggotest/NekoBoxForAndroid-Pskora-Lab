@@ -1,0 +1,26 @@
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors
+> Task :buildSrc:compileKotlin UP-TO-DATE
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:pluginDescriptors UP-TO-DATE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+
+> Task :app:buildHevTun FAILED
+/f/pskora-lab/alpha12-migration/worktrees/tun2/buildScript/init/env_ndk.sh: line 14: ANDROID_NDK_HOME: unbound variable
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:buildHevTun'.
+> Process 'command 'bash'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 4s
+5 actionable tasks: 2 executed, 3 up-to-date
