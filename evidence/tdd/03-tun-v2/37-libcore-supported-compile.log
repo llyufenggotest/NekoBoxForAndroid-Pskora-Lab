@@ -1,0 +1,8 @@
+$ go test ./androidmonitor ./boxapi ./latencyaudit ./protocol/oppa ./tunnetcontrol -run '^$' -count=1
+workdir=F:/pskora-lab/alpha12-migration/worktrees/tun2/core115-source/libcore
+
+ok  	libcore/androidmonitor	0.062s [no tests to run]
+ok  	libcore/boxapi	0.065s [no tests to run]
+ok  	libcore/latencyaudit	0.049s [no tests to run]
+ok  	libcore/protocol/oppa	0.052s [no tests to run]
+ok  	libcore/tunnetcontrol	0.032s [no tests to run]

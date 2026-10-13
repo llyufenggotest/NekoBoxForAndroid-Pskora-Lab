@@ -1,0 +1,42 @@
+TUN v2 GREEN verification
+
+Refs
+- baseline parent: 50bf826da22509c25c4cbab37ad68b7412c5e294
+- test skeleton: e943adf7b3add3e10c4d4b6b1b0a22941e8b006d
+- official sing-tun target: 5c2edb183cc92eb190d41c04dedfa5519ca3e78c
+- Go: go1.26.5 windows/amd64
+
+Closure
+- official tracked files: 253
+- missing official files: 0
+- local files: 258
+- private extra files: 5 (diagnostic/recovery.go, diagnostic/recovery_test.go, diagnostic/trace.go, diagnostic/trace_test.go, diagnostic_nat_test.go)
+- normalized official files equal: 250
+- explicit private differences in official paths: icmp_error.go, stack_system_nat.go, udp_egress.go
+
+Dependencies
+- github.com/sagernet/sing v0.9.5-0.20260917142815-f37989cadbf0
+- github.com/sagernet/sing-tun v0.9.7-0.20260918022723-5c2edb183cc9
+- sing-box and libcore both replace sing-tun with ../sing-tun-diagnostic.
+
+Passing gates (exit 0)
+- 31: local sing-tun all packages compile with vet disabled (the only vet failure is mirrored upstream winipcfg %w misuse).
+- 32: local sing-tun all packages compile with with_gvisor and vet disabled.
+- 33: real Go stack handshake/stream, UDP lifecycle, fragment, diagnostic NAT, and diagnostic package tests.
+- 34: sing-box all packages compile.
+- 35: sing-box all packages compile with with_gvisor.
+- 36: sing-box bridge/TUN/openvpn/openconnect/route/adapter/log focused integration.
+- 37: supported libcore bridge packages compile on Windows.
+- 44/45: module graph verification.
+
+Known limits / matched controls
+- 38 and 39 both fail only because Go vet rejects testing.Errorf("%w") in official internal/winipcfg tests; local and official output match in cause.
+- 40 and 41 both fail TestGoKernelPacketMapping on this Windows runner with the same peer-3 UDP timeout pattern; this is not unique to the local private diff.
+- 42 libcore root package is Unix/Android-specific and does not compile on Windows (unix.Socket/AF_UNIX etc.); supported bridge packages pass in 37.
+
+Integration fixes added after the skeleton
+- Forwarded v0.9.7 selector ranges through bridge and reserved the Windows bridge port range.
+- Preserved diagnostic NAT event identity and ensured dial/preparation failures release NAT state.
+- Updated Darwin openvpn/openconnect BatchRead headroom arguments for the v0.9.7 API.
+- Removed retired UDPNatOptions.ExcludeInterface initializers from gVisor openvpn/openconnect/wireguard adapters.
+- Updated recovery diagnostic assertion from schema 3 to schema 4; this is a real schema baseline update, not masking a product failure.

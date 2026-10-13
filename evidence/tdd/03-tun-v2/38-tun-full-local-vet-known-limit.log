@@ -1,0 +1,73 @@
+$ go test ./... -run '^$' -count=1
+workdir=F:/pskora-lab/alpha12-migration/worktrees/tun2/core115-source/sing-tun-diagnostic
+
+# github.com/sagernet/sing-tun/internal/winipcfg
+# [github.com/sagernet/sing-tun/internal/winipcfg]
+internal\winipcfg\winipcfg_test.go:89:52: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:116:50: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:127:45: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:137:48: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:150:52: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:160:54: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:165:54: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:173:54: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:188:53: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:207:63: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:213:66: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:229:56: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:236:53: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:254:56: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:261:53: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:278:53: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:291:45: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:298:53: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:308:45: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:315:53: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:325:51: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:331:49: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:344:48: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:362:54: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:370:51: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:383:49: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:400:71: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:410:54: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:424:49: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:434:55: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:443:49: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:453:50: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:482:51: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:495:45: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:501:44: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:516:62: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:522:48: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:531:45: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:541:44: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:550:51: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:559:45: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:567:44: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:576:51: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:586:43: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:591:48: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:599:43: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:619:51: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:629:43: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:634:46: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:642:43: (*testing.common).Errorf does not support error-wrapping directive %w
+internal\winipcfg\winipcfg_test.go:662:59: (*testing.common).Errorf does not support error-wrapping directive %w
+ok  	github.com/sagernet/sing-tun	0.027s [no tests to run]
+ok  	github.com/sagernet/sing-tun/diagnostic	0.028s [no tests to run]
+?   	github.com/sagernet/sing-tun/dnsinfo	[no test files]
+?   	github.com/sagernet/sing-tun/gtcpip	[no test files]
+?   	github.com/sagernet/sing-tun/gtcpip/checksum	[no test files]
+?   	github.com/sagernet/sing-tun/gtcpip/header	[no test files]
+?   	github.com/sagernet/sing-tun/gtcpip/seqnum	[no test files]
+?   	github.com/sagernet/sing-tun/internal/afd	[no test files]
+ok  	github.com/sagernet/sing-tun/internal/checksum_test	0.025s [no tests to run]
+?   	github.com/sagernet/sing-tun/internal/tschecksum	[no test files]
+?   	github.com/sagernet/sing-tun/internal/winfw	[no test files]
+FAIL	github.com/sagernet/sing-tun/internal/winipcfg [build failed]
+?   	github.com/sagernet/sing-tun/internal/winsys	[no test files]
+?   	github.com/sagernet/sing-tun/internal/wintun	[no test files]
+?   	github.com/sagernet/sing-tun/internal/wintun/memmod	[no test files]
+ok  	github.com/sagernet/sing-tun/ping	0.027s [no tests to run]
+FAIL

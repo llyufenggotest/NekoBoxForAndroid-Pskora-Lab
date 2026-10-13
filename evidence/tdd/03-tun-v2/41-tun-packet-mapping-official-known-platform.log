@@ -1,0 +1,37 @@
+$ go test . -run '^TestGoKernelPacketMapping$' -count=1
+workdir=C:/Users/Administrator/AppData/Local/hermes/cache/scratch/sing-tun-upstream-5c2edb183cc9
+
+--- FAIL: TestGoKernelPacketMapping (28.90s)
+    --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=0/filtering=0 (1.35s)
+        --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=0/filtering=0/ipv6=true (1.05s)
+            stack_go_integration_packet_flow_test.go:287: allowed return peer 3: source=invalid AddrPort: read udp [fd73:ab91:1::1]:61187: i/o timeout
+        --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=0/filtering=0/ipv6=false (1.05s)
+            stack_go_integration_packet_flow_test.go:287: allowed return peer 3: source=invalid AddrPort: read udp 198.18.0.9:61186: i/o timeout
+    --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=0/filtering=1 (2.36s)
+        --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=0/filtering=1/ipv6=false (1.04s)
+            stack_go_integration_packet_flow_test.go:287: allowed return peer 3: source=invalid AddrPort: read udp 198.18.0.17:56730: i/o timeout
+        --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=0/filtering=1/ipv6=true (1.03s)
+            stack_go_integration_packet_flow_test.go:287: allowed return peer 3: source=invalid AddrPort: read udp [fd73:ab91:2::1]:56731: i/o timeout
+    --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=1/filtering=0 (3.20s)
+        --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=1/filtering=0/ipv6=false (1.04s)
+            stack_go_integration_packet_flow_test.go:287: allowed return peer 3: source=invalid AddrPort: read udp 198.18.0.33:52653: i/o timeout
+        --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=1/filtering=0/ipv6=true (1.04s)
+            stack_go_integration_packet_flow_test.go:287: allowed return peer 3: source=invalid AddrPort: read udp [fd73:ab91:4::1]:52654: i/o timeout
+    --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=1/filtering=1 (2.35s)
+        --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=1/filtering=1/ipv6=true (1.10s)
+            stack_go_integration_packet_flow_test.go:287: allowed return peer 3: source=invalid AddrPort: read udp [fd73:ab91:5::1]:56236: i/o timeout
+        --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=1/filtering=1/ipv6=false (1.11s)
+            stack_go_integration_packet_flow_test.go:287: allowed return peer 3: source=invalid AddrPort: read udp 198.18.0.41:56235: i/o timeout
+    --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=2/filtering=0 (3.17s)
+        --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=2/filtering=0/ipv6=false (1.02s)
+            stack_go_integration_packet_flow_test.go:287: allowed return peer 3: source=invalid AddrPort: read udp 198.18.0.57:63239: i/o timeout
+        --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=2/filtering=0/ipv6=true (1.02s)
+            stack_go_integration_packet_flow_test.go:287: allowed return peer 3: source=invalid AddrPort: read udp [fd73:ab91:7::1]:63240: i/o timeout
+    --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=2/filtering=1 (2.39s)
+        --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=2/filtering=1/ipv6=true (1.12s)
+            stack_go_integration_packet_flow_test.go:287: allowed return peer 3: source=invalid AddrPort: read udp [fd73:ab91:8::1]:62126: i/o timeout
+        --- FAIL: TestGoKernelPacketMapping/mq=false/mapping=2/filtering=1/ipv6=false (1.13s)
+            stack_go_integration_packet_flow_test.go:287: allowed return peer 3: source=invalid AddrPort: read udp 198.18.0.65:62125: i/o timeout
+FAIL
+FAIL	github.com/sagernet/sing-tun	28.933s
+FAIL

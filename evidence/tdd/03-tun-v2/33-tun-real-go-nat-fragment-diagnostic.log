@@ -1,0 +1,5 @@
+$ go test . -run '^(TestDiagnosticNATNoBehaviorChange|TestGoKernelHandshake|TestGoKernelPacketFragments|TestGoKernelStream|TestGoUDPSessionImmediateClose)$' -count=1 && go test ./diagnostic -count=1
+workdir=F:/pskora-lab/alpha12-migration/worktrees/tun2/core115-source/sing-tun-diagnostic
+
+ok  	github.com/sagernet/sing-tun	31.951s
+ok  	github.com/sagernet/sing-tun/diagnostic	0.032s

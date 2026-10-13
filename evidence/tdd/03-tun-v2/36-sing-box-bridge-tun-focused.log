@@ -1,0 +1,10 @@
+$ go test ./protocol/bridge ./protocol/tun ./transport/openvpn ./transport/openconnect ./route ./adapter ./log -count=1
+workdir=F:/pskora-lab/alpha12-migration/worktrees/tun2/core115-source/sing-box
+
+?   	github.com/sagernet/sing-box/protocol/bridge	[no test files]
+?   	github.com/sagernet/sing-box/protocol/tun	[no test files]
+?   	github.com/sagernet/sing-box/transport/openvpn	[no test files]
+?   	github.com/sagernet/sing-box/transport/openconnect	[no test files]
+ok  	github.com/sagernet/sing-box/route	0.456s
+ok  	github.com/sagernet/sing-box/adapter	0.046s
+ok  	github.com/sagernet/sing-box/log	0.058s

@@ -1,0 +1,5 @@
+$ go list -m -f '{{.Path}} {{.Version}} {{if .Replace}}=> {{.Replace.Dir}}{{end}}' github.com/sagernet/sing github.com/sagernet/sing-tun
+workdir=F:\pskora-lab\alpha12-migration\worktrees\tun2\core115-source\sing-box
+
+github.com/sagernet/sing v0.9.5-0.20260917142815-f37989cadbf0
+github.com/sagernet/sing-tun v0.9.7-0.20260918022723-5c2edb183cc9 => F:\pskora-lab\alpha12-migration\worktrees\tun2\core115-source\sing-tun-diagnostic

@@ -72,9 +72,8 @@ func newStackDevice(options DeviceOptions) (*stackDevice, error) {
 			Shared:           true,
 			Mapping:          options.UDPMapping,
 			Filtering:        options.UDPFiltering,
-			MaxSize:          options.UDPNATMax,
-			InterfaceFinder:  options.InterfaceFinder,
-			ExcludeInterface: options.ExcludeInterface,
+			MaxSize:         options.UDPNATMax,
+			InterfaceFinder: options.InterfaceFinder,
 		})
 		ipStack.SetTransportProtocolHandler(udp.ProtocolNumber, udpForwarder.HandlePacket)
 		device.udpForwarder = udpForwarder

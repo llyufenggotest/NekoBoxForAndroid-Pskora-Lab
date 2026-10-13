@@ -1,0 +1,10 @@
+upstream_commit=5c2edb183cc92eb190d41c04dedfa5519ca3e78c
+upstream_files=253
+local_files=258
+missing_count=0
+extra_count=5
+normalized_equal_official_count=250
+normalized_private_difference_count=3
+missing_paths=
+extra_paths=diagnostic/recovery.go diagnostic/recovery_test.go diagnostic/trace.go diagnostic/trace_test.go diagnostic_nat_test.go
+private_difference_paths=icmp_error.go stack_system_nat.go udp_egress.go

@@ -209,7 +209,7 @@ func (d *systemDevice) readLoopLinux(tunInterface tun.LinuxTUN, batchSize int, m
 
 func (d *systemDevice) readLoopDarwin(tunInterface tun.DarwinTUN) {
 	for {
-		packetBuffers, readErr := tunInterface.BatchRead()
+		packetBuffers, readErr := tunInterface.BatchRead(PacketHeadroom, systemDevicePacketRearSpace)
 		outboundBuffers := packetBuffers[:0]
 		blockIPv6 := d.blockIPv6Enabled()
 		for _, packetBuffer := range packetBuffers {

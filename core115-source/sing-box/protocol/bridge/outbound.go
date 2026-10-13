@@ -110,11 +110,18 @@ func (o *Outbound) PortMTU() uint32 {
 	return o.backend.PortMTU()
 }
 
-func (o *Outbound) PortSelectorRange() (uint16, uint16) {
+func (o *Outbound) PortSelectorRanges(protocol uint8) []tun.SelectorRange {
 	if rangedBackend, isRanged := o.backend.(tun.PortWithSelectorRange); isRanged {
-		return rangedBackend.PortSelectorRange()
+		return rangedBackend.PortSelectorRanges(protocol)
 	}
-	return 0, 0
+	return nil
+}
+
+func (o *Outbound) ExpandSelectorRanges(protocol uint8) bool {
+	if rangedBackend, isRanged := o.backend.(tun.PortWithSelectorRange); isRanged {
+		return rangedBackend.ExpandSelectorRanges(protocol)
+	}
+	return false
 }
 
 func (o *Outbound) AttachReturn(returnPath tun.Return) error {

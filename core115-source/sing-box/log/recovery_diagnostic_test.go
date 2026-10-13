@@ -25,7 +25,7 @@ func TestRecoveryDiagnosticEnabledAtDebugAndTrace(t *testing.T) {
 	if strings.Contains(output, "epoch=1") {
 		t.Fatalf("recovery diagnostic enabled at info: %q", output)
 	}
-	if !strings.Contains(output, "RECOVTRACE schema=3") || !strings.Contains(output, "epoch=2") {
+	if !strings.Contains(output, "RECOVTRACE schema=4") || !strings.Contains(output, "epoch=2") {
 		t.Fatalf("recovery diagnostic missing at debug: %q", output)
 	}
 	if strings.Contains(output, "DTRACE3") {

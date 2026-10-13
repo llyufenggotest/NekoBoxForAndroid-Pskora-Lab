@@ -18,6 +18,10 @@ const (
 	ICMPErrorPacketTooBig
 )
 
+func BuildUnreachable(packet []byte, source netip.Addr, headroom int) ([]byte, bool) {
+	return BuildICMPError(packet, ICMPErrorAddressUnreachable, source, 0, headroom)
+}
+
 func BuildICMPError(packet []byte, errorType ICMPError, source netip.Addr, mtu uint32, headroom int) ([]byte, bool) {
 	switch header.IPVersion(packet) {
 	case header.IPv4Version:

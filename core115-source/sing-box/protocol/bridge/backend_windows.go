@@ -16,6 +16,7 @@ import (
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/windivert"
 	"github.com/sagernet/sing-box/option"
+	tun "github.com/sagernet/sing-tun"
 	"github.com/sagernet/sing-tun/gtcpip"
 	"github.com/sagernet/sing-tun/gtcpip/header"
 	"github.com/sagernet/sing/common/control"
@@ -207,8 +208,12 @@ func (b *backendWindows) acquireReservations() error {
 	return nil
 }
 
-func (b *backendWindows) PortSelectorRange() (uint16, uint16) {
-	return b.reservedStart, bridgeReservedPortCount
+func (b *backendWindows) PortSelectorRanges(uint8) []tun.SelectorRange {
+	return []tun.SelectorRange{{Start: b.reservedStart, Count: bridgeReservedPortCount}}
+}
+
+func (b *backendWindows) ExpandSelectorRanges(uint8) bool {
+	return false
 }
 
 func (b *backendWindows) rebuildDivertersLocked(state *egressState) error {

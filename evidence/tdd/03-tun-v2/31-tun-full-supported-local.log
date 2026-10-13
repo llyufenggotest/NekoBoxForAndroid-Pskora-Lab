@@ -1,0 +1,19 @@
+$ go test ./... -run '^$' -vet=off -count=1
+workdir=F:/pskora-lab/alpha12-migration/worktrees/tun2/core115-source/sing-tun-diagnostic
+
+ok  	github.com/sagernet/sing-tun	0.040s [no tests to run]
+ok  	github.com/sagernet/sing-tun/diagnostic	0.038s [no tests to run]
+?   	github.com/sagernet/sing-tun/dnsinfo	[no test files]
+?   	github.com/sagernet/sing-tun/gtcpip	[no test files]
+?   	github.com/sagernet/sing-tun/gtcpip/checksum	[no test files]
+?   	github.com/sagernet/sing-tun/gtcpip/header	[no test files]
+?   	github.com/sagernet/sing-tun/gtcpip/seqnum	[no test files]
+?   	github.com/sagernet/sing-tun/internal/afd	[no test files]
+ok  	github.com/sagernet/sing-tun/internal/checksum_test	0.044s [no tests to run]
+?   	github.com/sagernet/sing-tun/internal/tschecksum	[no test files]
+?   	github.com/sagernet/sing-tun/internal/winfw	[no test files]
+ok  	github.com/sagernet/sing-tun/internal/winipcfg	0.037s [no tests to run]
+?   	github.com/sagernet/sing-tun/internal/winsys	[no test files]
+?   	github.com/sagernet/sing-tun/internal/wintun	[no test files]
+?   	github.com/sagernet/sing-tun/internal/wintun/memmod	[no test files]
+ok  	github.com/sagernet/sing-tun/ping	0.025s [no tests to run]

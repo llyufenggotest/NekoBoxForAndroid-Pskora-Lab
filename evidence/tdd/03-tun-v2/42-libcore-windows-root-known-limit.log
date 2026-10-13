@@ -1,0 +1,17 @@
+$ go test . -run '^$' -count=1
+workdir=F:/pskora-lab/alpha12-migration/worktrees/tun2/core115-source/libcore
+
+# libcore [libcore.test]
+.\nb4a.go:123:24: undefined: unix.Socket
+.\nb4a.go:123:36: undefined: unix.AF_UNIX
+.\nb4a.go:123:50: undefined: unix.SOCK_STREAM
+.\nb4a.go:127:13: undefined: unix.Close
+.\nb4a.go:129:19: undefined: unix.Timeval
+.\nb4a.go:132:11: undefined: unix.SetsockoptTimeval
+.\nb4a.go:132:44: undefined: unix.SOL_SOCKET
+.\nb4a.go:132:61: undefined: unix.SO_RCVTIMEO
+.\nb4a.go:133:11: undefined: unix.SetsockoptTimeval
+.\nb4a.go:133:44: undefined: unix.SOL_SOCKET
+.\nb4a.go:133:44: too many errors
+FAIL	libcore [build failed]
+FAIL
