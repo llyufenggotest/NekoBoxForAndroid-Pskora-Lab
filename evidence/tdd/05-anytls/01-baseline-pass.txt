@@ -1,0 +1,5 @@
+baseline_head=df5390586afd6ee81307ccd9c5fde92753494f1f
+upstream_anytls=v0.0.0-20260928104022-580984e4d8cb
+upstream_commit=580984e4d8cb10f1c5e88d7ec14cfe4d955d66e6
+command=(cd core115-source/sing-anytls115-local && go test ./... -timeout 60s)
+ok  	github.com/sagernet/sing-anytls	(cached)
