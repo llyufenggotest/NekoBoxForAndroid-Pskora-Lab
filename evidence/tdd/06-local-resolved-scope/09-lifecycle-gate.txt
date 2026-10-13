@@ -1,0 +1,3428 @@
+{
+  "official_ref": "v1.15.0-alpha.12",
+  "migration_ref": "",
+  "official_start_count": 100,
+  "migration_start_count": 97,
+  "official_scope_add_count": 183,
+  "migration_scope_add_count": 180,
+  "mapped_scope_add_count": 173,
+  "aggregate_exemption_count": 0,
+  "old_signature_count": 0,
+  "missing_registration_count": 0,
+  "unexpected_missing_path_count": 0,
+  "missing_path_allowlist": [
+    "protocol/masque/client.go",
+    "protocol/masque/server.go",
+    "protocol/tailscale/tailcat_inbound.go",
+    "protocol/tailscale/tailcat_outbound.go"
+  ],
+  "missing_path_allowlist_exact": true,
+  "missing_path_proofs": [
+    {
+      "path": "protocol/masque/client.go",
+      "file_absent": true,
+      "registry_terms": [
+        "masque"
+      ],
+      "registry_matches": null,
+      "proved": true
+    },
+    {
+      "path": "protocol/masque/server.go",
+      "file_absent": true,
+      "registry_terms": [
+        "masque"
+      ],
+      "registry_matches": null,
+      "proved": true
+    },
+    {
+      "path": "protocol/tailscale/tailcat_inbound.go",
+      "file_absent": true,
+      "registry_terms": [
+        "tailcat"
+      ],
+      "registry_matches": null,
+      "proved": true
+    },
+    {
+      "path": "protocol/tailscale/tailcat_outbound.go",
+      "file_absent": true,
+      "registry_terms": [
+        "tailcat"
+      ],
+      "registry_matches": null,
+      "proved": true
+    }
+  ],
+  "missing_path_proof_failure_count": 0,
+  "ast_noop_cleanup_count": 0,
+  "text_noop_cleanup_count": 0,
+  "invalid_aggregate_exemption_count": 0,
+  "issues": null,
+  "official_functions": {
+    "adapter/certificate/manager.go::Manager": {
+      "path": "adapter/certificate/manager.go",
+      "receiver": "Manager",
+      "line": 28,
+      "has_scope": true,
+      "registrations": null
+    },
+    "adapter/endpoint/manager.go::Manager": {
+      "path": "adapter/endpoint/manager.go",
+      "receiver": "Manager",
+      "line": 29,
+      "has_scope": true,
+      "registrations": null
+    },
+    "adapter/inbound/manager.go::Manager": {
+      "path": "adapter/inbound/manager.go",
+      "receiver": "Manager",
+      "line": 30,
+      "has_scope": true,
+      "registrations": null
+    },
+    "adapter/outbound/manager.go::Manager": {
+      "path": "adapter/outbound/manager.go",
+      "receiver": "Manager",
+      "line": 41,
+      "has_scope": true,
+      "registrations": null
+    },
+    "adapter/service/manager.go::Manager": {
+      "path": "adapter/service/manager.go",
+      "receiver": "Manager",
+      "line": 28,
+      "has_scope": true,
+      "registrations": null
+    },
+    "common/certificate/store.go::Store": {
+      "path": "common/certificate/store.go",
+      "receiver": "Store",
+      "line": 109,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "s.closePlatform",
+          "line": 118,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.watcher.Close",
+          "line": 125,
+          "occurrence": 1
+        }
+      ]
+    },
+    "common/httpclient/manager.go::Manager": {
+      "path": "common/httpclient/manager.go",
+      "receiver": "Manager",
+      "line": 64,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "m.close",
+          "line": 75,
+          "occurrence": 1
+        }
+      ]
+    },
+    "common/netns/manager_linux.go::Manager": {
+      "path": "common/netns/manager_linux.go",
+      "receiver": "Manager",
+      "line": 66,
+      "has_scope": true,
+      "registrations": null
+    },
+    "common/netns/manager_stub.go::Manager": {
+      "path": "common/netns/manager_stub.go",
+      "receiver": "Manager",
+      "line": 25,
+      "has_scope": true,
+      "registrations": null
+    },
+    "common/trafficcontrol/manager.go::Manager": {
+      "path": "common/trafficcontrol/manager.go",
+      "receiver": "Manager",
+      "line": 58,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "m.eventObserver.Close",
+          "line": 61,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{cleaner.Close()returnnil}",
+          "line": 63,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/router.go::Router": {
+      "path": "dns/router.go",
+      "receiver": "Router",
+      "line": 132,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{r.rulesAccess.Lock()r.closing=trueruntimeRules:=r.rulesr.rules=nilr.rulesAccess.Unlock()closeRules(runtimeRules)returnnil}",
+          "line": 136,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/dhcp/dhcp.go::Transport": {
+      "path": "dns/transport/dhcp/dhcp.go",
+      "receiver": "Transport",
+      "line": 107,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.Reset()returnnil}",
+          "line": 111,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{interfaceMonitor.UnregisterCallback(interfaceCallback)returnnil}",
+          "line": 123,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/fakeip/fakeip.go::Transport": {
+      "path": "dns/transport/fakeip/fakeip.go",
+      "receiver": "Transport",
+      "line": 48,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.store.Close",
+          "line": 56,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/hosts/hosts.go::Transport": {
+      "path": "dns/transport/hosts/hosts.go",
+      "receiver": "Transport",
+      "line": 61,
+      "has_scope": true,
+      "registrations": null
+    },
+    "dns/transport/https.go::HTTPSTransport": {
+      "path": "dns/transport/https.go",
+      "receiver": "HTTPSTransport",
+      "line": 152,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.Reset()returnnil}",
+          "line": 156,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/local/local.go::Transport": {
+      "path": "dns/transport/local/local.go",
+      "receiver": "Transport",
+      "line": 72,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.configSource.Close",
+          "line": 76,
+          "occurrence": 1
+        },
+        {
+          "expression": "resolvedResolver.Close",
+          "line": 80,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{t.system.close()returnnil}",
+          "line": 90,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{serverSet:=t.serverSet.Swap(nil)ifserverSet!=nil{returnserverSet.serverScope.Close()}returnnil}",
+          "line": 94,
+          "occurrence": 1
+        },
+        {
+          "expression": "t.mdnsScope.Close",
+          "line": 104,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/mdns/mdns.go::Transport": {
+      "path": "dns/transport/mdns/mdns.go",
+      "receiver": "Transport",
+      "line": 96,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.configSource.Close",
+          "line": 98,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/quic/http3.go::HTTP3Transport": {
+      "path": "dns/transport/quic/http3.go",
+      "receiver": "HTTP3Transport",
+      "line": 140,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.transportAccess.Lock()defert.transportAccess.Unlock()returnt.transport.Close()}",
+          "line": 144,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/quic/quic.go::Transport": {
+      "path": "dns/transport/quic/quic.go",
+      "receiver": "Transport",
+      "line": 82,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.connection.Close",
+          "line": 86,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/tcp.go::TCPTransport": {
+      "path": "dns/transport/tcp.go",
+      "receiver": "TCPTransport",
+      "line": 82,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.multiplexer.Close",
+          "line": 86,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/tls.go::TLSTransport": {
+      "path": "dns/transport/tls.go",
+      "receiver": "TLSTransport",
+      "line": 88,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.multiplexer.Close",
+          "line": 92,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/udp.go::UDPTransport": {
+      "path": "dns/transport/udp.go",
+      "receiver": "UDPTransport",
+      "line": 82,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.multiplexer.Close",
+          "line": 86,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport_manager.go::TransportManager": {
+      "path": "dns/transport_manager.go",
+      "receiver": "TransportManager",
+      "line": 43,
+      "has_scope": true,
+      "registrations": null
+    },
+    "experimental/cachefile/cache.go::CacheFile": {
+      "path": "experimental/cachefile/cache.go",
+      "receiver": "CacheFile",
+      "line": 148,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{returnc.database().Close()}",
+          "line": 155,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{c.flushTimer.Stop()c.Flush()returnnil}",
+          "line": 158,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{flushGroup.Wait()returnnil}",
+          "line": 164,
+          "occurrence": 1
+        }
+      ]
+    },
+    "experimental/clashapi/server.go::Server": {
+      "path": "experimental/clashapi/server.go",
+      "receiver": "Server",
+      "line": 149,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "s.httpServer.Close",
+          "line": 170,
+          "occurrence": 1
+        }
+      ]
+    },
+    "experimental/clashmode/manager.go::Manager": {
+      "path": "experimental/clashmode/manager.go",
+      "receiver": "Manager",
+      "line": 46,
+      "has_scope": true,
+      "registrations": null
+    },
+    "experimental/libbox/dns.go::platformTransport": {
+      "path": "experimental/libbox/dns.go",
+      "receiver": "platformTransport",
+      "line": 49,
+      "has_scope": true,
+      "registrations": null
+    },
+    "experimental/v2rayapi/server.go::Server": {
+      "path": "experimental/v2rayapi/server.go",
+      "receiver": "Server",
+      "line": 50,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.grpcServer.Stop()returnnil}",
+          "line": 53,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/anytls/inbound.go::Inbound": {
+      "path": "protocol/anytls/inbound.go",
+      "receiver": "Inbound",
+      "line": 84,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 93,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 99,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/anytls/outbound.go::Outbound": {
+      "path": "protocol/anytls/outbound.go",
+      "receiver": "Outbound",
+      "line": 86,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "client.Close",
+          "line": 95,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/bridge/backend_darwin.go::backendDarwin": {
+      "path": "protocol/bridge/backend_darwin.go",
+      "receiver": "backendDarwin",
+      "line": 70,
+      "has_scope": true,
+      "registrations": null
+    },
+    "protocol/bridge/backend_linux.go::backendLinux": {
+      "path": "protocol/bridge/backend_linux.go",
+      "receiver": "backendLinux",
+      "line": 58,
+      "has_scope": true,
+      "registrations": null
+    },
+    "protocol/bridge/backend_windows.go::backendWindows": {
+      "path": "protocol/bridge/backend_windows.go",
+      "receiver": "backendWindows",
+      "line": 141,
+      "has_scope": true,
+      "registrations": null
+    },
+    "protocol/bridge/outbound.go::Outbound": {
+      "path": "protocol/bridge/outbound.go",
+      "receiver": "Outbound",
+      "line": 60,
+      "has_scope": true,
+      "registrations": null
+    },
+    "protocol/cloudflare/inbound.go::Inbound": {
+      "path": "protocol/cloudflare/inbound.go",
+      "receiver": "Inbound",
+      "line": 95,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "i.service.Close",
+          "line": 103,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/direct/inbound.go::Inbound": {
+      "path": "protocol/direct/inbound.go",
+      "receiver": "Inbound",
+      "line": 73,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "i.listener.Close",
+          "line": 81,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/direct/outbound.go::Outbound": {
+      "path": "protocol/direct/outbound.go",
+      "receiver": "Outbound",
+      "line": 91,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.icmpPort.Close",
+          "line": 95,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/group/selector.go::Selector": {
+      "path": "protocol/group/selector.go",
+      "receiver": "Selector",
+      "line": 73,
+      "has_scope": true,
+      "registrations": null
+    },
+    "protocol/group/urltest.go::URLTest": {
+      "path": "protocol/group/urltest.go",
+      "receiver": "URLTest",
+      "line": 73,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "s.group.Close",
+          "line": 91,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/http/inbound.go::Inbound": {
+      "path": "protocol/http/inbound.go",
+      "receiver": "Inbound",
+      "line": 99,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 108,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 114,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/http/outbound.go::Outbound": {
+      "path": "protocol/http/outbound.go",
+      "receiver": "Outbound",
+      "line": 62,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.client.Close",
+          "line": 66,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/hysteria/inbound.go::Inbound": {
+      "path": "protocol/hysteria/inbound.go",
+      "receiver": "Inbound",
+      "line": 150,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 159,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 165,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.service.Close",
+          "line": 170,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/hysteria/outbound.go::Outbound": {
+      "path": "protocol/hysteria/outbound.go",
+      "receiver": "Outbound",
+      "line": 134,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{returnh.client.CloseWithError(os.ErrClosed)}",
+          "line": 138,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/hysteria2/inbound.go::Inbound": {
+      "path": "protocol/hysteria2/inbound.go",
+      "receiver": "Inbound",
+      "line": 271,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 280,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 286,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.service.Close",
+          "line": 291,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/hysteria2/outbound.go::Outbound": {
+      "path": "protocol/hysteria2/outbound.go",
+      "receiver": "Outbound",
+      "line": 226,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{returnh.client.CloseWithError(os.ErrClosed)}",
+          "line": 230,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/hysteria2/realm.go::RealmService": {
+      "path": "protocol/hysteria2/realm.go",
+      "receiver": "RealmService",
+      "line": 125,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.cancel()returnnil}",
+          "line": 127,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.tlsConfig.Close",
+          "line": 141,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 147,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{s.server.closeAll()returnnil}",
+          "line": 148,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.httpServer.Close",
+          "line": 164,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/masque/client.go::ClientEndpoint": {
+      "path": "protocol/masque/client.go",
+      "receiver": "ClientEndpoint",
+      "line": 151,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "tunnelDevice.Close",
+          "line": 159,
+          "occurrence": 1
+        },
+        {
+          "expression": "c.client.Close",
+          "line": 163,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/masque/server.go::ServerEndpoint": {
+      "path": "protocol/masque/server.go",
+      "receiver": "ServerEndpoint",
+      "line": 146,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "tunnelDevice.Close",
+          "line": 154,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.server.Close",
+          "line": 158,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.tlsConfig.Close",
+          "line": 165,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 175,
+          "occurrence": 1
+        },
+        {
+          "expression": "http3Server.Close",
+          "line": 181,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{s.started.Store(false)returnnil}",
+          "line": 184,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/mixed/inbound.go::Inbound": {
+      "path": "protocol/mixed/inbound.go",
+      "receiver": "Inbound",
+      "line": 89,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 98,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 104,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/naive/inbound.go::Inbound": {
+      "path": "protocol/naive/inbound.go",
+      "receiver": "Inbound",
+      "line": 91,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "n.tlsConfig.Close",
+          "line": 100,
+          "occurrence": 1
+        },
+        {
+          "expression": "n.listener.Close",
+          "line": 102,
+          "occurrence": 1
+        },
+        {
+          "expression": "n.httpServer.Close",
+          "line": 130,
+          "occurrence": 1
+        },
+        {
+          "expression": "http3Server.Close",
+          "line": 136,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/naive/outbound.go::Outbound": {
+      "path": "protocol/naive/outbound.go",
+      "receiver": "Outbound",
+      "line": 224,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.client.Close",
+          "line": 232,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/openconnect/client.go::Endpoint": {
+      "path": "protocol/openconnect/client.go",
+      "receiver": "Endpoint",
+      "line": 419,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{e.notifyStatusUpdated()returnnil}",
+          "line": 422,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{e.cancelLoop()returnnil}",
+          "line": 426,
+          "occurrence": 1
+        },
+        {
+          "expression": "tunnelDevice.Close",
+          "line": 435,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{loopGroup.Wait()returnnil}",
+          "line": 441,
+          "occurrence": 1
+        },
+        {
+          "expression": "e.client.Close",
+          "line": 449,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{e.stateAccess.Lock()e.updateState(func(state*clientState){state.started=false})e.stateAccess.Unlock()returnnil}",
+          "line": 455,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/openconnect/dns_transport.go::DNSTransport": {
+      "path": "protocol/openconnect/dns_transport.go",
+      "receiver": "DNSTransport",
+      "line": 69,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.access.Lock()resolverScope:=t.resolverScopet.closed=truet.routes=nilt.searchDomains=nilt.serverAddresses=nilt.defaultResolvers=nilt.resolverScope=nilt.access.Unlock()ifresolverScope!=nil{returnresolverScope.Close()}returnnil}",
+          "line": 81,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{openConnectEndpoint.dnsTransportAccess.Lock()ifopenConnectEndpoint.dnsTransport==t{openConnectEndpoint.dnsTransport=nil}openConnectEndpoint.dnsTransportAccess.Unlock()returnnil}",
+          "line": 102,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/openvpn/client.go::ClientEndpoint": {
+      "path": "protocol/openvpn/client.go",
+      "receiver": "ClientEndpoint",
+      "line": 605,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{c.notifyStatusUpdated()returnnil}",
+          "line": 608,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{c.cancelLoop()returnnil}",
+          "line": 612,
+          "occurrence": 1
+        },
+        {
+          "expression": "tunnelDevice.Close",
+          "line": 621,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{loopGroup.Wait()returnnil}",
+          "line": 627,
+          "occurrence": 1
+        },
+        {
+          "expression": "c.client.Close",
+          "line": 635,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{c.stateAccess.Lock()c.updateState(func(state*clientState){state.started=false})c.stateAccess.Unlock()returnnil}",
+          "line": 641,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/openvpn/dns_transport.go::DNSTransport": {
+      "path": "protocol/openvpn/dns_transport.go",
+      "receiver": "DNSTransport",
+      "line": 72,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.updateAccess.Lock()t.access.Lock()resolverScope:=t.resolverScopet.closed=truet.routes=nilt.searchDomains=nilt.serverAddresses=nilt.defaultResolvers=nilt.resolverScope=nilt.access.Unlock()t.updateAccess.Unlock()ifresolverScope!=nil{returnresolverScope.Close()}returnnil}",
+          "line": 85,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{endpoint.uninstallDNSTransport(t)returnnil}",
+          "line": 106,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/openvpn/server.go::ServerEndpoint": {
+      "path": "protocol/openvpn/server.go",
+      "receiver": "ServerEndpoint",
+      "line": 163,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.cancelLoop()returnnil}",
+          "line": 165,
+          "occurrence": 1
+        },
+        {
+          "expression": "tunnelDevice.Close",
+          "line": 174,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 242,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{loopGroup.Wait()returnnil}",
+          "line": 264,
+          "occurrence": 1
+        },
+        {
+          "expression": "server.Close",
+          "line": 268,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{s.started.Store(false)returnnil}",
+          "line": 278,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/redirect/redirect.go::Redirect": {
+      "path": "protocol/redirect/redirect.go",
+      "receiver": "Redirect",
+      "line": 45,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 53,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/redirect/tproxy.go::TProxy": {
+      "path": "protocol/redirect/tproxy.go",
+      "receiver": "TProxy",
+      "line": 73,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.udpNat.Close",
+          "line": 81,
+          "occurrence": 1
+        },
+        {
+          "expression": "t.listener.Close",
+          "line": 86,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/shadowsocks/inbound.go::Inbound": {
+      "path": "protocol/shadowsocks/inbound.go",
+      "receiver": "Inbound",
+      "line": 98,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 106,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/shadowsocks/inbound_multi.go::MultiInbound": {
+      "path": "protocol/shadowsocks/inbound_multi.go",
+      "receiver": "MultiInbound",
+      "line": 112,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 120,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/shadowsocks/inbound_relay.go::RelayInbound": {
+      "path": "protocol/shadowsocks/inbound_relay.go",
+      "receiver": "RelayInbound",
+      "line": 89,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 97,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/shadowsocks/outbound.go::Outbound": {
+      "path": "protocol/shadowsocks/outbound.go",
+      "receiver": "Outbound",
+      "line": 155,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.multiplexDialer.Close",
+          "line": 160,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/shadowtls/inbound.go::Inbound": {
+      "path": "protocol/shadowtls/inbound.go",
+      "receiver": "Inbound",
+      "line": 107,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 115,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/snell/inbound.go::Inbound": {
+      "path": "protocol/snell/inbound.go",
+      "receiver": "Inbound",
+      "line": 122,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 130,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/snell/outbound.go::Outbound": {
+      "path": "protocol/snell/outbound.go",
+      "receiver": "Outbound",
+      "line": 166,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.client.Close",
+          "line": 170,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/socks/inbound.go::Inbound": {
+      "path": "protocol/socks/inbound.go",
+      "receiver": "Inbound",
+      "line": 63,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 71,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/ssh/outbound.go::Outbound": {
+      "path": "protocol/ssh/outbound.go",
+      "receiver": "Outbound",
+      "line": 263,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{returncommon.Close(s.clientConn)}",
+          "line": 267,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/tailscale/certificate_provider.go::CertificateProvider": {
+      "path": "protocol/tailscale/certificate_provider.go",
+      "receiver": "CertificateProvider",
+      "line": 66,
+      "has_scope": true,
+      "registrations": null
+    },
+    "protocol/tailscale/dns_transport.go::DNSTransport": {
+      "path": "protocol/tailscale/dns_transport.go",
+      "receiver": "DNSTransport",
+      "line": 82,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.access.Lock()resolverScope:=t.resolverScopet.routePrefixes=nilt.routes=nilt.hosts=nilt.magicHosts=nilt.serverAddresses=nilt.defaultResolvers=nilt.resolverScope=nilt.access.Unlock()ifresolverScope!=nil{returnresolverScope.Close()}returnnil}",
+          "line": 99,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/tailscale/endpoint.go::Endpoint": {
+      "path": "protocol/tailscale/endpoint.go",
+      "receiver": "Endpoint",
+      "line": 250,
+      "has_scope": true,
+      "registrations": null
+    },
+    "protocol/tailscale/tailcat_inbound.go::TailcatInbound": {
+      "path": "protocol/tailscale/tailcat_inbound.go",
+      "receiver": "TailcatInbound",
+      "line": 126,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{node.close()returnnil}",
+          "line": 159,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/tailscale/tailcat_outbound.go::TailcatOutbound": {
+      "path": "protocol/tailscale/tailcat_outbound.go",
+      "receiver": "TailcatOutbound",
+      "line": 119,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{o.access.Lock()o.closeNodeLocked()o.access.Unlock()returnnil}",
+          "line": 125,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/tor/outbound.go::Outbound": {
+      "path": "protocol/tor/outbound.go",
+      "receiver": "Outbound",
+      "line": 98,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "proxy.Close",
+          "line": 129,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/trojan/inbound.go::Inbound": {
+      "path": "protocol/trojan/inbound.go",
+      "receiver": "Inbound",
+      "line": 123,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 132,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 139,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.transport.Close",
+          "line": 142,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 143,
+          "occurrence": 2
+        }
+      ]
+    },
+    "protocol/trojan/outbound.go::Outbound": {
+      "path": "protocol/trojan/outbound.go",
+      "receiver": "Outbound",
+      "line": 153,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.transport.Close",
+          "line": 158,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.multiplexDialer.Close",
+          "line": 161,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/tuic/inbound.go::Inbound": {
+      "path": "protocol/tuic/inbound.go",
+      "receiver": "Inbound",
+      "line": 156,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 165,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 171,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.server.Close",
+          "line": 176,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/tuic/outbound.go::Outbound": {
+      "path": "protocol/tuic/outbound.go",
+      "receiver": "Outbound",
+      "line": 164,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{returnh.client.CloseWithError(os.ErrClosed)}",
+          "line": 168,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/tun/inbound.go::Inbound": {
+      "path": "protocol/tun/inbound.go",
+      "receiver": "Inbound",
+      "line": 332,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{routeRuleSet.UnregisterCallback(callback)returnnil}",
+          "line": 427,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{routeExcludeRuleSet.UnregisterCallback(callback)returnnil}",
+          "line": 434,
+          "occurrence": 1
+        },
+        {
+          "expression": "tunInterface.Close",
+          "line": 475,
+          "occurrence": 1
+        },
+        {
+          "expression": "tunStack.Close",
+          "line": 512,
+          "occurrence": 1
+        },
+        {
+          "expression": "t.autoRedirect.Close",
+          "line": 530,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/vless/inbound.go::Inbound": {
+      "path": "protocol/vless/inbound.go",
+      "receiver": "Inbound",
+      "line": 105,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 114,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 121,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.transport.Close",
+          "line": 124,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 125,
+          "occurrence": 2
+        }
+      ]
+    },
+    "protocol/vless/outbound.go::Outbound": {
+      "path": "protocol/vless/outbound.go",
+      "receiver": "Outbound",
+      "line": 173,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.transport.Close",
+          "line": 178,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.multiplexDialer.Close",
+          "line": 181,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/vmess/inbound.go::Inbound": {
+      "path": "protocol/vmess/inbound.go",
+      "receiver": "Inbound",
+      "line": 103,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.service.Close",
+          "line": 111,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 117,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 124,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.transport.Close",
+          "line": 127,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 128,
+          "occurrence": 2
+        }
+      ]
+    },
+    "protocol/vmess/outbound.go::Outbound": {
+      "path": "protocol/vmess/outbound.go",
+      "receiver": "Outbound",
+      "line": 151,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.transport.Close",
+          "line": 156,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.multiplexDialer.Close",
+          "line": 159,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/wireguard/endpoint.go::Endpoint": {
+      "path": "protocol/wireguard/endpoint.go",
+      "receiver": "Endpoint",
+      "line": 140,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "w.endpoint.Close",
+          "line": 147,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{w.bindAccess.Lock()w.started.Store(false)w.bindAccess.Unlock()returnnil}",
+          "line": 156,
+          "occurrence": 1
+        }
+      ]
+    },
+    "route/conn.go::ConnectionManager": {
+      "path": "route/conn.go",
+      "receiver": "ConnectionManager",
+      "line": 47,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{m.CloseAll()returnnil}",
+          "line": 51,
+          "occurrence": 1
+        }
+      ]
+    },
+    "route/network.go::NetworkManager": {
+      "path": "route/network.go",
+      "receiver": "NetworkManager",
+      "line": 148,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{r.environmentUpdateAccess.Lock()ifr.environmentUpdateTimer!=nil{r.environmentUpdateTimer.Stop()}r.environmentUpdateAccess.Unlock()returnnil}",
+          "line": 153,
+          "occurrence": 1
+        },
+        {
+          "expression": "r.networkMonitor.Close",
+          "line": 168,
+          "occurrence": 1
+        },
+        {
+          "expression": "r.interfaceMonitor.Close",
+          "line": 177,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{r.interfaceMonitor.UnregisterCallback(interfaceUpdateElement)returnnil}",
+          "line": 179,
+          "occurrence": 1
+        },
+        {
+          "expression": "packageManager.Close",
+          "line": 202,
+          "occurrence": 1
+        },
+        {
+          "expression": "wifiMonitor.Close",
+          "line": 214,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{r.resetRunAccess.Lock()deferr.resetRunAccess.Unlock()returnnil}",
+          "line": 221,
+          "occurrence": 1
+        },
+        {
+          "expression": "r.powerListener.Close",
+          "line": 247,
+          "occurrence": 1
+        }
+      ]
+    },
+    "route/reference.go::ReferenceManager": {
+      "path": "route/reference.go",
+      "receiver": "ReferenceManager",
+      "line": 85,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "m.subscriber.Close",
+          "line": 90,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{m.pauseManager.UnregisterCallback(pauseCallback)returnnil}",
+          "line": 116,
+          "occurrence": 1
+        }
+      ]
+    },
+    "route/router.go::Router": {
+      "path": "route/router.go",
+      "receiver": "Router",
+      "line": 101,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "ruleSet.Close",
+          "line": 106,
+          "occurrence": 1
+        },
+        {
+          "expression": "resolver.Close",
+          "line": 118,
+          "occurrence": 1
+        },
+        {
+          "expression": "resolver.Close",
+          "line": 134,
+          "occurrence": 2
+        },
+        {
+          "expression": "r.ruleSetUpdater.Close",
+          "line": 168,
+          "occurrence": 1
+        },
+        {
+          "expression": "r.processSearcher.Close",
+          "line": 202,
+          "occurrence": 1
+        },
+        {
+          "expression": "rule.Close",
+          "line": 209,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/acme/service.go::Service": {
+      "path": "service/acme/service.go",
+      "receiver": "Service",
+      "line": 188,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{cache.Stop()returnnil}",
+          "line": 204,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/api/server.go::Service": {
+      "path": "service/api/server.go",
+      "receiver": "Service",
+      "line": 63,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{startedService.Close()returnnil}",
+          "line": 69,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{grpcServer.Stop()returnnil}",
+          "line": 74,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.dashboard.close",
+          "line": 83,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.tlsConfig.Close",
+          "line": 97,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 109,
+          "occurrence": 1
+        },
+        {
+          "expression": "httpServer.Close",
+          "line": 113,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/ccm/service.go::Service": {
+      "path": "service/ccm/service.go",
+      "receiver": "Service",
+      "line": 199,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.usageTracker.cancelPendingSave()saveErr:=s.usageTracker.Save()ifsaveErr!=nil{s.logger.Error(\"saveusagestatistics:\",saveErr)}returnnil}",
+          "line": 218,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.tlsConfig.Close",
+          "line": 239,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 246,
+          "occurrence": 1
+        },
+        {
+          "expression": "httpServer.Close",
+          "line": 255,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/derp/service.go::Service": {
+      "path": "service/derp/service.go",
+      "receiver": "Service",
+      "line": 152,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "d.tlsConfig.Close",
+          "line": 247,
+          "occurrence": 1
+        },
+        {
+          "expression": "d.listener.Close",
+          "line": 253,
+          "occurrence": 1
+        },
+        {
+          "expression": "d.stunListener.Close",
+          "line": 271,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/ocm/service.go::Service": {
+      "path": "service/ocm/service.go",
+      "receiver": "Service",
+      "line": 220,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.usageTracker.cancelPendingSave()saveErr:=s.usageTracker.Save()ifsaveErr!=nil{s.logger.Error(\"saveusagestatistics:\",saveErr)}returnnil}",
+          "line": 239,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.tlsConfig.Close",
+          "line": 260,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 267,
+          "occurrence": 1
+        },
+        {
+          "expression": "httpServer.Close",
+          "line": 276,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{for_,session:=ranges.startWebSocketShutdown(){session.Close()}s.webSocketGroup.Wait()returnnil}",
+          "line": 277,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/oomkiller/service_darwin.go::Service": {
+      "path": "service/oomkiller/service_darwin.go",
+      "receiver": "Service",
+      "line": 47,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.stopTimer()returnnil}",
+          "line": 55,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{globalAccess.Lock()fori,svc:=rangeglobalServices{ifsvc==s{globalServices=append(globalServices[:i],globalServices[i+1:]...)break}}isLast:=len(globalServices)==0globalAccess.Unlock()ifisLast{C.stopMemoryPressureMonitor()}returnnil}",
+          "line": 67,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/oomkiller/service_stub.go::Service": {
+      "path": "service/oomkiller/service_stub.go",
+      "receiver": "Service",
+      "line": 9,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.stopTimer()returnnil}",
+          "line": 17,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/origin_ca/service.go::Service": {
+      "path": "service/origin_ca/service.go",
+      "receiver": "Service",
+      "line": 159,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{\u003c-donereturnnil}",
+          "line": 192,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/resolved/service.go::Service": {
+      "path": "service/resolved/service.go",
+      "receiver": "Service",
+      "line": 82,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "systemBus.Close",
+          "line": 95,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{_,releaseErr:=systemBus.ReleaseName(\"org.freedesktop.resolve1\")returnreleaseErr}",
+          "line": 105,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{networkMonitor.UnregisterCallback(networkUpdateCallback)returnnil}",
+          "line": 118,
+          "occurrence": 1
+        },
+        {
+          "expression": "i.listener.Close",
+          "line": 127,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/resolved/transport.go::Transport": {
+      "path": "service/resolved/transport.go",
+      "receiver": "Transport",
+      "line": 90,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.linkAccess.RLock()defert.linkAccess.RUnlock()for_,servers:=ranget.linkServers{servers.serverScope.Close()}returnnil}",
+          "line": 106,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/ssmapi/server.go::Service": {
+      "path": "service/ssmapi/server.go",
+      "receiver": "Service",
+      "line": 94,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{saveTicker.Stop()saveErr:=s.saveCache()ifsaveErr!=nil{s.logger.Error(E.Cause(saveErr,\"savecache\"))}returnnil}",
+          "line": 103,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.tlsConfig.Close",
+          "line": 118,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 124,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.httpServer.Close",
+          "line": 131,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/usbip/client.go::ClientService": {
+      "path": "service/usbip/client.go",
+      "receiver": "ClientService",
+      "line": 55,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "s.inner.Close",
+          "line": 63,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/usbip/server.go::ServerService": {
+      "path": "service/usbip/server.go",
+      "receiver": "ServerService",
+      "line": 86,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "s.inner.Close",
+          "line": 94,
+          "occurrence": 1
+        }
+      ]
+    }
+  },
+  "migration_functions": {
+    "adapter/certificate/manager.go::Manager": {
+      "path": "adapter/certificate/manager.go",
+      "receiver": "Manager",
+      "line": 39,
+      "has_scope": true,
+      "registrations": null
+    },
+    "adapter/endpoint/manager.go::Manager": {
+      "path": "adapter/endpoint/manager.go",
+      "receiver": "Manager",
+      "line": 37,
+      "has_scope": true,
+      "registrations": null
+    },
+    "adapter/inbound/manager.go::Manager": {
+      "path": "adapter/inbound/manager.go",
+      "receiver": "Manager",
+      "line": 39,
+      "has_scope": true,
+      "registrations": null
+    },
+    "adapter/lifecycle_legacy.go::lifecycleServiceWrapper": {
+      "path": "adapter/lifecycle_legacy.go",
+      "receiver": "lifecycleServiceWrapper",
+      "line": 51,
+      "has_scope": true,
+      "registrations": null
+    },
+    "adapter/outbound/manager.go::Manager": {
+      "path": "adapter/outbound/manager.go",
+      "receiver": "Manager",
+      "line": 49,
+      "has_scope": true,
+      "registrations": null
+    },
+    "adapter/service/manager.go::Manager": {
+      "path": "adapter/service/manager.go",
+      "receiver": "Manager",
+      "line": 37,
+      "has_scope": true,
+      "registrations": null
+    },
+    "common/certificate/store.go::Store": {
+      "path": "common/certificate/store.go",
+      "receiver": "Store",
+      "line": 110,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "s.closePlatform",
+          "line": 119,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.watcher.Close",
+          "line": 126,
+          "occurrence": 1
+        }
+      ]
+    },
+    "common/httpclient/manager.go::Manager": {
+      "path": "common/httpclient/manager.go",
+      "receiver": "Manager",
+      "line": 64,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "m.close",
+          "line": 75,
+          "occurrence": 1
+        }
+      ]
+    },
+    "common/netns/manager_linux.go::Manager": {
+      "path": "common/netns/manager_linux.go",
+      "receiver": "Manager",
+      "line": 66,
+      "has_scope": true,
+      "registrations": null
+    },
+    "common/netns/manager_stub.go::Manager": {
+      "path": "common/netns/manager_stub.go",
+      "receiver": "Manager",
+      "line": 25,
+      "has_scope": true,
+      "registrations": null
+    },
+    "common/trafficcontrol/manager.go::Manager": {
+      "path": "common/trafficcontrol/manager.go",
+      "receiver": "Manager",
+      "line": 61,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "m.eventObserver.Close",
+          "line": 64,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{cleaner.Close()returnnil}",
+          "line": 66,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/router.go::Router": {
+      "path": "dns/router.go",
+      "receiver": "Router",
+      "line": 132,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{r.rulesAccess.Lock()r.closing=trueruntimeRules:=r.rulesr.rules=nilr.rulesAccess.Unlock()closeRules(runtimeRules)returnnil}",
+          "line": 136,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/dhcp/dhcp.go::Transport": {
+      "path": "dns/transport/dhcp/dhcp.go",
+      "receiver": "Transport",
+      "line": 105,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.Reset()returnnil}",
+          "line": 109,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{interfaceMonitor.UnregisterCallback(interfaceCallback)returnnil}",
+          "line": 119,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/fakeip/fakeip.go::Transport": {
+      "path": "dns/transport/fakeip/fakeip.go",
+      "receiver": "Transport",
+      "line": 48,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.store.Close",
+          "line": 56,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/hosts/hosts.go::Transport": {
+      "path": "dns/transport/hosts/hosts.go",
+      "receiver": "Transport",
+      "line": 61,
+      "has_scope": true,
+      "registrations": null
+    },
+    "dns/transport/https.go::HTTPSTransport": {
+      "path": "dns/transport/https.go",
+      "receiver": "HTTPSTransport",
+      "line": 152,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.Reset()returnnil}",
+          "line": 156,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/local/local.go::Transport": {
+      "path": "dns/transport/local/local.go",
+      "receiver": "Transport",
+      "line": 68,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.configSource.Close",
+          "line": 72,
+          "occurrence": 1
+        },
+        {
+          "expression": "resolvedResolver.Close",
+          "line": 76,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{t.system.close()returnnil}",
+          "line": 86,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{serverSet:=t.serverSet.Swap(nil)ifserverSet!=nil{returnserverSet.serverScope.Close()}returnnil}",
+          "line": 90,
+          "occurrence": 1
+        },
+        {
+          "expression": "t.mdnsScope.Close",
+          "line": 100,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/mdns/mdns.go::Transport": {
+      "path": "dns/transport/mdns/mdns.go",
+      "receiver": "Transport",
+      "line": 96,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.configSource.Close",
+          "line": 98,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/quic/http3.go::HTTP3Transport": {
+      "path": "dns/transport/quic/http3.go",
+      "receiver": "HTTP3Transport",
+      "line": 140,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.transportAccess.Lock()defert.transportAccess.Unlock()returnt.transport.Close()}",
+          "line": 144,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/quic/quic.go::Transport": {
+      "path": "dns/transport/quic/quic.go",
+      "receiver": "Transport",
+      "line": 82,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.connection.Close",
+          "line": 86,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/tcp.go::TCPTransport": {
+      "path": "dns/transport/tcp.go",
+      "receiver": "TCPTransport",
+      "line": 82,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.multiplexer.Close",
+          "line": 86,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/tls.go::TLSTransport": {
+      "path": "dns/transport/tls.go",
+      "receiver": "TLSTransport",
+      "line": 88,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.multiplexer.Close",
+          "line": 92,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport/udp.go::UDPTransport": {
+      "path": "dns/transport/udp.go",
+      "receiver": "UDPTransport",
+      "line": 82,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.multiplexer.Close",
+          "line": 86,
+          "occurrence": 1
+        }
+      ]
+    },
+    "dns/transport_manager.go::TransportManager": {
+      "path": "dns/transport_manager.go",
+      "receiver": "TransportManager",
+      "line": 49,
+      "has_scope": true,
+      "registrations": null
+    },
+    "experimental/cachefile/cache.go::CacheFile": {
+      "path": "experimental/cachefile/cache.go",
+      "receiver": "CacheFile",
+      "line": 148,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{returnc.database().Close()}",
+          "line": 155,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{c.flushTimer.Stop()c.Flush()returnnil}",
+          "line": 158,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{flushGroup.Wait()returnnil}",
+          "line": 164,
+          "occurrence": 1
+        }
+      ]
+    },
+    "experimental/clashapi/server.go::Server": {
+      "path": "experimental/clashapi/server.go",
+      "receiver": "Server",
+      "line": 149,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "s.httpServer.Close",
+          "line": 170,
+          "occurrence": 1
+        }
+      ]
+    },
+    "experimental/clashmode/manager.go::Manager": {
+      "path": "experimental/clashmode/manager.go",
+      "receiver": "Manager",
+      "line": 46,
+      "has_scope": true,
+      "registrations": null
+    },
+    "experimental/libbox/dns.go::platformTransport": {
+      "path": "experimental/libbox/dns.go",
+      "receiver": "platformTransport",
+      "line": 49,
+      "has_scope": true,
+      "registrations": null
+    },
+    "experimental/v2rayapi/server.go::Server": {
+      "path": "experimental/v2rayapi/server.go",
+      "receiver": "Server",
+      "line": 50,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.grpcServer.Stop()returnnil}",
+          "line": 53,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/anytls/inbound.go::Inbound": {
+      "path": "protocol/anytls/inbound.go",
+      "receiver": "Inbound",
+      "line": 84,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 93,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 99,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/anytls/outbound.go::Outbound": {
+      "path": "protocol/anytls/outbound.go",
+      "receiver": "Outbound",
+      "line": 90,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "client.Close",
+          "line": 99,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/bridge/backend_darwin.go::backendDarwin": {
+      "path": "protocol/bridge/backend_darwin.go",
+      "receiver": "backendDarwin",
+      "line": 75,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{releaseBridgeIndex(b.index)returnnil}",
+          "line": 78,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/bridge/backend_linux.go::backendLinux": {
+      "path": "protocol/bridge/backend_linux.go",
+      "receiver": "backendLinux",
+      "line": 66,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{releaseBridgeIndex(b.index)returnnil}",
+          "line": 69,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/bridge/backend_windows.go::backendWindows": {
+      "path": "protocol/bridge/backend_windows.go",
+      "receiver": "backendWindows",
+      "line": 144,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{releaseBridgeIndex(b.index)returnnil}",
+          "line": 147,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/bridge/outbound.go::Outbound": {
+      "path": "protocol/bridge/outbound.go",
+      "receiver": "Outbound",
+      "line": 60,
+      "has_scope": true,
+      "registrations": null
+    },
+    "protocol/cloudflare/inbound.go::Inbound": {
+      "path": "protocol/cloudflare/inbound.go",
+      "receiver": "Inbound",
+      "line": 95,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "i.service.Close",
+          "line": 103,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/direct/inbound.go::Inbound": {
+      "path": "protocol/direct/inbound.go",
+      "receiver": "Inbound",
+      "line": 73,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "i.listener.Close",
+          "line": 81,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/direct/outbound.go::Outbound": {
+      "path": "protocol/direct/outbound.go",
+      "receiver": "Outbound",
+      "line": 99,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.icmpPort.Close",
+          "line": 103,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/group/selector.go::Selector": {
+      "path": "protocol/group/selector.go",
+      "receiver": "Selector",
+      "line": 79,
+      "has_scope": true,
+      "registrations": null
+    },
+    "protocol/group/urltest.go::URLTest": {
+      "path": "protocol/group/urltest.go",
+      "receiver": "URLTest",
+      "line": 89,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "s.group.Close",
+          "line": 93,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/http/inbound.go::Inbound": {
+      "path": "protocol/http/inbound.go",
+      "receiver": "Inbound",
+      "line": 69,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 78,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 84,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/http/outbound.go::Outbound": {
+      "path": "protocol/http/outbound.go",
+      "receiver": "Outbound",
+      "line": 98,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.client.Close",
+          "line": 100,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/hysteria/inbound.go::Inbound": {
+      "path": "protocol/hysteria/inbound.go",
+      "receiver": "Inbound",
+      "line": 151,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 160,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 166,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.service.Close",
+          "line": 171,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/hysteria/outbound.go::Outbound": {
+      "path": "protocol/hysteria/outbound.go",
+      "receiver": "Outbound",
+      "line": 135,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{returnh.client.CloseWithError(os.ErrClosed)}",
+          "line": 139,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/hysteria2/inbound.go::Inbound": {
+      "path": "protocol/hysteria2/inbound.go",
+      "receiver": "Inbound",
+      "line": 267,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 276,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 282,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.service.Close",
+          "line": 287,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/hysteria2/outbound.go::Outbound": {
+      "path": "protocol/hysteria2/outbound.go",
+      "receiver": "Outbound",
+      "line": 223,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{returnh.client.CloseWithError(os.ErrClosed)}",
+          "line": 227,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/hysteria2/realm.go::RealmService": {
+      "path": "protocol/hysteria2/realm.go",
+      "receiver": "RealmService",
+      "line": 125,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.cancel()returnnil}",
+          "line": 127,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.tlsConfig.Close",
+          "line": 141,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 147,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{s.server.closeAll()returnnil}",
+          "line": 148,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.httpServer.Close",
+          "line": 164,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/mixed/inbound.go::Inbound": {
+      "path": "protocol/mixed/inbound.go",
+      "receiver": "Inbound",
+      "line": 81,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 90,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 96,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/naive/inbound.go::Inbound": {
+      "path": "protocol/naive/inbound.go",
+      "receiver": "Inbound",
+      "line": 89,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "n.tlsConfig.Close",
+          "line": 98,
+          "occurrence": 1
+        },
+        {
+          "expression": "n.listener.Close",
+          "line": 100,
+          "occurrence": 1
+        },
+        {
+          "expression": "n.httpServer.Close",
+          "line": 128,
+          "occurrence": 1
+        },
+        {
+          "expression": "http3Server.Close",
+          "line": 134,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/naive/outbound.go::Outbound": {
+      "path": "protocol/naive/outbound.go",
+      "receiver": "Outbound",
+      "line": 224,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.client.Close",
+          "line": 232,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/openconnect/client.go::Endpoint": {
+      "path": "protocol/openconnect/client.go",
+      "receiver": "Endpoint",
+      "line": 424,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{e.notifyStatusUpdated()returnnil}",
+          "line": 427,
+          "occurrence": 1
+        },
+        {
+          "expression": "tunnelDevice.Close",
+          "line": 432,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{e.cancelLoop()returnnil}",
+          "line": 433,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{loopGroup.Wait()returnnil}",
+          "line": 439,
+          "occurrence": 1
+        },
+        {
+          "expression": "e.client.Close",
+          "line": 447,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{e.stateAccess.Lock()e.updateState(func(state*clientState){state.started=false})e.stateAccess.Unlock()returnnil}",
+          "line": 453,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/openconnect/dns_transport.go::DNSTransport": {
+      "path": "protocol/openconnect/dns_transport.go",
+      "receiver": "DNSTransport",
+      "line": 69,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.access.Lock()resolverScope:=t.resolverScopet.closed=truet.routes=nilt.searchDomains=nilt.serverAddresses=nilt.defaultResolvers=nilt.resolverScope=nilt.access.Unlock()ifresolverScope!=nil{returnresolverScope.Close()}returnnil}",
+          "line": 81,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{openConnectEndpoint.dnsTransportAccess.Lock()ifopenConnectEndpoint.dnsTransport==t{openConnectEndpoint.dnsTransport=nil}openConnectEndpoint.dnsTransportAccess.Unlock()returnnil}",
+          "line": 102,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/openvpn/client.go::ClientEndpoint": {
+      "path": "protocol/openvpn/client.go",
+      "receiver": "ClientEndpoint",
+      "line": 602,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{c.notifyStatusUpdated()returnnil}",
+          "line": 605,
+          "occurrence": 1
+        },
+        {
+          "expression": "tunnelDevice.Close",
+          "line": 610,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{c.cancelLoop()returnnil}",
+          "line": 611,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{loopGroup.Wait()returnnil}",
+          "line": 617,
+          "occurrence": 1
+        },
+        {
+          "expression": "c.client.Close",
+          "line": 625,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{c.stateAccess.Lock()c.updateState(func(state*clientState){state.started=false})c.stateAccess.Unlock()returnnil}",
+          "line": 631,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/openvpn/dns_transport.go::DNSTransport": {
+      "path": "protocol/openvpn/dns_transport.go",
+      "receiver": "DNSTransport",
+      "line": 72,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.updateAccess.Lock()t.access.Lock()resolverScope:=t.resolverScopet.closed=truet.routes=nilt.searchDomains=nilt.serverAddresses=nilt.defaultResolvers=nilt.resolverScope=nilt.access.Unlock()t.updateAccess.Unlock()ifresolverScope!=nil{returnresolverScope.Close()}returnnil}",
+          "line": 85,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{endpoint.uninstallDNSTransport(t)returnnil}",
+          "line": 106,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/openvpn/server.go::ServerEndpoint": {
+      "path": "protocol/openvpn/server.go",
+      "receiver": "ServerEndpoint",
+      "line": 162,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "tunnelDevice.Close",
+          "line": 165,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{s.cancelLoop()returnnil}",
+          "line": 166,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 235,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{loopGroup.Wait()returnnil}",
+          "line": 253,
+          "occurrence": 1
+        },
+        {
+          "expression": "server.Close",
+          "line": 257,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{s.started.Store(false)returnnil}",
+          "line": 267,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/redirect/redirect.go::Redirect": {
+      "path": "protocol/redirect/redirect.go",
+      "receiver": "Redirect",
+      "line": 45,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 53,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/redirect/tproxy.go::TProxy": {
+      "path": "protocol/redirect/tproxy.go",
+      "receiver": "TProxy",
+      "line": 73,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.udpNat.Close",
+          "line": 81,
+          "occurrence": 1
+        },
+        {
+          "expression": "t.listener.Close",
+          "line": 86,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/shadowsocks/inbound.go::Inbound": {
+      "path": "protocol/shadowsocks/inbound.go",
+      "receiver": "Inbound",
+      "line": 98,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 106,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/shadowsocks/inbound_multi.go::MultiInbound": {
+      "path": "protocol/shadowsocks/inbound_multi.go",
+      "receiver": "MultiInbound",
+      "line": 110,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 118,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/shadowsocks/inbound_relay.go::RelayInbound": {
+      "path": "protocol/shadowsocks/inbound_relay.go",
+      "receiver": "RelayInbound",
+      "line": 89,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 97,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/shadowsocks/outbound.go::Outbound": {
+      "path": "protocol/shadowsocks/outbound.go",
+      "receiver": "Outbound",
+      "line": 155,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.multiplexDialer.Close",
+          "line": 160,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/shadowtls/inbound.go::Inbound": {
+      "path": "protocol/shadowtls/inbound.go",
+      "receiver": "Inbound",
+      "line": 107,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 115,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/snell/inbound.go::Inbound": {
+      "path": "protocol/snell/inbound.go",
+      "receiver": "Inbound",
+      "line": 169,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 177,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{h.udpNat.Close()returnnil}",
+          "line": 179,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{h.quicAuth.Close()returnnil}",
+          "line": 185,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/snell/outbound.go::Outbound": {
+      "path": "protocol/snell/outbound.go",
+      "receiver": "Outbound",
+      "line": 452,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.client.Close",
+          "line": 454,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{h.quicDestCache.Close()returnnil}",
+          "line": 456,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{h.warmAccess.Lock()h.warmClosed=trueh.warmAccess.Unlock()h.cancelWarm()returnnil}",
+          "line": 461,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/socks/inbound.go::Inbound": {
+      "path": "protocol/socks/inbound.go",
+      "receiver": "Inbound",
+      "line": 62,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.listener.Close",
+          "line": 70,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/ssh/outbound.go::Outbound": {
+      "path": "protocol/ssh/outbound.go",
+      "receiver": "Outbound",
+      "line": 260,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{returncommon.Close(s.clientConn)}",
+          "line": 264,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/tailscale/certificate_provider.go::CertificateProvider": {
+      "path": "protocol/tailscale/certificate_provider.go",
+      "receiver": "CertificateProvider",
+      "line": 66,
+      "has_scope": true,
+      "registrations": null
+    },
+    "protocol/tailscale/dns_transport.go::DNSTransport": {
+      "path": "protocol/tailscale/dns_transport.go",
+      "receiver": "DNSTransport",
+      "line": 82,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.access.Lock()resolverScope:=t.resolverScopet.routePrefixes=nilt.routes=nilt.hosts=nilt.magicHosts=nilt.serverAddresses=nilt.defaultResolvers=nilt.resolverScope=nilt.access.Unlock()ifresolverScope!=nil{returnresolverScope.Close()}returnnil}",
+          "line": 99,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/tailscale/endpoint.go::Endpoint": {
+      "path": "protocol/tailscale/endpoint.go",
+      "receiver": "Endpoint",
+      "line": 272,
+      "has_scope": true,
+      "registrations": null
+    },
+    "protocol/tor/outbound.go::Outbound": {
+      "path": "protocol/tor/outbound.go",
+      "receiver": "Outbound",
+      "line": 98,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "proxy.Close",
+          "line": 129,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/trojan/inbound.go::Inbound": {
+      "path": "protocol/trojan/inbound.go",
+      "receiver": "Inbound",
+      "line": 123,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 132,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 139,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.transport.Close",
+          "line": 142,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 143,
+          "occurrence": 2
+        }
+      ]
+    },
+    "protocol/trojan/outbound.go::Outbound": {
+      "path": "protocol/trojan/outbound.go",
+      "receiver": "Outbound",
+      "line": 184,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.transport.Close",
+          "line": 189,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.multiplexDialer.Close",
+          "line": 192,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/tuic/inbound.go::Inbound": {
+      "path": "protocol/tuic/inbound.go",
+      "receiver": "Inbound",
+      "line": 157,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 166,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 172,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.server.Close",
+          "line": 177,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/tuic/outbound.go::Outbound": {
+      "path": "protocol/tuic/outbound.go",
+      "receiver": "Outbound",
+      "line": 165,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{returnh.client.CloseWithError(os.ErrClosed)}",
+          "line": 169,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/tun/inbound.go::Inbound": {
+      "path": "protocol/tun/inbound.go",
+      "receiver": "Inbound",
+      "line": 325,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "t.autoRedirect.Close",
+          "line": 329,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{routeRuleSet.UnregisterCallback(callback)returnnil}",
+          "line": 403,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{routeExcludeRuleSet.UnregisterCallback(callback)returnnil}",
+          "line": 411,
+          "occurrence": 1
+        },
+        {
+          "expression": "tunInterface.Close",
+          "line": 455,
+          "occurrence": 1
+        },
+        {
+          "expression": "tunStack.Close",
+          "line": 486,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/vless/inbound.go::Inbound": {
+      "path": "protocol/vless/inbound.go",
+      "receiver": "Inbound",
+      "line": 122,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 131,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 138,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.transport.Close",
+          "line": 141,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 142,
+          "occurrence": 2
+        }
+      ]
+    },
+    "protocol/vless/outbound.go::Outbound": {
+      "path": "protocol/vless/outbound.go",
+      "receiver": "Outbound",
+      "line": 223,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.transport.Close",
+          "line": 228,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.multiplexDialer.Close",
+          "line": 231,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/vmess/inbound.go::Inbound": {
+      "path": "protocol/vmess/inbound.go",
+      "receiver": "Inbound",
+      "line": 103,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.service.Close",
+          "line": 111,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.tlsConfig.Close",
+          "line": 117,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 124,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.transport.Close",
+          "line": 127,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.listener.Close",
+          "line": 128,
+          "occurrence": 2
+        }
+      ]
+    },
+    "protocol/vmess/outbound.go::Outbound": {
+      "path": "protocol/vmess/outbound.go",
+      "receiver": "Outbound",
+      "line": 151,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "h.transport.Close",
+          "line": 156,
+          "occurrence": 1
+        },
+        {
+          "expression": "h.multiplexDialer.Close",
+          "line": 159,
+          "occurrence": 1
+        }
+      ]
+    },
+    "protocol/wireguard/endpoint.go::Endpoint": {
+      "path": "protocol/wireguard/endpoint.go",
+      "receiver": "Endpoint",
+      "line": 140,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "w.endpoint.Close",
+          "line": 143,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{w.bindAccess.Lock()w.started.Store(false)w.bindAccess.Unlock()returnnil}",
+          "line": 152,
+          "occurrence": 1
+        }
+      ]
+    },
+    "route/conn.go::ConnectionManager": {
+      "path": "route/conn.go",
+      "receiver": "ConnectionManager",
+      "line": 75,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{m.CloseAll()returnnil}",
+          "line": 79,
+          "occurrence": 1
+        }
+      ]
+    },
+    "route/network.go::NetworkManager": {
+      "path": "route/network.go",
+      "receiver": "NetworkManager",
+      "line": 174,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{r.environmentUpdateAccess.Lock()ifr.environmentUpdateTimer!=nil{r.environmentUpdateTimer.Stop()}r.environmentUpdateAccess.Unlock()returnnil}",
+          "line": 179,
+          "occurrence": 1
+        },
+        {
+          "expression": "r.networkMonitor.Close",
+          "line": 194,
+          "occurrence": 1
+        },
+        {
+          "expression": "r.interfaceMonitor.Close",
+          "line": 203,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{r.interfaceMonitor.UnregisterCallback(interfaceUpdateElement)returnnil}",
+          "line": 205,
+          "occurrence": 1
+        },
+        {
+          "expression": "r.powerListener.Close",
+          "line": 231,
+          "occurrence": 1
+        },
+        {
+          "expression": "packageManager.Close",
+          "line": 250,
+          "occurrence": 1
+        },
+        {
+          "expression": "wifiMonitor.Close",
+          "line": 262,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{r.resetRunAccess.Lock()deferr.resetRunAccess.Unlock()returnnil}",
+          "line": 269,
+          "occurrence": 1
+        }
+      ]
+    },
+    "route/reference.go::ReferenceManager": {
+      "path": "route/reference.go",
+      "receiver": "ReferenceManager",
+      "line": 88,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "m.subscriber.Close",
+          "line": 93,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{m.pauseManager.UnregisterCallback(pauseCallback)returnnil}",
+          "line": 120,
+          "occurrence": 1
+        }
+      ]
+    },
+    "route/router.go::Router": {
+      "path": "route/router.go",
+      "receiver": "Router",
+      "line": 101,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "ruleSet.Close",
+          "line": 106,
+          "occurrence": 1
+        },
+        {
+          "expression": "resolver.Close",
+          "line": 118,
+          "occurrence": 1
+        },
+        {
+          "expression": "resolver.Close",
+          "line": 134,
+          "occurrence": 2
+        },
+        {
+          "expression": "r.ruleSetUpdater.Close",
+          "line": 168,
+          "occurrence": 1
+        },
+        {
+          "expression": "r.processSearcher.Close",
+          "line": 202,
+          "occurrence": 1
+        },
+        {
+          "expression": "rule.Close",
+          "line": 209,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/acme/service.go::Service": {
+      "path": "service/acme/service.go",
+      "receiver": "Service",
+      "line": 188,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{cache.Stop()returnnil}",
+          "line": 204,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/api/server.go::Service": {
+      "path": "service/api/server.go",
+      "receiver": "Service",
+      "line": 64,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{startedService.Close()returnnil}",
+          "line": 70,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{grpcServer.Stop()returnnil}",
+          "line": 75,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.dashboard.close",
+          "line": 84,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.tlsConfig.Close",
+          "line": 98,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 110,
+          "occurrence": 1
+        },
+        {
+          "expression": "httpServer.Close",
+          "line": 119,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/ccm/service.go::Service": {
+      "path": "service/ccm/service.go",
+      "receiver": "Service",
+      "line": 199,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.usageTracker.cancelPendingSave()saveErr:=s.usageTracker.Save()ifsaveErr!=nil{s.logger.Error(\"saveusagestatistics:\",saveErr)}returnnil}",
+          "line": 205,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.tlsConfig.Close",
+          "line": 240,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 247,
+          "occurrence": 1
+        },
+        {
+          "expression": "httpServer.Close",
+          "line": 256,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/derp/service.go::Service": {
+      "path": "service/derp/service.go",
+      "receiver": "Service",
+      "line": 137,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "d.tlsConfig.Close",
+          "line": 208,
+          "occurrence": 1
+        },
+        {
+          "expression": "d.listener.Close",
+          "line": 214,
+          "occurrence": 1
+        },
+        {
+          "expression": "d.stunListener.Close",
+          "line": 232,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/ocm/service.go::Service": {
+      "path": "service/ocm/service.go",
+      "receiver": "Service",
+      "line": 220,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.usageTracker.cancelPendingSave()saveErr:=s.usageTracker.Save()ifsaveErr!=nil{s.logger.Error(\"saveusagestatistics:\",saveErr)}returnnil}",
+          "line": 226,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.tlsConfig.Close",
+          "line": 261,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 268,
+          "occurrence": 1
+        },
+        {
+          "expression": "httpServer.Close",
+          "line": 277,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{for_,session:=ranges.startWebSocketShutdown(){session.Close()}s.webSocketGroup.Wait()returnnil}",
+          "line": 278,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/oomkiller/service_darwin.go::Service": {
+      "path": "service/oomkiller/service_darwin.go",
+      "receiver": "Service",
+      "line": 47,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.stopTimer()returnnil}",
+          "line": 55,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{globalAccess.Lock()fori,svc:=rangeglobalServices{ifsvc==s{globalServices=append(globalServices[:i],globalServices[i+1:]...)break}}isLast:=len(globalServices)==0globalAccess.Unlock()ifisLast{C.stopMemoryPressureMonitor()}returnnil}",
+          "line": 67,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/oomkiller/service_stub.go::Service": {
+      "path": "service/oomkiller/service_stub.go",
+      "receiver": "Service",
+      "line": 9,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{s.stopTimer()returnnil}",
+          "line": 17,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/origin_ca/service.go::Service": {
+      "path": "service/origin_ca/service.go",
+      "receiver": "Service",
+      "line": 159,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "waitForDone(done)",
+          "line": 192,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/resolved/service.go::Service": {
+      "path": "service/resolved/service.go",
+      "receiver": "Service",
+      "line": 82,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "systemBus.Close",
+          "line": 95,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{_,releaseErr:=systemBus.ReleaseName(\"org.freedesktop.resolve1\")returnreleaseErr}",
+          "line": 105,
+          "occurrence": 1
+        },
+        {
+          "expression": "func()error{networkMonitor.UnregisterCallback(networkUpdateCallback)returnnil}",
+          "line": 118,
+          "occurrence": 1
+        },
+        {
+          "expression": "i.listener.Close",
+          "line": 127,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/resolved/transport.go::Transport": {
+      "path": "service/resolved/transport.go",
+      "receiver": "Transport",
+      "line": 89,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{t.linkAccess.RLock()defert.linkAccess.RUnlock()for_,servers:=ranget.linkServers{servers.serverScope.Close()}returnnil}",
+          "line": 105,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/ssmapi/server.go::Service": {
+      "path": "service/ssmapi/server.go",
+      "receiver": "Service",
+      "line": 94,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "func()error{saveTicker.Stop()saveErr:=s.saveCache()ifsaveErr!=nil{s.logger.Error(E.Cause(saveErr,\"savecache\"))}returnnil}",
+          "line": 103,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.tlsConfig.Close",
+          "line": 117,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.listener.Close",
+          "line": 123,
+          "occurrence": 1
+        },
+        {
+          "expression": "s.httpServer.Close",
+          "line": 130,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/usbip/client.go::ClientService": {
+      "path": "service/usbip/client.go",
+      "receiver": "ClientService",
+      "line": 55,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "s.inner.Close",
+          "line": 63,
+          "occurrence": 1
+        }
+      ]
+    },
+    "service/usbip/server.go::ServerService": {
+      "path": "service/usbip/server.go",
+      "receiver": "ServerService",
+      "line": 86,
+      "has_scope": true,
+      "registrations": [
+        {
+          "expression": "s.inner.Close",
+          "line": 94,
+          "occurrence": 1
+        }
+      ]
+    }
+  },
+  "passed": true
+}
+
+exit_code=0
+command=go run ./scripts/lifecycle_v4_gate.go --official-git C:/Users/Administrator/AppData/Local/hermes/cache/scratch/sing-box-official --migration-root core115-source/sing-box --json-out evidence/tdd/06-local-resolved-scope/09-lifecycle-gate.json

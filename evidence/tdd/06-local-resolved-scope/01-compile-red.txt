@@ -1,0 +1,16 @@
+# github.com/sagernet/sing-box/dns/transport/local
+dns\transport\local\local_resolved_linux.go:297:20: oldServerSet.serverScope undefined (type *resolvedServerSet has no field or method serverScope)
+dns\transport\local\local_resolved_linux.go:437:89: not enough arguments in call to t.createResolvedTransport
+	have (network.Dialer, resolvedServerSpecification, bool)
+	want (*adapter.Scope, network.Dialer, resolvedServerSpecification, bool)
+dns\transport\local\local_resolved_linux.go:446:54: undefined: serverScope
+dns\transport\local\local_resolved_linux.go:450:55: undefined: serverScope
+dns\transport\local\local_resolved_linux.go:459:53: undefined: serverScope
+dns\transport\local\local_resolved_linux.go:504:51: server.primaryTransport.Close undefined (type adapter.DNSTransport has no field or method Close)
+dns\transport\local\local_resolved_linux.go:506:53: server.fallbackTransport.Close undefined (type adapter.DNSTransport has no field or method Close)
+FAIL	github.com/sagernet/sing-box/dns/transport/local [build failed]
+FAIL
+
+exit_code=1
+head=7ea3b5b7cca688f1cf2aba7f6fdd0bcc6809471a
+command=GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go test ./dns/transport/local -run '^$' -count=1

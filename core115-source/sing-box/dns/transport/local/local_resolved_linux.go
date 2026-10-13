@@ -66,8 +66,9 @@ type DBusResolvedResolver struct {
 }
 
 type resolvedServerSet struct {
-	servers   []resolvedServer
-	signature []string
+	servers     []resolvedServer
+	signature   []string
+	serverScope *adapter.Scope
 }
 
 type resolvedServer struct {
@@ -138,7 +139,7 @@ func (t *DBusResolvedResolver) Close() error {
 		serverSet := t.savedServerSet.Swap(nil)
 		t.updateRunAccess.Unlock()
 		if serverSet != nil {
-			closeErr = serverSet.Close()
+			closeErr = closeResolvedServerSet(serverSet)
 		}
 		if t.interfaceCallback != nil {
 			t.interfaceMonitor.UnregisterCallback(t.interfaceCallback)
@@ -181,7 +182,7 @@ func (t *DBusResolvedResolver) Exchange(ctx context.Context, message *mDNS.Msg) 
 		}
 		previousServerSet := t.savedServerSet.Swap(serverSet)
 		if previousServerSet != nil {
-			_ = previousServerSet.Close()
+			_ = closeResolvedServerSet(previousServerSet)
 		}
 	}
 	response, err := t.exchangeServerSet(ctx, message, serverSet)
@@ -288,14 +289,12 @@ func (t *DBusResolvedResolver) updateStatus(ctx context.Context) {
 	serverSet, err := t.checkResolved(ctx)
 	if t.closed || ctx.Err() != nil {
 		if serverSet != nil {
-			_ = serverSet.Close()
+			_ = closeResolvedServerSet(serverSet)
 		}
 		return
 	}
-	oldServerSet := t.savedServerSet.Swap(serverSet)
-	if oldServerSet != nil {
-		_ = oldServerSet.serverScope.Close()
-	}
+	oldServerSet := t.savedServerSet.Load()
+	_ = replaceResolvedServerSet(&t.savedServerSet, serverSet)
 	if err != nil {
 		var dbusErr dbus.Error
 		if !errors.As(err, &dbusErr) || dbusErr.Name != "org.freedesktop.DBus.Error.NameHasNoOwner" {
@@ -415,26 +414,27 @@ func (t *DBusResolvedResolver) checkResolved(ctx context.Context) (*resolvedServ
 	if len(serverSpecifications) == 0 {
 		return nil, E.New("no valid DNS servers on link")
 	}
+	serverScope := adapter.NewScope(t.ctx, t.logger)
 	serverSet := &resolvedServerSet{
 		servers: make([]resolvedServer, 0, len(serverSpecifications)),
 		signature: common.Map(serverSpecifications, func(it resolvedServerSpecification) string {
 			return M.SocksaddrFrom(it.address, it.port).String()
 		}),
+		serverScope: serverScope,
 	}
 	for _, serverSpecification := range serverSpecifications {
-		server, createErr := t.createResolvedServer(serverDialer, dnsOverTLSMode, serverSpecification)
+		server, createErr := t.createResolvedServer(serverScope, serverDialer, dnsOverTLSMode, serverSpecification)
 		if createErr != nil {
-			_ = serverSet.Close()
-			return nil, createErr
+			return nil, E.Errors(createErr, serverScope.Close())
 		}
 		serverSet.servers = append(serverSet.servers, server)
 	}
 	return serverSet, nil
 }
 
-func (t *DBusResolvedResolver) createResolvedServer(serverDialer N.Dialer, dnsOverTLSMode string, serverSpecification resolvedServerSpecification) (resolvedServer, error) {
+func (t *DBusResolvedResolver) createResolvedServer(serverScope *adapter.Scope, serverDialer N.Dialer, dnsOverTLSMode string, serverSpecification resolvedServerSpecification) (resolvedServer, error) {
 	if dnsOverTLSMode == "yes" {
-		primaryTransport, err := t.createResolvedTransport(serverDialer, serverSpecification, true)
+		primaryTransport, err := t.createResolvedTransport(serverScope, serverDialer, serverSpecification, true)
 		if err != nil {
 			return resolvedServer{}, err
 		}
@@ -484,29 +484,38 @@ func (t *DBusResolvedResolver) createResolvedTransport(serverScope *adapter.Scop
 			return nil, err
 		}
 		serverTransport := dnsTransport.NewTLSRaw(t.logger, dns.NewTransportAdapter(C.DNSTypeTLS, "", nil), serverDialer, serverAddress, tlsConfig)
-		err = serverTransport.Start(adapter.StartStateStart, serverScope)
+		err = startResolvedTransport(serverScope, serverTransport)
 		if err != nil {
 			return nil, err
 		}
 		return serverTransport, nil
 	}
 	serverTransport := dnsTransport.NewUDPRaw(t.logger, dns.NewTransportAdapter(C.DNSTypeUDP, "", nil), serverDialer, serverAddress)
-	err := serverTransport.Start(adapter.StartStateStart, serverScope)
+	err := startResolvedTransport(serverScope, serverTransport)
 	if err != nil {
 		return nil, err
 	}
 	return serverTransport, nil
 }
 
-func (s *resolvedServerSet) Close() error {
-	var errors []error
-	for _, server := range s.servers {
-		errors = append(errors, server.primaryTransport.Close())
-		if server.fallbackTransport != nil {
-			errors = append(errors, server.fallbackTransport.Close())
-		}
+func startResolvedTransport(serverScope *adapter.Scope, serverTransport adapter.DNSTransport) error {
+	err := serverScope.Start("dns/resolved/"+serverTransport.Type(), serverTransport, adapter.StartStateStart)
+	if err != nil {
+		return E.Errors(err, serverScope.Remove(serverTransport))
 	}
-	return E.Errors(errors...)
+	return nil
+}
+
+func closeResolvedServerSet(serverSet *resolvedServerSet) error {
+	if serverSet == nil || serverSet.serverScope == nil {
+		return nil
+	}
+	return serverSet.serverScope.Close()
+}
+
+func replaceResolvedServerSet(savedServerSet *atomic.Pointer[resolvedServerSet], serverSet *resolvedServerSet) error {
+	oldServerSet := savedServerSet.Swap(serverSet)
+	return closeResolvedServerSet(oldServerSet)
 }
 
 func buildResolvedServerSpecification(interfaceName string, rawAddress []byte, port uint16, serverName string) (resolvedServerSpecification, bool) {

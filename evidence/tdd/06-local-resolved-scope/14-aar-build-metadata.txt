@@ -1,0 +1,110 @@
+C:/Users/Administrator/AppData/Local/hermes/cache/scratch/libgojni.so: go1.26.5
+	path	gobind/gobind
+	mod	gobind	(devel)
+	dep	github.com/ajg/form	v1.7.1	h1:OsnBDzTkrWdrxvEnO68I72ZVGJGNaMwPhoAm0V+llgc=
+	dep	github.com/andybalholm/brotli	v1.1.1	h1:PR2pgnyFznKEugtsUo0xLdDop5SKXd5Qf5ysW+7XdTA=
+	dep	github.com/cloudflare/circl	v1.6.3	h1:9GPOhQGF9MCYUeXyMYlqTR6a5gTrgR/fBLXvUgtVcg8=
+	dep	github.com/cretz/bine	v0.2.0	h1:8GiDRGlTgz+o8H9DSnsl+5MeBK4HsExxgl6WgzOCuZo=
+	dep	github.com/database64128/netx-go	v0.1.1	h1:dT5LG7Gs7zFZBthFBbzWE6K8wAHjSNAaK7wCYZT7NzM=
+	dep	github.com/database64128/tfo-go/v2	v2.3.2	h1:UhZMKiMq3swZGUiETkLBDzQnZBPSAeBMClpJGlnJ5Fw=
+	dep	github.com/dyhkwong/sing-juicity	v0.0.3
+	=>	F:\pskora-lab\alpha12-migration\worktrees\native-scope-fix\core115-source\sing-juicity	(devel)
+
+	dep	github.com/florianl/go-nfqueue/v2	v2.1.0	h1:Fywt30TY/evxyDySpXjxQ1jsRW7nQbLpOhELqpr4068=
+	dep	github.com/fsnotify/fsnotify	v1.9.0	h1:2Ml+OJNzbYCTzsxtv8vKSFD9PbJjmhYF14k/jKC7S9k=
+	dep	github.com/go-chi/chi/v5	v5.2.5	h1:Eg4myHZBjyvJmAFjFvWgrqDTXFyOzjj7YIm3L3mu6Ug=
+	dep	github.com/go-chi/render	v1.0.3	h1:AsXqd2a1/INaIfUSKq3G5uA8weYx20FOsM7uSoCyyt4=
+	dep	github.com/gobwas/httphead	v0.1.0	h1:exrUm0f4YX0L7EBwZHuCF4GDp8aJfVeBrlLQrs6NqWU=
+	dep	github.com/gobwas/pool	v0.2.1	h1:xfeeEhW7pwmX8nuLVlqbzVc7udMDrwetjEv+TZIz1og=
+	dep	github.com/godbus/dbus/v5	v5.2.2	h1:TUR3TgtSVDmjiXOgAAyaZbYmIeP3DPkld3jgKGV8mXQ=
+	dep	github.com/gofrs/uuid/v5	v5.5.1	h1:z1Ce19/JwNidXpy3tOQc3241lnJLKdKyq/xlNvlD4Ng=
+	dep	github.com/google/btree	v1.1.3	h1:CVpQJjYgC4VbzxeGVHfvZrv1ctoYCAI8vbl07Fcxlyg=
+	dep	github.com/google/gopacket	v1.1.19	h1:ves8RnFZPGiFnTS0uPQStjwru6uO6h+nlr9j6fL7kF8=
+	dep	github.com/hashicorp/yamux	v0.1.2	h1:XtB8kyFOyHXYVFnwT5C3+Bdo8gArse7j2AQ0DA0Uey8=
+	dep	github.com/huin/goupnp	v1.3.0	h1:UvLUlWDNpoUdYzb2TCn+MuTWtcjXKSza2n6CBdQ0xXc=
+	dep	github.com/jackpal/go-nat-pmp	v1.0.2	h1:KzKSgb7qkJvOUTqYl9/Hg/me3pWgBmERKrTGD7BdWus=
+	dep	github.com/jsimonetti/rtnetlink	v1.4.1	h1:JfD4jthWBqZMEffc5RjgmlzpYttAVw1sdnmiNaPO3hE=
+	dep	github.com/klauspost/compress	v1.19.1	h1:VsB4HPswih7mmZ8WleSFQ75c/Ui1M4trX5oAsJnhSlk=
+	dep	github.com/klauspost/cpuid/v2	v2.3.0	h1:S4CRMLnYUhGeDFDqkGriYKdfoFlDnMtqTiI/sFzhA9Y=
+	dep	github.com/koron/go-ssdp	v0.0.4	h1:1IDwrghSKYM7yLf7XCzbByg2sJ/JcNOZRXS2jczTwz0=
+	dep	github.com/libp2p/go-nat	v1.0.1-0.20250821073202-01afc089f138	h1:YohuNPT/1k3VcThCQlBZ43PCPWPfMRS1zcxWBF2SLK8=
+	dep	github.com/libp2p/go-netroute	v0.2.1	h1:V8kVrpD8GK0Riv15/7VN6RbUQ3URNZVosw7H2v9tksU=
+	dep	github.com/logrusorgru/aurora	v2.0.3+incompatible	h1:tOpm7WcpBTn4fjmVfgpQq0EfczGlG91VSDkswnjF5A8=
+	dep	github.com/matsuridayo/libneko	v1.0.0
+	=>	F:\pskora-lab\alpha12-migration\worktrees\native-scope-fix\core115-source\libneko	(devel)
+
+	dep	github.com/mdlayher/netlink	v1.11.2	h1:HKh2jqe+omdSWcQ88nrT7INE61B0NXfiSPFdgL4YbNI=
+	dep	github.com/mdlayher/socket	v0.6.0	h1:ScZPaAGyO1icQnbFrhPM8mnXyMu9qukC1K4ZoM2IQKU=
+	dep	github.com/metacubex/chacha	v0.1.5	h1:fKWMb/5c7ZrY8Uoqi79PPFxl+qwR7X/q0OrsAubyX2M=
+	dep	github.com/metacubex/mihomo	v1.19.30	h1:2lTz7fcyZAQQzwbPuETChtwSHIHsT4zYhBSC3i/fRVI=
+	dep	github.com/metacubex/randv2	v0.2.0	h1:uP38uBvV2SxYfLj53kuvAjbND4RUDfFJjwr4UigMiLs=
+	dep	github.com/metacubex/sing	v0.5.7	h1:8OC+fhKFSv/l9ehEhJRaZZAOuthfZo68SteBVLe8QqM=
+	dep	github.com/metacubex/utls	v1.8.7	h1:Cp+yWkNTFkSihETgGWq34hlVFds5HpYWVOR1xovUVTs=
+	dep	github.com/miekg/dns	v1.1.72	h1:vhmr+TF2A3tuoGNkLDFK9zi36F2LS+hKTRW0Uf8kbzI=
+	dep	github.com/oschwald/maxminddb-golang	v1.13.1	h1:G3wwjdN9JmIK2o/ermkHM+98oX5fS+k5MbwsmL4MRQE=
+	dep	github.com/quic-go/qpack	v0.6.0	h1:g7W+BMYynC1LbYLSqRt8PBg5Tgwxn214ZZR34VIOjz8=
+	dep	github.com/sagernet/bbolt	v0.0.0-20260823094646-e24805439c9c	h1:JdEDkgiwsDxiZb4+dQYgVOU/lND+jZxFmN5y/q49EXk=
+	dep	github.com/sagernet/cors	v1.2.1	h1:Cv5Z8y9YSD6Gm+qSpNrL3LO4lD3eQVvbFYJSG7JCMHQ=
+	dep	github.com/sagernet/fswatch	v0.1.2	h1:/TT7k4mkce1qFPxamLO842WjqBgbTBiXP2mlUjp9PFk=
+	dep	github.com/sagernet/gvisor	v0.0.0-20260727.0-sing-box-mod.1	h1:IdQ7yTKkB2wv8txwshxUroPlO4npOYAV71xb7xQ7Lys=
+	dep	github.com/sagernet/netlink	v0.0.0-20260814022025-64455d367bbf	h1:b/3rm+KvxzuYRcnMdLq/hmcqX6/2B8k24l6SDHL2Piw=
+	dep	github.com/sagernet/nftables	v0.3.0-mod.4	h1:vnOtcDYeSXv2e5RoRuGH0lrpttQFJ8iC4ICS2nhlDSo=
+	dep	github.com/sagernet/quic-go	v0.61.0-sing-box-mod.7	h1:sW2O+DoNF+my1PGlSZ3zG2N+fdxLR3DC0l4sXCM0lBE=
+	dep	github.com/sagernet/sing	v0.9.5-0.20260917142815-f37989cadbf0	h1:rn2MLe/qiqCxvRIHfT9WRc22eNLBTRCKlY39pZTWRdg=
+	dep	github.com/sagernet/sing-anytls	v0.0.0-20260904135308-cec2d74334be
+	=>	F:\pskora-lab\alpha12-migration\worktrees\native-scope-fix\core115-source\sing-anytls115-local	(devel)
+
+	dep	github.com/sagernet/sing-box	v1.0.0
+	=>	F:\pskora-lab\alpha12-migration\worktrees\native-scope-fix\core115-source\sing-box	(devel)
+
+	dep	github.com/sagernet/sing-mux	v0.3.7-0.20260905054442-91d1502591ce	h1:ay1pGbzMF4e7iggj+uESNhwMNPbZZajDghcdC4P92Dc=
+	dep	github.com/sagernet/sing-quic	v0.7.1-0.20260904135313-497364e8ee3e	h1:2r0FRN0DBSfggWYtdH/69uW91kqEOByBWw/5hiCq6qU=
+	dep	github.com/sagernet/sing-shadowsocks	v0.2.8	h1:PURj5PRoAkqeHh2ZW205RWzN9E9RtKCVCzByXruQWfE=
+	dep	github.com/sagernet/sing-shadowsocks2	v0.2.1
+	=>	F:\pskora-lab\alpha12-migration\worktrees\native-scope-fix\core115-source\sing-shadowsocks2	(devel)
+
+	dep	github.com/sagernet/sing-shadowtls	v0.2.1	h1:ZiHZdnEnP+YS73NMsxiZmIFCwNd0M4k7PkGCKNXhbaM=
+	dep	github.com/sagernet/sing-snell	v0.0.0-20260904135315-bc5a12ac736f
+	=>	F:\pskora-lab\alpha12-migration\worktrees\native-scope-fix\core115-source\sing-snell-local	(devel)
+
+	dep	github.com/sagernet/sing-tun	v0.9.7-0.20260918022723-5c2edb183cc9
+	=>	F:\pskora-lab\alpha12-migration\worktrees\native-scope-fix\core115-source\sing-tun-diagnostic	(devel)
+
+	dep	github.com/sagernet/sing-vmess	v0.2.8
+	=>	F:\pskora-lab\alpha12-migration\worktrees\native-scope-fix\core115-source\sing-vmess	(devel)
+
+	dep	github.com/sagernet/smux	v1.5.50-sing-box-mod.1	h1:XkJcivBC9V4wBjiGXIXZ229aZCU1hzcbp6kSkkyQ478=
+	dep	github.com/sagernet/wireguard-go	v0.0.5	h1:FLoxIfX8bcedFqn3Yfop7tJNQV1NeMNRZ/9LQLQdKvU=
+	dep	github.com/sagernet/ws	v0.0.0-20231204124109-acfe8907c854	h1:6uUiZcDRnZSAegryaUGwPC/Fj13JSHwiTftrXhMmYOc=
+	dep	github.com/sirupsen/logrus	v1.9.4	h1:TsZE7l11zFCLZnZ+teH4Umoq5BhEIfIzfRDZ1Uzql2w=
+	dep	github.com/ulikunitz/xz	v0.5.15	h1:9DNdB5s+SgV3bQ2ApL10xRc35ck0DuIX/isZvIk+ubY=
+	dep	github.com/vishvananda/netns	v0.0.5	h1:DfiHV+j8bA32MFM7bfEunvT8IAqQ/NzSJHtcmW5zdEY=
+	dep	gitlab.com/go-extension/aes-ccm	v0.0.0-20230221065045-e58665ef23c7	h1:UNrDfkQqiEYzdMlNsVvBYOAJWZjdktqFE9tQh5BT2+4=
+	dep	go.uber.org/multierr	v1.11.0	h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
+	dep	go.uber.org/zap	v1.27.1	h1:08RqriUEv8+ArZRYSTXy1LeBScaMpVSTBhCeaZYfMYc=
+	dep	go4.org/netipx	v0.0.0-20231129151722-fdeea329fbba	h1:0b9z3AuHCjxk0x/opv64kcgZLBseWJUpBw5I82+2U4M=
+	dep	golang.org/x/crypto	v0.54.0	h1:YLIA59K4fiNzHzjnZt2tUJQjQtUWfWbeHBqKtk3eScw=
+	dep	golang.org/x/exp	v0.0.0-20260410095643-746e56fc9e2f	h1:W3F4c+6OLc6H2lb//N1q4WpJkhzJCK5J6kUi1NTVXfM=
+	dep	golang.org/x/mobile	v0.0.0-20231108233038-35478a0c49da	h1:gS9sVMAeHM+gVBmM9bTM6vUi/NHv58O3QzJ3vjjN84M=
+	dep	golang.org/x/mod	v0.37.0	h1:vF1DjpVEshcIqoEaauuHebaLk1O1forxjxBaVn884JQ=
+	dep	golang.org/x/net	v0.57.0	h1:K5+3DljvIuDG9/Jv9rvyMywYNFCQ9RSUY6OOTTkT+tE=
+	dep	golang.org/x/sync	v0.22.0	h1:SZjpbeLmrCk4xhRSZFNZW5gFUeCeFgjekvI/+gfScek=
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	dep	golang.org/x/text	v0.40.0	h1:Ub2Z6/xjgF1WrYQz2nuITOEegKFtiIy+rieRJ5lHZKs=
+	dep	golang.org/x/time	v0.15.0	h1:bbrp8t3bGUeFOx08pvsMYRTCVSMk89u4tKbNOZbp88U=
+	dep	gopkg.in/yaml.v3	v3.0.1	h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+	dep	libcore	v0.0.0-00010101000000-000000000000
+	=>	F:\pskora-lab\alpha12-migration\worktrees\native-scope-fix\core115-source\libcore	(devel)
+
+	dep	lukechampine.com/blake3	v1.3.0	h1:sJ3XhFINmHSrYCgl958hscfIa3bw8x4DqMP3u1YvoYE=
+	build	-buildmode=c-shared
+	build	-compiler=gc
+	build	-tags=with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api
+	build	-trimpath=true
+	build	CGO_ENABLED=1
+	build	GOARCH=arm64
+	build	GOOS=android
+	build	GOARM64=v8.0
+ee73d9da3b55c208b8ba4a56fd59f93eb590c9c6be27420530bf1011e0d3d3a5 *C:/Users/Administrator/AppData/Local/hermes/cache/scratch/libgojni.so
+head=7ea3b5b7cca688f1cf2aba7f6fdd0bcc6809471a
+aar=F:\pskora-lab\alpha12-migration\worktrees\native-scope-fix\app\libs\libcore.aar

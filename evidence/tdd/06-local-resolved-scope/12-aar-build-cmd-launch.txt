@@ -1,0 +1,13 @@
+ok  	github.com/sagernet/sing-vmess/vless	(cached)
+ok  	libcore/protocol/oppa	(cached)
+ok  	libcore/tunnetcontrol	(cached)
+ok  	github.com/sagernet/sing-box/protocol/trojan	(cached)
+write \f\pskora-lab\alpha12-migration\worktrees\native-scope-fix\core115-source\libcore\.build\src-android-arm64\go.mod
+go: GOPATH entry is relative; must be absolute path: "/f/pskora-lab/alpha12-migration/worktrees/native-scope-fix/core115-source/libcore/.build".
+For more details see: 'go help gopath'
+F:\dev\go\bin\gomobile-matsuri.exe: go mod tidy -v failed: exit status 2
+
+
+exit_code=1
+head=7ea3b5b7cca688f1cf2aba7f6fdd0bcc6809471a
+command=cmd.exe /c ... bash build.sh

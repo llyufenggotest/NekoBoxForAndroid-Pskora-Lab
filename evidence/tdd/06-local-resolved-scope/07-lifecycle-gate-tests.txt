@@ -1,0 +1,4 @@
+ok  	command-line-arguments	0.023s
+
+exit_code=0
+command=go test lifecycle_v4_gate.go lifecycle_v4_gate_test.go -run TestGate -count=1

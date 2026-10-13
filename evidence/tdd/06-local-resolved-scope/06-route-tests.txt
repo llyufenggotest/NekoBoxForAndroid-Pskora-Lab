@@ -1,0 +1,5 @@
+ok  	github.com/sagernet/sing-box/route	0.462s
+ok  	github.com/sagernet/sing-box/route/rule	0.062s
+
+exit_code=0
+command=go test ./route/... -count=1

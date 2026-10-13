@@ -1,0 +1,5 @@
+
+exit_code=0
+head=7ea3b5b7cca688f1cf2aba7f6fdd0bcc6809471a
+command=GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go test -c ./dns/transport/local
+output=C:/Users/Administrator/AppData/Local/hermes/cache/scratch/local-linux.test

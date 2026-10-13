@@ -1,0 +1,5 @@
+ok  	github.com/sagernet/sing-box/dns/transport/local	0.050s
+
+exit_code=0
+head=7ea3b5b7cca688f1cf2aba7f6fdd0bcc6809471a
+command=go test -tags=resolved_lifecycle_test ./dns/transport/local -run '^TestResolvedServerSetLifecycle' -count=1

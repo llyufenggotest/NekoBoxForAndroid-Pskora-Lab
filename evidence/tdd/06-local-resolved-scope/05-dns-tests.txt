@@ -1,0 +1,12 @@
+ok  	github.com/sagernet/sing-box/dns	0.568s
+ok  	github.com/sagernet/sing-box/dns/transport	5.402s
+?   	github.com/sagernet/sing-box/dns/transport/dhcp	[no test files]
+?   	github.com/sagernet/sing-box/dns/transport/fakeip	[no test files]
+ok  	github.com/sagernet/sing-box/dns/transport/hosts	0.080s
+?   	github.com/sagernet/sing-box/dns/transport/local	[no test files]
+?   	github.com/sagernet/sing-box/dns/transport/local/systemconfig	[no test files]
+?   	github.com/sagernet/sing-box/dns/transport/mdns	[no test files]
+?   	github.com/sagernet/sing-box/dns/transport/quic	[no test files]
+
+exit_code=0
+command=go test ./dns/... -count=1
