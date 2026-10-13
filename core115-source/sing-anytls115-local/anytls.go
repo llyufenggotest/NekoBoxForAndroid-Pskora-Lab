@@ -45,6 +45,8 @@ const (
 )
 
 var (
+	ErrMissingPassword = E.New("anytls: missing password")
+	ErrMissingDialer   = E.New("anytls: missing dialer")
 	ErrAuthentication  = E.New("anytls: authentication failed")
 	ErrMissingSettings = E.New("anytls: client did not send its settings")
 	ErrPaddingScheme   = E.New("anytls: invalid padding scheme")

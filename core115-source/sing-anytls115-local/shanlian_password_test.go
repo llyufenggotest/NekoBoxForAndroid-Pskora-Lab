@@ -107,12 +107,16 @@ func TestOrdinaryHandshakeWritesSHA256AsFirst32Bytes(t *testing.T) {
 
 func TestInvalidShanlianPasswordFailsBeforeDial(t *testing.T) {
 	dialed := false
-	_, err := NewClient(ClientOptions{Password: "short#sl", DialOut: func(ctx context.Context) (net.Conn, error) {
+	secret := "private-prefix-that-must-not-leak#sl"
+	_, err := NewClient(ClientOptions{Password: secret, DialOut: func(ctx context.Context) (net.Conn, error) {
 		dialed = true
 		return nil, nil
 	}})
 	if err == nil || dialed {
 		t.Fatalf("err=%v dialed=%v, expected validation before dial", err, dialed)
+	}
+	if strings.Contains(err.Error(), secret) || strings.Contains(err.Error(), "private-prefix") {
+		t.Fatalf("validation error leaked the password: %v", err)
 	}
 }
 

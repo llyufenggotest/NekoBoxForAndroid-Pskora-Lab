@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -59,13 +61,41 @@ type Client struct {
 	idleTimer    *time.Timer
 }
 
+func decodeClientPassword(password string) ([passwordLen]byte, error) {
+	var decodedPassword [passwordLen]byte
+	const marker = "#sl"
+	if strings.HasSuffix(strings.ToLower(password), marker) {
+		raw := password[:len(password)-len(marker)]
+		if len(raw) != passwordLen*2 {
+			return decodedPassword, E.New("anytls: invalid Shanlian identity")
+		}
+		decoded, err := hex.DecodeString(raw)
+		if err != nil {
+			return decodedPassword, E.New("anytls: invalid Shanlian identity")
+		}
+		copy(decodedPassword[:], decoded)
+		return decodedPassword, nil
+	}
+	return sha256.Sum256([]byte(password)), nil
+}
+
 func NewClient(options ClientOptions) (*Client, error) {
+	if options.Password == "" {
+		return nil, ErrMissingPassword
+	}
+	if options.DialOut == nil {
+		return nil, ErrMissingDialer
+	}
+	password, err := decodeClientPassword(options.Password)
+	if err != nil {
+		return nil, err
+	}
 	factory, err := newPaddingFactory(DefaultPaddingScheme)
 	if err != nil {
 		return nil, err
 	}
 	client := &Client{
-		password:          sha256.Sum256([]byte(options.Password)),
+		password:          password,
 		clientMetadata:    options.ClientMetadata,
 		dialOut:           options.DialOut,
 		logger:            options.Logger,

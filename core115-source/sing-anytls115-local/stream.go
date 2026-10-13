@@ -325,8 +325,8 @@ func (s *stream) writeBufferLocked(buffer *buf.Buffer) error {
 }
 
 func (s *stream) Close() error {
-	closing := s.closeLocally(net.ErrClosed)
-	s.discardRead(net.ErrClosed)
+	closing := s.closeLocally(io.EOF)
+	s.discardRead(io.EOF)
 	if !closing {
 		return nil
 	}

@@ -1,0 +1,56 @@
+upstream_source=github.com/sagernet/sing-anytls@v0.0.0-20260928104022-580984e4d8cb
+upstream_commit=580984e4d8cb10f1c5e88d7ec14cfe4d955d66e6
+local_module_requirement=github.com/sagernet/sing v0.8.14
+
+== focused contracts ==
+=== RUN   TestClientMetadataSettingsPreserveEmptyAndOverride
+--- PASS: TestClientMetadataSettingsPreserveEmptyAndOverride (0.00s)
+=== RUN   TestLongUoTPayloadRemainsOneLogicalPacketAcrossAnyTLSFrames
+--- PASS: TestLongUoTPayloadRemainsOneLogicalPacketAcrossAnyTLSFrames (0.00s)
+=== RUN   TestDialContextCancellationPropagates
+--- PASS: TestDialContextCancellationPropagates (0.00s)
+=== RUN   TestStreamCloseUnblocksRead
+--- PASS: TestStreamCloseUnblocksRead (0.00s)
+=== RUN   TestWriteBufferLongPayloadMatchesWriteFraming
+--- PASS: TestWriteBufferLongPayloadMatchesWriteFraming (0.00s)
+=== RUN   TestPrivateLocalCloseEOF
+--- PASS: TestPrivateLocalCloseEOF (0.00s)
+=== RUN   TestShanlianPasswordSuffixUsesDirect32ByteAuthentication
+--- PASS: TestShanlianPasswordSuffixUsesDirect32ByteAuthentication (0.00s)
+=== RUN   TestShanlianPasswordSuffixIsCaseInsensitive
+--- PASS: TestShanlianPasswordSuffixIsCaseInsensitive (0.00s)
+=== RUN   TestShanlianPasswordRejectsNon64HexIdentity
+--- PASS: TestShanlianPasswordRejectsNon64HexIdentity (0.00s)
+=== RUN   TestShanlianHandshakeWritesDecodedPasswordAsFirst32Bytes
+--- PASS: TestShanlianHandshakeWritesDecodedPasswordAsFirst32Bytes (0.00s)
+=== RUN   TestInvalidShanlianPasswordFailsBeforeDial
+--- PASS: TestInvalidShanlianPasswordFailsBeforeDial (0.00s)
+PASS
+ok  	github.com/sagernet/sing-anytls	0.028s
+
+== full module ==
+ok  	github.com/sagernet/sing-anytls	0.032s
+
+== vet ==
+go vet: PASS
+
+== integration compile/tests ==
+?   	github.com/sagernet/sing-box/protocol/anytls	[no test files]
+?   	github.com/sagernet/sing-box/common/urltest	[no test files]
+
+== local graph ==
+github.com/sagernet/sing-anytls github.com/sagernet/sing@v0.8.14
+github.com/sagernet/sing-anytls go@1.24.0
+github.com/sagernet/sing-anytls golang.org/x/sys@v0.41.0
+
+== libcore dependency reasons ==
+# github.com/anytls/sing-anytls
+(main module does not need module github.com/anytls/sing-anytls)
+# github.com/sagernet/sing-anytls
+libcore
+github.com/sagernet/sing-box/protocol/anytls
+github.com/sagernet/sing-anytls
+
+== race availability ==
+CGO_ENABLED=0: go test -race requires cgo
+CGO_ENABLED=1: gcc not found in PATH; race unavailable on this host
