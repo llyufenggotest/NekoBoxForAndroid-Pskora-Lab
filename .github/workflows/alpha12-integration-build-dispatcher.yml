@@ -4,21 +4,24 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Alpha12 integration branch to build
+        description: Exact Alpha12 integration branch to build
         required: true
         default: upgrade/sing-box-1.15.0-alpha.12
+        type: string
+      expected_sha:
+        description: Exact 40-character commit SHA already pushed to the target branch
+        required: true
         type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: alpha12-integration-${{ inputs.ref }}
+  group: alpha12-integration-${{ inputs.expected_sha }}
   cancel-in-progress: false
 
 env:
   GOMOBILE_COMMIT: 17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f
-  RUNTIME_PROVENANCE: runtime-attestation.json
 
 jobs:
   native:
@@ -27,18 +30,34 @@ jobs:
     outputs:
       source_sha: ${{ steps.resolve.outputs.sha }}
     steps:
-      - name: Validate and resolve Alpha12 branch
+      - name: Initialize external native artifact paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "RUNTIME_PROVENANCE=$RUNNER_TEMP/runtime-attestation.json"
+            echo "NATIVE_BUNDLE_ROOT=$RUNNER_TEMP/alpha12-native-bundle"
+            echo "NATIVE_AAR_ARTIFACT=$RUNNER_TEMP/alpha12-native-bundle/libcore.aar"
+            echo "NATIVE_RUNTIME_ARTIFACT=$RUNNER_TEMP/alpha12-native-bundle/runtime-attestation.json"
+          } >> "$GITHUB_ENV"
+      - name: Validate and resolve exact Alpha12 commit
         id: resolve
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           TARGET_REF: ${{ inputs.ref }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const targetRef = process.env.TARGET_REF;
-            const baseRef = 'upgrade/sing-box-1.15.0-alpha.12';
-            if (targetRef !== baseRef && !targetRef.startsWith(`${baseRef}-`)) {
-              core.setFailed('Ref is outside the Alpha12 branch allowlist');
+            const expectedSha = process.env.EXPECTED_SHA;
+            const allowedRef = 'upgrade/sing-box-1.15.0-alpha.12';
+            if (targetRef !== allowedRef) {
+              core.setFailed('Only the exact Alpha12 integration branch is allowed');
+              return;
+            }
+            if (!/^[0-9a-f]{40}$/.test(expectedSha)) {
+              core.setFailed('expected_sha must be exactly 40 lowercase hexadecimal characters');
               return;
             }
             const response = await github.rest.git.getRef({
@@ -46,7 +65,7 @@ jobs:
               repo: context.repo.repo,
               ref: `heads/${targetRef}`,
             });
-            if (response.data.ref !== `refs/heads/${targetRef}`) {
+            if (response.data.ref !== `refs/heads/${allowedRef}`) {
               core.setFailed('GitHub returned a different ref');
               return;
             }
@@ -59,15 +78,21 @@ jobs:
               core.setFailed('Resolved commit SHA is invalid');
               return;
             }
+            if (sha !== expectedSha) {
+              core.setFailed(`Target branch SHA ${sha} does not match expected_sha ${expectedSha}`);
+              return;
+            }
             core.setOutput('sha', sha);
-            core.info(`Resolved ${targetRef} to ${sha}`);
-      - name: Checkout resolved Alpha12 commit
+            core.info(`Resolved ${targetRef} to the caller-approved commit ${sha}`);
+      - name: Checkout caller-approved Alpha12 commit
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ steps.resolve.outputs.sha }}
           fetch-depth: 2
           persist-credentials: false
           submodules: recursive
+      # SECURITY: Target checkout scripts are trusted only after exact branch and SHA validation.
+      # A caller must push the target branch first and supply its observed 40-hex commit SHA.
       - name: Verify resolved checkout and runtime verifier
         shell: bash
         env:
@@ -138,13 +163,28 @@ jobs:
           unzip -l app/libs/libcore.aar | tee aar-files.txt
           grep -q 'jni/arm64-v8a/libgojni.so' aar-files.txt
           ! grep -Eq 'jni/(armeabi-v7a|x86|x86_64)/' aar-files.txt
-      - name: Upload native runtime provenance bundle
+      - name: Stage native runtime provenance bundle outside checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$NATIVE_BUNDLE_ROOT"
+          mkdir -p "$NATIVE_BUNDLE_ROOT"
+          cp app/libs/libcore.aar "$NATIVE_AAR_ARTIFACT"
+          cp "$RUNTIME_PROVENANCE" "$NATIVE_RUNTIME_ARTIFACT"
+          test -s "$NATIVE_AAR_ARTIFACT"
+          test -s "$NATIVE_RUNTIME_ARTIFACT"
+      - name: Upload native AAR
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: alpha12-native-aar-${{ steps.resolve.outputs.sha }}
+          path: ${{ env.NATIVE_AAR_ARTIFACT }}
+          if-no-files-found: error
+          retention-days: 3
+      - name: Upload native runtime provenance
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: alpha12-runtime-provenance-${{ steps.resolve.outputs.sha }}
-          path: |
-            app/libs/libcore.aar
-            runtime-attestation.json
+          path: ${{ env.NATIVE_RUNTIME_ARTIFACT }}
           if-no-files-found: error
           retention-days: 3
 
@@ -153,6 +193,17 @@ jobs:
     needs: native
     runs-on: ubuntu-latest
     steps:
+      - name: Initialize external Android artifact paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "RUNTIME_PROVENANCE=$RUNNER_TEMP/runtime-attestation.json"
+            echo "ANDROID_OUTPUT_ROOT=$RUNNER_TEMP/alpha12-android-output"
+            echo "ANDROID_APK_ARTIFACT=$RUNNER_TEMP/alpha12-android-output/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk"
+            echo "ANDROID_SHA256_ARTIFACT=$RUNNER_TEMP/alpha12-android-output/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256"
+            echo "ANDROID_RUNTIME_ARTIFACT=$RUNNER_TEMP/alpha12-android-output/runtime-attestation.json"
+          } >> "$GITHUB_ENV"
       - name: Checkout exact resolved Alpha12 commit
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -160,6 +211,7 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
           submodules: recursive
+      # SECURITY: Target checkout scripts are trusted only after exact branch and SHA validation.
       - name: Verify resolved checkout and runtime verifier
         shell: bash
         env:
@@ -173,18 +225,23 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Download native runtime provenance bundle
+      - name: Download native AAR
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: alpha12-native-aar-${{ needs.native.outputs.source_sha }}
+          path: ${{ runner.temp }}/downloaded-native-aar
+      - name: Download native runtime provenance
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: alpha12-runtime-provenance-${{ needs.native.outputs.source_sha }}
-          path: runtime-provenance
+          path: ${{ runner.temp }}/downloaded-runtime-provenance
       - name: Install and verify runtime AAR
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p app/libs
-          cp runtime-provenance/app/libs/libcore.aar app/libs/libcore.aar
-          cp runtime-provenance/runtime-attestation.json "$RUNTIME_PROVENANCE"
+          cp "$RUNNER_TEMP/downloaded-native-aar/libcore.aar" app/libs/libcore.aar
+          cp "$RUNNER_TEMP/downloaded-runtime-provenance/runtime-attestation.json" "$RUNTIME_PROVENANCE"
           python buildScript/lib/core/verify_runtime_provenance.py \
             --aar app/libs/libcore.aar \
             --runtime-attestation "$RUNTIME_PROVENANCE"
@@ -220,7 +277,7 @@ jobs:
             gradle-release-build.log
           if-no-files-found: ignore
           retention-days: 7
-      - name: Verify target APK against runtime provenance
+      - name: Verify and stage target APK outside checkout
         shell: bash
         run: |
           set -euo pipefail
@@ -237,18 +294,33 @@ jobs:
             echo 'APK unexpectedly signed' >&2
             exit 1
           fi
-          mkdir -p out
-          cp "$APK" out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk
-          cp "$RUNTIME_PROVENANCE" out/runtime-attestation.json
-          (cd out && sha256sum NekoBoxYF-core115-validated250-arm64-release-unsigned.apk > NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256)
+          rm -rf "$ANDROID_OUTPUT_ROOT"
+          mkdir -p "$ANDROID_OUTPUT_ROOT"
+          cp "$APK" "$ANDROID_APK_ARTIFACT"
+          cp "$RUNTIME_PROVENANCE" "$ANDROID_RUNTIME_ARTIFACT"
+          (cd "$ANDROID_OUTPUT_ROOT" && sha256sum "$(basename "$ANDROID_APK_ARTIFACT")" > "$(basename "$ANDROID_SHA256_ARTIFACT")")
+          test -s "$ANDROID_APK_ARTIFACT"
+          test -s "$ANDROID_SHA256_ARTIFACT"
+          test -s "$ANDROID_RUNTIME_ARTIFACT"
           python tools/verify_maintenance_ci.py .
       - name: Upload verified unsigned Alpha12 APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: NekoBoxYF-alpha12-arm64-unsigned-${{ needs.native.outputs.source_sha }}
-          path: |
-            out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk
-            out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256
-            out/runtime-attestation.json
+          path: ${{ env.ANDROID_APK_ARTIFACT }}
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload verified unsigned Alpha12 APK checksum
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: NekoBoxYF-alpha12-arm64-unsigned-sha256-${{ needs.native.outputs.source_sha }}
+          path: ${{ env.ANDROID_SHA256_ARTIFACT }}
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload Android runtime provenance
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: NekoBoxYF-alpha12-runtime-provenance-${{ needs.native.outputs.source_sha }}
+          path: ${{ env.ANDROID_RUNTIME_ARTIFACT }}
           if-no-files-found: error
           retention-days: 30
