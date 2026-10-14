@@ -119,7 +119,7 @@ def write_snapshot(root, source_head, snapshot_path, manifest_path):
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o100644 << 16
             archive.writestr(info, payload)
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
     return manifest
 
 
@@ -245,7 +245,7 @@ def create_attestation(root, source_head, aar_path, snapshot_path, manifest_path
     }
     with zipfile.ZipFile(aar_path) as archive:
         verify_build(archive.read('jni/arm64-v8a/libgojni.so'), data)
-    Path(output_path).write_text(json.dumps(data, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    Path(output_path).write_text(json.dumps(data, indent=2, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
     return data
 
 

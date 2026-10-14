@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import struct
 import shutil
+import subprocess
+import sys
 import unittest
 import zipfile
 import tempfile
@@ -40,6 +42,69 @@ class ProvenanceTest(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_attestation_bytes_survive_real_git_autocrlf_checkouts(self):
+        # Invoke the actual CLI in separate processes: Windows write_text newline
+        # translation must not be hidden by mocks or in-process JSON reads.
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            source = base / 'source'
+            source.mkdir()
+            core = Path('buildScript/lib/core')
+            (source / core).mkdir(parents=True)
+            shutil.copy2(HERE / 'verify_provenance.py', source / core / 'verify_provenance.py')
+            (source / 'core115-source').mkdir()
+            (source / 'core115-source/example.go').write_bytes(b'package example\n')
+            (source / '.gitignore').write_bytes(b'app/libs/\n')
+            (source / '.gitattributes').write_bytes((ROOT / '.gitattributes').read_bytes())
+
+            def command(*args, cwd=source, check=True):
+                return subprocess.run(args, cwd=cwd, check=check, capture_output=True, text=True)
+
+            command('git', 'init')
+            command('git', 'config', 'core.autocrlf', 'true')
+            command('git', 'config', 'user.name', 'Provenance regression')
+            command('git', 'config', 'user.email', 'provenance@example.invalid')
+            command('git', 'add', '.')
+            command('git', 'commit', '-m', 'source')
+            source_head = command('git', 'rev-parse', 'HEAD').stdout.strip()
+            aar = source / 'app/libs/libcore.aar'
+            aar.parent.mkdir(parents=True)
+            shutil.copy2(self.fixture_aar, aar)
+            manifest = core / 'core115-source.manifest.json'
+            baseline = core / 'native-baseline.json'
+            snapshot = core / 'core115-source.snapshot.tar'
+            command(sys.executable, str(source / core / 'verify_provenance.py'), '--create',
+                    '--root', str(source), '--source-head', source_head,
+                    '--aar', str(aar), '--snapshot', str(source / snapshot),
+                    '--manifest', str(source / manifest), '--output', str(source / baseline))
+            generated = {path: (source / path).read_bytes() for path in (manifest, baseline)}
+            command('git', 'add', str(core))
+            command('git', 'commit', '-m', 'direct-child attestation')
+            self.assertEqual(command('git', 'rev-parse', 'HEAD^').stdout.strip(), source_head)
+            for autocrlf in ('false', 'true'):
+                with self.subTest(autocrlf=autocrlf):
+                    checkout = base / ('checkout-' + autocrlf)
+                    command('git', 'clone', '--no-hardlinks', '-c', 'core.autocrlf=' + autocrlf,
+                            str(source), str(checkout))
+                    verified = command(sys.executable, str(checkout / core / 'verify_provenance.py'),
+                                       '--source-only', '--root', str(checkout), cwd=checkout)
+                    self.assertIn('SOURCE ATTESTATION PASS', verified.stdout)
+                    loaded = json.loads((checkout / baseline).read_bytes())
+                    self.assertEqual(p.sha((checkout / manifest).read_bytes()), loaded['source_manifest_sha256'])
+                    for path, expected in generated.items():
+                        self.assertEqual((checkout / path).read_bytes(), expected)
+                        blob = subprocess.run(['git', 'show', 'HEAD:' + path.as_posix()],
+                                              cwd=checkout, check=True, capture_output=True).stdout
+                        self.assertEqual(blob, expected)
+                    # A byte mutation must still fail the strict SHA gate.
+                    (checkout / manifest).write_bytes(generated[manifest] + b' ')
+                    rejected = command(sys.executable, str(checkout / core / 'verify_provenance.py'),
+                                       '--source-only', '--root', str(checkout), cwd=checkout, check=False)
+                    self.assertNotEqual(rejected.returncode, 0)
+                    self.assertIn('Source manifest identity mismatch', rejected.stderr)
+                    for path, expected in generated.items():
+                        self.assertNotIn(b'\r', expected, str(path) + ' must be canonical LF')
 
     def test_real_snapshot(self):
         manifest = p.verify_snapshot(self.baseline, ROOT)
