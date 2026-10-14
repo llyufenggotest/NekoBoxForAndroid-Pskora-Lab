@@ -5,8 +5,8 @@
   "build_goarch": "arm64",
   "build_goos": "android",
   "build_tags": "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api",
-  "built_source_head": "c4acb3e70acc5cdd8fe84e795d1480754a86df34",
-  "built_source_tree": "37990bbac69b6bbcd92475abc0e661681faddc94",
+  "built_source_head": "120144a6b6011e669dbb58a14532a23abbcac9dc",
+  "built_source_tree": "7f670f82f60bfb0fa9e01e35189baab1a33be08b",
   "classes_jar_sha256": "82fd24fc75494f6d8940ebf109fab92cb51d13bd025afa721871b752ab2baa69",
   "core_version": "1.15.0-alpha.12-private-lab",
   "native_sha256": {
