@@ -22,7 +22,6 @@ FINGERPRINT_MARKER_PREFIX = b'NEKOBOX-OIX-SEED-FINGERPRINT-v1:'
 FINGERPRINT_MARKER_SUFFIX = b':END-NEKOBOX-OIX-SEED-FINGERPRINT-v1'
 FINGERPRINT_CHECKSUM_DOMAIN = b'nekoboxyf:oix-dns-auth:marker-checksum:v1\0'
 FINGERPRINT_CHECKSUM_SIZE = 16
-OUTPUT_PATHS = ('app/libs', 'out', 'artifacts')
 TOOLCHAIN_KEYS = {
     'go_version', 'go_version_output', 'java_major', 'java_version_output',
     'gomobile_commit', 'build_tags',
@@ -57,21 +56,9 @@ def require_clean_source(root, baseline, provenance):
     root = Path(root)
     if (root / GENERATED_SEED_PATH).exists():
         raise ValueError('Runtime provenance requires generated private seed cleanup')
-    tracked = provenance.git(root, 'diff', '--name-only', '--cached')
-    unstaged = provenance.git(root, 'diff', '--name-only')
-    untracked = provenance.git(root, 'ls-files', '--others', '--exclude-standard')
-    dirty = [
-        line for line in (tracked + '\n' + unstaged + '\n' + untracked).splitlines()
-        if line and not is_output_path(line)
-    ]
-    if dirty:
-        raise ValueError('Runtime provenance requires clean tracked source and no untracked source files')
+    clean_gate = load_module('runtime_clean_gate', HERE / 'verify_runtime_clean.py')
+    clean_gate.verify(root)
     verify_source_contract(root, baseline, provenance)
-
-
-def is_output_path(path):
-    normalized = path.replace('\\', '/').removeprefix('./')
-    return any(normalized == output or normalized.startswith(output + '/') for output in OUTPUT_PATHS)
 
 
 def aar_members(aar_path, provenance):

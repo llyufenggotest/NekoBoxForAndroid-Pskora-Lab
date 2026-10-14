@@ -14,6 +14,9 @@ HERE = Path(__file__).resolve().parent
 SPEC = importlib.util.spec_from_file_location('runtime_provenance', HERE / 'verify_runtime_provenance.py')
 RUNTIME = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RUNTIME)
+CLEAN_SPEC = importlib.util.spec_from_file_location('runtime_clean', HERE / 'verify_runtime_clean.py')
+CLEAN = importlib.util.module_from_spec(CLEAN_SPEC)
+CLEAN_SPEC.loader.exec_module(CLEAN)
 ROOT = HERE.parents[2]
 BASELINE = ROOT / 'buildScript/lib/core/native-baseline.json'
 FINGERPRINT = '1' * 64
@@ -200,20 +203,41 @@ class RuntimeProvenanceTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'generated private seed'):
                 RUNTIME.require_clean_source(ROOT, json.loads(BASELINE.read_text()), RUNTIME.load_provenance())
 
-    def test_clean_source_rejects_untracked_source_and_ignores_only_explicit_outputs(self):
-        provenance = mock.Mock()
-        provenance.git.side_effect = [
-            '',
-            '',
-            'app/libs/libcore.aar\nout/release.apk\nartifacts/report.txt\ncore115-source/sing-box/component/oixdnsauth/untracked.go',
-        ]
-        with mock.patch.object(Path, 'exists', return_value=False), mock.patch.object(RUNTIME, 'verify_source_contract'):
-            with self.assertRaisesRegex(ValueError, 'clean tracked source'):
-                RUNTIME.require_clean_source(ROOT, {}, provenance)
-        provenance.git = mock.Mock(side_effect=['', '', 'app/libs/libcore.aar\nout/release.apk\nartifacts/report.txt'])
-        with mock.patch.object(Path, 'exists', return_value=False), mock.patch.object(RUNTIME, 'verify_source_contract'):
-            RUNTIME.require_clean_source(ROOT, {}, provenance)
-        self.assertFalse(RUNTIME.is_output_path('downloads/untracked.go'))
+    def test_clean_source_allows_only_ignored_libcore_aar(self):
+        clean_status = '!! app/libs/libcore.aar'
+        clean_gate = mock.Mock()
+        clean_gate.verify.side_effect = lambda root: CLEAN.verify(root)
+        with mock.patch.object(Path, 'exists', return_value=False), mock.patch.object(
+            RUNTIME, 'verify_source_contract'
+        ), mock.patch.object(CLEAN, 'status_lines', return_value=clean_status.splitlines()), mock.patch.object(
+            RUNTIME, 'load_module', return_value=clean_gate
+        ):
+            RUNTIME.require_clean_source(ROOT, {}, mock.Mock())
+
+    def test_clean_source_rejects_everything_except_ignored_libcore_aar(self):
+        failures = (
+            '?? app/libs/evil.jar',
+            '!! app/libs/evil.jar',
+            '!! app/libs/evil.aar',
+            '?? source.go',
+            '?? script.sh',
+            ' M app/libs/tracked.jar',
+            'M  app/libs/tracked.jar',
+            '!! out/release.apk',
+            '!! artifacts/report.txt',
+            '!! ignored.tmp',
+            '!! app/libs/libcore.aar\n!! app/libs/evil.jar',
+        )
+        for status in failures:
+            clean_gate = mock.Mock()
+            clean_gate.verify.side_effect = lambda root: CLEAN.verify(root)
+            with self.subTest(status=status), mock.patch.object(Path, 'exists', return_value=False), mock.patch.object(
+                RUNTIME, 'verify_source_contract'
+            ), mock.patch.object(CLEAN, 'status_lines', return_value=status.splitlines()), mock.patch.object(
+                RUNTIME, 'load_module', return_value=clean_gate
+            ):
+                with self.assertRaisesRegex(ValueError, 'only ignored app/libs/libcore.aar'):
+                    RUNTIME.require_clean_source(ROOT, {}, mock.Mock())
 
     def test_apk_identity_matches_runtime_aar(self):
         apk = self.root / 'app.apk'

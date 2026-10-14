@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+# Runtime verification rejects ignored files too; imports must not dirty checkout.
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
 jobs:
   native:
     name: Native AAR and protocol gates
@@ -30,23 +34,12 @@ jobs:
         with:
           go-version: '1.26.5'
           cache: false
-      - name: Verify clean tracked source before private input
+      - name: Verify exact runtime checkout before private input
         shell: bash
         run: |
           set -euo pipefail
           test ! -e core115-source/sing-box/component/oixdnsauth/private_seed_generated.go
-          test -z "$(git diff --name-only --cached)"
-          test -z "$(git diff --name-only)"
-          python - <<'PY'
-          import subprocess
-          allowed = ('app/libs/', 'out/', 'artifacts/')
-          untracked = subprocess.check_output(
-              ['git', 'ls-files', '--others', '--exclude-standard'], text=True
-          ).splitlines()
-          unexpected = [path for path in untracked if not path.startswith(allowed)]
-          if unexpected:
-              raise SystemExit('unexpected untracked source: ' + ', '.join(unexpected))
-          PY
+          python buildScript/lib/core/verify_runtime_clean.py
       - name: Prepare private Oix DNS-Auth build input
         id: oix-input
         shell: bash
@@ -62,27 +55,19 @@ jobs:
           git -C "$RUNNER_TEMP/gomobile" checkout --detach 17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f
           test "$(git -C "$RUNNER_TEMP/gomobile" rev-parse HEAD)" = 17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f
           export GOMOBILE_SOURCE="$RUNNER_TEMP/gomobile"
-          chmod +x core115-source/libcore/init.sh core115-source/libcore/build.sh
-          (cd core115-source/libcore && GOMOBILE_SOURCE="$GOMOBILE_SOURCE" ./init.sh && ./build.sh)
+          (cd core115-source/libcore && GOMOBILE_SOURCE="$GOMOBILE_SOURCE" bash ./init.sh && bash ./build.sh)
           test -s app/libs/libcore.aar
           rm -f core115-source/sing-box/component/oixdnsauth/private_seed_generated.go
+          # Remove exact native build outputs, never exempt source directories.
+          rm -rf core115-source/libcore/.build
+          rm -f core115-source/libcore/libcore.aar
           printf 'GOMOBILE_SOURCE=%s' "$GOMOBILE_SOURCE" >> "$GITHUB_ENV"
-      - name: Verify clean tracked source after private build
+      - name: Verify exact runtime checkout after private build
         shell: bash
         run: |
+          set -euo pipefail
           test ! -e core115-source/sing-box/component/oixdnsauth/private_seed_generated.go
-          test -z "$(git diff --name-only --cached)"
-          test -z "$(git diff --name-only)"
-          python - <<'PY'
-          import subprocess
-          allowed = ('app/libs/', 'out/', 'artifacts/')
-          untracked = subprocess.check_output(
-              ['git', 'ls-files', '--others', '--exclude-standard'], text=True
-          ).splitlines()
-          unexpected = [path for path in untracked if not path.startswith(allowed)]
-          if unexpected:
-              raise SystemExit('unexpected untracked source: ' + ', '.join(unexpected))
-          PY
+          python buildScript/lib/core/verify_runtime_clean.py
       - name: Create and verify secret runtime provenance
         shell: bash
         env:
@@ -111,15 +96,20 @@ jobs:
           python buildScript/lib/core/verify_provenance.py --source-only
           (cd core115-source/libcore && go test -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' ./boxapi ./androidmonitor ./latencyaudit)
           (cd core115-source/libcore && go test -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' . -run 'TestIPQuality|TestBoxInstanceQueryIPQuality|TestNormalizeSpeedTestStreams|TestRaceSpeedBackends|TestRunTransfer|TestUpload' -count=1)
-          unzip -l app/libs/libcore.aar | tee aar-files.txt
-          grep -q 'jni/arm64-v8a/libgojni.so' aar-files.txt
-          ! grep -Eq 'jni/(armeabi-v7a|x86|x86_64)/' aar-files.txt
+          unzip -l app/libs/libcore.aar | tee "$RUNNER_TEMP/aar-files.txt"
+          grep -q 'jni/arm64-v8a/libgojni.so' "$RUNNER_TEMP/aar-files.txt"
+          ! grep -Eq 'jni/(armeabi-v7a|x86|x86_64)/' "$RUNNER_TEMP/aar-files.txt"
+      - name: Stage flat runtime native bundle outside checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/runtime-native-bundle"
+          cp app/libs/libcore.aar "$RUNNER_TEMP/runtime-native-bundle/libcore.aar"
+          cp "$RUNNER_TEMP/runtime-attestation.json" "$RUNNER_TEMP/runtime-native-bundle/runtime-attestation.json"
       - uses: actions/upload-artifact@v7
         with:
           name: libcore-runtime-provenance
-          path: |
-            app/libs/libcore.aar
-            ${{ runner.temp }}/runtime-attestation.json
+          path: ${{ runner.temp }}/runtime-native-bundle
           if-no-files-found: error
           retention-days: 3
 
@@ -139,14 +129,14 @@ jobs:
       - uses: actions/download-artifact@v5
         with:
           name: libcore-runtime-provenance
-          path: runtime-provenance
+          path: ${{ runner.temp }}/runtime-provenance
       - name: Install verified runtime AAR
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p app/libs
-          cp runtime-provenance/app/libs/libcore.aar app/libs/libcore.aar
-          find runtime-provenance -name runtime-attestation.json -type f -exec cp {} "$RUNNER_TEMP/runtime-attestation.json" \;
+          cp "$RUNNER_TEMP/runtime-provenance/libcore.aar" app/libs/libcore.aar
+          cp "$RUNNER_TEMP/runtime-provenance/runtime-attestation.json" "$RUNNER_TEMP/runtime-attestation.json"
           test -f "$RUNNER_TEMP/runtime-attestation.json"
           python buildScript/lib/core/verify_runtime_provenance.py \
             --aar app/libs/libcore.aar \
@@ -155,16 +145,17 @@ jobs:
         shell: bash
         env:
           BUILD_PLUGIN: none
+          HEV_SRC: ${{ runner.temp }}/hev-socks5-tunnel
         run: |
           set -euo pipefail
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
           echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
-          chmod +x ./run ./gradlew buildScript/init/action/gradle.sh
+
           export GRADLE_OPTS="${GRADLE_OPTS:-} -Dhttps.protocols=TLSv1.2 -Djava.net.preferIPv4Stack=true"
-          ./run init action gradle
+          bash buildScript/init/action/gradle.sh
           tests_ok=false
           for attempt in 1 2 3; do
-            if ./gradlew --no-daemon --refresh-dependencies app:testOssDebugUnitTest app:testOssReleaseUnitTest --stacktrace --console=plain 2>&1 | tee gradle-unit-tests.log; then
+            if bash ./gradlew --no-daemon --refresh-dependencies app:testOssDebugUnitTest app:testOssReleaseUnitTest --stacktrace --console=plain 2>&1 | tee "$RUNNER_TEMP/gradle-unit-tests.log"; then
               tests_ok=true
               break
             fi
@@ -172,15 +163,15 @@ jobs:
             sleep 15
           done
           test "$tests_ok" = true
-          ./gradlew --no-daemon app:assembleOssRelease --stacktrace --console=plain 2>&1 | tee gradle-release-build.log
+          bash ./gradlew --no-daemon app:assembleOssRelease --stacktrace --console=plain 2>&1 | tee "$RUNNER_TEMP/gradle-release-build.log"
       - name: Upload Gradle diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: gradle-diagnostics
           path: |
-            gradle-unit-tests.log
-            gradle-release-build.log
+            ${{ runner.temp }}/gradle-unit-tests.log
+            ${{ runner.temp }}/gradle-release-build.log
           if-no-files-found: ignore
           retention-days: 7
       - name: Verify target APK against runtime provenance
@@ -190,6 +181,13 @@ jobs:
           mapfile -t apks < <(find app/build/outputs/apk/oss/release -type f -name '*arm64-v8a*.apk')
           test "${#apks[@]}" -eq 1
           APK="${apks[0]}"
+          cp "$APK" "$RUNNER_TEMP/runtime-release.apk"
+          APK="$RUNNER_TEMP/runtime-release.apk"
+          # These are generated outputs only, not allowlisted packaging inputs.
+          rm -rf .gradle .kotlin app/build buildSrc/build buildSrc/.gradle
+          rm -rf .hev-build app/src/main/jniLibs
+          rm -rf app/src/main/assets/sing-box
+          rm -f local.properties
           python buildScript/lib/core/verify_runtime_provenance.py \
             --aar app/libs/libcore.aar \
             --runtime-attestation "$RUNNER_TEMP/runtime-attestation.json" \
@@ -200,17 +198,15 @@ jobs:
             echo 'APK unexpectedly signed' >&2
             exit 1
           fi
-          mkdir -p out
-          cp "$APK" out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk
-          cp "$RUNNER_TEMP/runtime-attestation.json" out/runtime-attestation.json
-          sha256sum out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk > out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256
+          mkdir -p "$RUNNER_TEMP/runtime-output"
+          cp "$APK" "$RUNNER_TEMP/runtime-output/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk"
+          cp "$RUNNER_TEMP/runtime-attestation.json" "$RUNNER_TEMP/runtime-output/runtime-attestation.json"
+          (cd "$RUNNER_TEMP/runtime-output" && sha256sum NekoBoxYF-core115-validated250-arm64-release-unsigned.apk > NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256)
+          python buildScript/lib/core/verify_runtime_clean.py
           python tools/verify_maintenance_ci.py .
       - uses: actions/upload-artifact@v7
         with:
           name: NekoBoxYF-core115-validated250-arm64-unsigned
-          path: |
-            out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk
-            out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256
-            out/runtime-attestation.json
+          path: ${{ runner.temp }}/runtime-output
           if-no-files-found: error
           retention-days: 30

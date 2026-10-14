@@ -83,7 +83,7 @@ android {
 
 dependencies {
 
-    implementation(fileTree("libs"))
+    implementation(files("libs/libcore.aar"))
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
     implementation("androidx.core:core-ktx:1.9.0")
