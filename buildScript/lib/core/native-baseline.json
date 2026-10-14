@@ -5,8 +5,8 @@
   "build_goarch": "arm64",
   "build_goos": "android",
   "build_tags": "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api",
-  "built_source_head": "46009afa18112371a530da519156e1b8c6a878a6",
-  "built_source_tree": "ea574f092b3c61378928cbcd77cb191f32f57624",
+  "built_source_head": "2557ac5e21deaab687fa6c0510e72a61a5aa5e70",
+  "built_source_tree": "5c65026af5cd6c158bdf6767c79ba614fd097034",
   "classes_jar_sha256": "82fd24fc75494f6d8940ebf109fab92cb51d13bd025afa721871b752ab2baa69",
   "core_version": "1.15.0-alpha.12-private-lab",
   "native_sha256": {
@@ -16,7 +16,7 @@
   "source_file_count": 2282,
   "source_kind": "clean-git-source-commit",
   "source_manifest_path": "buildScript/lib/core/core115-source.manifest.json",
-  "source_manifest_sha256": "f0a5f8dd293bee267bc647ca8af1e00ab8e78c271e1b081067fb7ebe3579a5db",
+  "source_manifest_sha256": "ac65ad9007de623bc8e7dc4b59c8505348d0175f3f4ad33b4d6f4c9f2d83d3f3",
   "source_snapshot_path": "buildScript/lib/core/core115-source.snapshot.tar",
   "source_snapshot_sha256": "355e26dc4f611f4013e4ca49a24f3d576872b51faf51fa48f095b2d8bc24cba9"
 }
