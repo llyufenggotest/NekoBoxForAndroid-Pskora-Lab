@@ -189,6 +189,25 @@ jobs:
           rm -rf .hev-build app/src/main/jniLibs
           rm -rf app/src/main/assets/sing-box
           rm -f local.properties
+          # Preserve only the exact ignored reports emitted by unit tests.
+          reports=(
+            evidence/concurrency-routing/generated/actual-buildConfig-test.json
+            evidence/concurrency-routing/generated/test-experimental.json
+            evidence/concurrency-routing/generated/vpn-experimental.json
+            evidence/urltest-optimized/host-benchmark.csv
+          )
+          for report in "${reports[@]}"; do
+            if git ls-files --error-unmatch -- "$report" >/dev/null 2>&1; then
+              echo "Refusing to move tracked test report: $report" >&2
+              exit 1
+            fi
+          done
+          for report in "${reports[@]}"; do
+            if test -f "$report"; then
+              mkdir -p "$RUNNER_TEMP/test-evidence/$(dirname "$report")"
+              mv "$report" "$RUNNER_TEMP/test-evidence/$report"
+            fi
+          done
           python buildScript/lib/core/verify_runtime_provenance.py \
             --aar app/libs/libcore.aar \
             --runtime-attestation "$RUNNER_TEMP/runtime-attestation.json" \
@@ -205,6 +224,14 @@ jobs:
           (cd "$RUNNER_TEMP/runtime-output" && sha256sum NekoBoxYF-core115-validated250-arm64-release-unsigned.apk > NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256)
           python buildScript/lib/core/verify_runtime_clean.py
           python tools/verify_maintenance_ci.py .
+      - name: Upload preserved unit-test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-evidence
+          path: ${{ runner.temp }}/test-evidence
+          if-no-files-found: ignore
+          retention-days: 7
       - uses: actions/upload-artifact@v7
         with:
           name: NekoBoxYF-core115-validated250-arm64-unsigned

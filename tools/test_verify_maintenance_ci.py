@@ -108,7 +108,13 @@ class MaintenanceCIContractTest(unittest.TestCase):
         """
         workflow = (ROOT / ".github/workflows/maintenance-core115.yml").read_text(encoding="utf-8")
         gate = ROOT / "buildScript/lib/core/verify_runtime_clean.py"
-        ignore = "/app/libs/\n/core115-source/libcore/.build/\n*.aar\n*.apk\n*.log\n**/__pycache__/\n.gradle/\n.kotlin/\nbuild/\n/app/src/main/assets/sing-box/\nlocal.properties\n"
+        reports = (
+            "evidence/concurrency-routing/generated/actual-buildConfig-test.json",
+            "evidence/concurrency-routing/generated/test-experimental.json",
+            "evidence/concurrency-routing/generated/vpn-experimental.json",
+            "evidence/urltest-optimized/host-benchmark.csv",
+        )
+        ignore = "/app/libs/\n/core115-source/libcore/.build/\n*.aar\n*.apk\n*.log\n**/__pycache__/\n.gradle/\n.kotlin/\nbuild/\n/app/src/main/assets/sing-box/\nlocal.properties\n" + "".join("/" + path + "\n" for path in reports)
         counts = {"pass": 0, "reject": 0}
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
@@ -159,11 +165,16 @@ class MaintenanceCIContractTest(unittest.TestCase):
             run_gate(True)
             for path in (".gradle/cache.bin", ".kotlin/cache.bin", "app/build/outputs/apk/oss/release/fixture-arm64-v8a.apk", "buildSrc/build/generated.bin", "buildSrc/.gradle/cache.bin", ".hev-build/obj/native.o", "app/src/main/jniLibs/arm64-v8a/libhev-socks5-tunnel.so", "app/src/main/assets/sing-box/geoip.db.xz", "local.properties"):
                 write(path)
+            for path in reports:
+                write(path)  # ignored reports emitted by Gradle unit tests
             run_gate(False)
             verify = block("Verify target APK against runtime provenance")
             shell(verify[:verify.index("python buildScript/lib/core/verify_runtime_provenance.py \\")])
             self.assertEqual(b"explicit phase-test sentinel\n", (runtime / "runtime-release.apk").read_bytes())
             run_gate(True)
+            for path in reports:
+                self.assertFalse((root / path).exists(), path)
+                self.assertEqual(b"explicit phase-test sentinel\n", (runtime / "test-evidence" / path).read_bytes())
             # Cleanup does not hide a foreign packaging input or tracked edit.
             write("app/libs/evil.jar")
             run_gate(False)
@@ -172,6 +183,38 @@ class MaintenanceCIContractTest(unittest.TestCase):
             run_gate(False)
         self.assertEqual({"pass": 5, "reject": 4}, counts)
         print("workflow-stage clean-gate checks: 5 pass / 4 expected rejects")
+
+    def test_report_preservation_rejects_each_tracked_path_before_any_move(self):
+        workflow = (ROOT / ".github/workflows/maintenance-core115.yml").read_text(encoding="utf-8")
+        match = re.search(r"          # Preserve only the exact ignored reports.*?(?=          python buildScript/lib/core/verify_runtime_provenance.py)", workflow, re.S)
+        self.assertIsNotNone(match)
+        cleanup = "\n".join(line[10:] for line in match.group().splitlines())
+        reports = (
+            "evidence/concurrency-routing/generated/actual-buildConfig-test.json",
+            "evidence/concurrency-routing/generated/test-experimental.json",
+            "evidence/concurrency-routing/generated/vpn-experimental.json",
+            "evidence/urltest-optimized/host-benchmark.csv",
+        )
+        for tracked in reports:
+            with self.subTest(tracked=tracked), tempfile.TemporaryDirectory() as directory:
+                base = Path(directory)
+                root, runtime = base / "source", base / "runner-temp"
+                root.mkdir()
+                runtime.mkdir()
+                subprocess.run(["git", "init", "-q", str(root)], check=True)
+                for path in reports:
+                    target = root / path
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(b"report sentinel\n")
+                subprocess.run(["git", "-C", str(root), "add", tracked], check=True)
+                subprocess.run(["git", "-C", str(root), "-c", "user.name=fixture", "-c", "user.email=test@example.invalid", "commit", "-qm", "tracked-report fixture"], check=True)
+                result = subprocess.run(["bash", "-euc", cleanup], cwd=root, env=dict(os.environ, RUNNER_TEMP=runtime.as_posix()), capture_output=True, text=True)
+                self.assertNotEqual(0, result.returncode, result.stdout + result.stderr)
+                self.assertIn("Refusing to move tracked test report: " + tracked, result.stderr)
+                for path in reports:
+                    self.assertEqual(b"report sentinel\n", (root / path).read_bytes())
+                self.assertFalse((runtime / "test-evidence").exists())
+        print("report-preservation tracked-path guard: 4 expected rejects / no reports moved")
 
     def test_clean_gate_rejects_staged_and_unstaged_tracked_changes(self):
         gate = ROOT / "buildScript" / "lib" / "core" / "verify_runtime_clean.py"
