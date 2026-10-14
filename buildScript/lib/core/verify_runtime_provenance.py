@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Create and verify private CI runtime native provenance."""
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -17,7 +18,11 @@ EXPECTED_JAVA_MAJOR = '21'
 EXPECTED_GOMOBILE_COMMIT = '17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f'
 EXPECTED_BUILD_TAGS = 'with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api'
 GENERATED_SEED_PATH = Path('core115-source/sing-box/component/oixdnsauth/private_seed_generated.go')
-FINGERPRINT_MARKER = b'NEKOBOX-OIX-SEED-FINGERPRINT-v1:'
+FINGERPRINT_MARKER_PREFIX = b'NEKOBOX-OIX-SEED-FINGERPRINT-v1:'
+FINGERPRINT_MARKER_SUFFIX = b':END-NEKOBOX-OIX-SEED-FINGERPRINT-v1'
+FINGERPRINT_CHECKSUM_DOMAIN = b'nekoboxyf:oix-dns-auth:marker-checksum:v1\0'
+FINGERPRINT_CHECKSUM_SIZE = 16
+OUTPUT_PATHS = ('app/libs', 'out', 'artifacts')
 TOOLCHAIN_KEYS = {
     'go_version', 'go_version_output', 'java_major', 'java_version_output',
     'gomobile_commit', 'build_tags',
@@ -48,14 +53,25 @@ def verify_source_contract(root, baseline, provenance):
     provenance.verify_source_attestation(baseline, root)
 
 
-def require_clean_exact(root, baseline, provenance):
+def require_clean_source(root, baseline, provenance):
     root = Path(root)
     if (root / GENERATED_SEED_PATH).exists():
         raise ValueError('Runtime provenance requires generated private seed cleanup')
-    status = provenance.git(root, 'status', '--porcelain', '--untracked-files=all')
-    if status:
-        raise ValueError('Runtime provenance requires a clean source worktree')
+    tracked = provenance.git(root, 'diff', '--name-only', '--cached')
+    unstaged = provenance.git(root, 'diff', '--name-only')
+    untracked = provenance.git(root, 'ls-files', '--others', '--exclude-standard')
+    dirty = [
+        line for line in (tracked + '\n' + unstaged + '\n' + untracked).splitlines()
+        if line and not is_output_path(line)
+    ]
+    if dirty:
+        raise ValueError('Runtime provenance requires clean tracked source and no untracked source files')
     verify_source_contract(root, baseline, provenance)
+
+
+def is_output_path(path):
+    normalized = path.replace('\\', '/').removeprefix('./')
+    return any(normalized == output or normalized.startswith(output + '/') for output in OUTPUT_PATHS)
 
 
 def aar_members(aar_path, provenance):
@@ -134,13 +150,23 @@ def validate_toolchain(toolchain):
         raise ValueError('build tags mismatch')
 
 
+def marker_checksum(fingerprint):
+    return hashlib.sha256(FINGERPRINT_CHECKSUM_DOMAIN + fingerprint.encode('ascii')).hexdigest()[:FINGERPRINT_CHECKSUM_SIZE]
+
+
 def extract_binary_fingerprint(native):
-    pattern = re.compile(re.escape(FINGERPRINT_MARKER) + rb'([0-9a-f]{64})(?![0-9a-f])')
+    pattern = re.compile(
+        re.escape(FINGERPRINT_MARKER_PREFIX) +
+        rb'([0-9a-f]{64})([0-9a-f]{' + str(FINGERPRINT_CHECKSUM_SIZE).encode() + rb'})' +
+        re.escape(FINGERPRINT_MARKER_SUFFIX)
+    )
     matches = pattern.findall(native)
     if len(matches) != 1:
-        raise ValueError('Native binary must contain exactly one Oix seed fingerprint marker')
-    fingerprint = matches[0].decode('ascii')
+        raise ValueError('Native binary must contain exactly one structured Oix seed fingerprint marker')
+    fingerprint, checksum = (value.decode('ascii') for value in matches[0])
     require_digest(fingerprint, 'native binary fingerprint')
+    if checksum != marker_checksum(fingerprint):
+        raise ValueError('Native binary fingerprint marker checksum mismatch')
     return fingerprint
 
 
@@ -153,7 +179,7 @@ def create_runtime_attestation(root, baseline_path, aar_path, output_path, seed_
     baseline = json.loads(baseline_path.read_text(encoding='utf-8'))
     require_digest(seed_fingerprint, 'seed fingerprint')
     if require_clean:
-        require_clean_exact(root, baseline, provenance)
+        require_clean_source(root, baseline, provenance)
     else:
         verify_source_contract(root, baseline, provenance)
     identity = provenance.artifact_identity(aar_path)
@@ -238,7 +264,7 @@ def verify_runtime_provenance(root, baseline_path, runtime_path, aar_path, apk_p
     require_digest(data.get('built_source_head'), 'built source HEAD', 40)
     require_digest(data.get('built_source_tree'), 'built source tree', 40)
     if verify_worktree:
-        require_clean_exact(root, baseline, provenance)
+        require_clean_source(root, baseline, provenance)
     else:
         verify_source_contract(root, baseline, provenance)
     if data['source_attestation_path'] != str(baseline_path.relative_to(root)).replace('\\', '/'):

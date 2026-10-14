@@ -20,6 +20,10 @@ FINGERPRINT = '1' * 64
 OTHER_FINGERPRINT = '2' * 64
 
 
+def fingerprint_marker(fingerprint=FINGERPRINT):
+    return RUNTIME.FINGERPRINT_MARKER_PREFIX + fingerprint.encode() + RUNTIME.marker_checksum(fingerprint).encode() + RUNTIME.FINGERPRINT_MARKER_SUFFIX
+
+
 def native_fixture(fingerprint=FINGERPRINT):
     header = bytearray(64)
     header[:4] = b'\x7fELF'
@@ -34,7 +38,7 @@ def native_fixture(fingerprint=FINGERPRINT):
         'go' + RUNTIME.EXPECTED_GO_VERSION,
         'EXPORTER-Dler-Snell-Identity-v2',
     )).encode()
-    return bytes(header) + evidence + b'\0' + RUNTIME.FINGERPRINT_MARKER + fingerprint.encode() + b'\0'
+    return bytes(header) + evidence + b'\0' + fingerprint_marker(fingerprint) + b'\0'
 
 
 def write_fixture_aar(path, fingerprint=FINGERPRINT):
@@ -119,6 +123,17 @@ class RuntimeProvenanceTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'binary fingerprint'):
             self.verify(data, fingerprint=OTHER_FINGERPRINT)
 
+    def test_marker_requires_structural_suffix_and_checksum(self):
+        valid = native_fixture()
+        self.assertEqual(RUNTIME.extract_binary_fingerprint(valid), FINGERPRINT)
+        for invalid in (
+            valid.replace(RUNTIME.FINGERPRINT_MARKER_SUFFIX, b':BROKEN-END'),
+            valid.replace(RUNTIME.marker_checksum(FINGERPRINT).encode(), b'0' * RUNTIME.FINGERPRINT_CHECKSUM_SIZE),
+            valid + fingerprint_marker(),
+        ):
+            with self.subTest(invalid=invalid[-160:]), self.assertRaises(ValueError):
+                RUNTIME.extract_binary_fingerprint(invalid)
+
     def test_aar_so_and_classes_tamper_fail(self):
         mutations = {
             'AAR': lambda name, payload: payload + b'tamper' if name == 'AndroidManifest.xml' else payload,
@@ -148,7 +163,7 @@ class RuntimeProvenanceTest(unittest.TestCase):
                     self.verify(data)
 
     def test_create_rejects_dirty_source(self):
-        with mock.patch.object(RUNTIME, 'require_clean_exact', side_effect=ValueError('dirty')):
+        with mock.patch.object(RUNTIME, 'require_clean_source', side_effect=ValueError('dirty')):
             with self.assertRaisesRegex(ValueError, 'dirty'):
                 RUNTIME.create_runtime_attestation(
                     ROOT,
@@ -183,7 +198,22 @@ class RuntimeProvenanceTest(unittest.TestCase):
         generated = ROOT / RUNTIME.GENERATED_SEED_PATH
         with mock.patch.object(Path, 'exists', autospec=True, side_effect=lambda path: path == generated):
             with self.assertRaisesRegex(ValueError, 'generated private seed'):
-                RUNTIME.require_clean_exact(ROOT, json.loads(BASELINE.read_text()), RUNTIME.load_provenance())
+                RUNTIME.require_clean_source(ROOT, json.loads(BASELINE.read_text()), RUNTIME.load_provenance())
+
+    def test_clean_source_rejects_untracked_source_and_ignores_only_explicit_outputs(self):
+        provenance = mock.Mock()
+        provenance.git.side_effect = [
+            '',
+            '',
+            'app/libs/libcore.aar\nout/release.apk\nartifacts/report.txt\ncore115-source/sing-box/component/oixdnsauth/untracked.go',
+        ]
+        with mock.patch.object(Path, 'exists', return_value=False), mock.patch.object(RUNTIME, 'verify_source_contract'):
+            with self.assertRaisesRegex(ValueError, 'clean tracked source'):
+                RUNTIME.require_clean_source(ROOT, {}, provenance)
+        provenance.git = mock.Mock(side_effect=['', '', 'app/libs/libcore.aar\nout/release.apk\nartifacts/report.txt'])
+        with mock.patch.object(Path, 'exists', return_value=False), mock.patch.object(RUNTIME, 'verify_source_contract'):
+            RUNTIME.require_clean_source(ROOT, {}, provenance)
+        self.assertFalse(RUNTIME.is_output_path('downloads/untracked.go'))
 
     def test_apk_identity_matches_runtime_aar(self):
         apk = self.root / 'app.apk'

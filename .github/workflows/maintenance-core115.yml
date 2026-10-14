@@ -30,6 +30,23 @@ jobs:
         with:
           go-version: '1.26.5'
           cache: false
+      - name: Verify clean tracked source before private input
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e core115-source/sing-box/component/oixdnsauth/private_seed_generated.go
+          test -z "$(git diff --name-only --cached)"
+          test -z "$(git diff --name-only)"
+          python - <<'PY'
+          import subprocess
+          allowed = ('app/libs/', 'out/', 'artifacts/')
+          untracked = subprocess.check_output(
+              ['git', 'ls-files', '--others', '--exclude-standard'], text=True
+          ).splitlines()
+          unexpected = [path for path in untracked if not path.startswith(allowed)]
+          if unexpected:
+              raise SystemExit('unexpected untracked source: ' + ', '.join(unexpected))
+          PY
       - name: Prepare private Oix DNS-Auth build input
         id: oix-input
         shell: bash
@@ -50,11 +67,22 @@ jobs:
           test -s app/libs/libcore.aar
           rm -f core115-source/sing-box/component/oixdnsauth/private_seed_generated.go
           printf 'GOMOBILE_SOURCE=%s' "$GOMOBILE_SOURCE" >> "$GITHUB_ENV"
-      - name: Verify clean source worktree after private build
+      - name: Verify clean tracked source after private build
         shell: bash
         run: |
           test ! -e core115-source/sing-box/component/oixdnsauth/private_seed_generated.go
-          test -z "$(git status --porcelain --untracked-files=all -- . ':(exclude)app/libs' ':(exclude)out' ':(exclude)artifacts')"
+          test -z "$(git diff --name-only --cached)"
+          test -z "$(git diff --name-only)"
+          python - <<'PY'
+          import subprocess
+          allowed = ('app/libs/', 'out/', 'artifacts/')
+          untracked = subprocess.check_output(
+              ['git', 'ls-files', '--others', '--exclude-standard'], text=True
+          ).splitlines()
+          unexpected = [path for path in untracked if not path.startswith(allowed)]
+          if unexpected:
+              raise SystemExit('unexpected untracked source: ' + ', '.join(unexpected))
+          PY
       - name: Create and verify secret runtime provenance
         shell: bash
         env:
@@ -68,11 +96,11 @@ jobs:
           python buildScript/lib/core/verify_runtime_provenance.py \
             --create \
             --aar app/libs/libcore.aar \
-            --runtime-attestation runtime-attestation.json \
+            --runtime-attestation "$RUNNER_TEMP/runtime-attestation.json" \
             --seed-fingerprint "$OIX_SEED_FINGERPRINT"
           python buildScript/lib/core/verify_runtime_provenance.py \
             --aar app/libs/libcore.aar \
-            --runtime-attestation runtime-attestation.json \
+            --runtime-attestation "$RUNNER_TEMP/runtime-attestation.json" \
             --expected-seed-fingerprint "$OIX_SEED_FINGERPRINT" \
             --verify-oix
           (cd core115-source/libcore && go test -tags with_utls ../sing-box/component/oixdnsauth ../sing-box/protocol/snell github.com/sagernet/sing-snell/...)
@@ -91,7 +119,7 @@ jobs:
           name: libcore-runtime-provenance
           path: |
             app/libs/libcore.aar
-            runtime-attestation.json
+            ${{ runner.temp }}/runtime-attestation.json
           if-no-files-found: error
           retention-days: 3
 
@@ -118,10 +146,11 @@ jobs:
           set -euo pipefail
           mkdir -p app/libs
           cp runtime-provenance/app/libs/libcore.aar app/libs/libcore.aar
-          cp runtime-provenance/runtime-attestation.json runtime-attestation.json
+          find runtime-provenance -name runtime-attestation.json -type f -exec cp {} "$RUNNER_TEMP/runtime-attestation.json" \;
+          test -f "$RUNNER_TEMP/runtime-attestation.json"
           python buildScript/lib/core/verify_runtime_provenance.py \
             --aar app/libs/libcore.aar \
-            --runtime-attestation runtime-attestation.json
+            --runtime-attestation "$RUNNER_TEMP/runtime-attestation.json"
       - name: Gradle tests and release build
         shell: bash
         env:
@@ -163,7 +192,7 @@ jobs:
           APK="${apks[0]}"
           python buildScript/lib/core/verify_runtime_provenance.py \
             --aar app/libs/libcore.aar \
-            --runtime-attestation runtime-attestation.json \
+            --runtime-attestation "$RUNNER_TEMP/runtime-attestation.json" \
             --apk "$APK" \
             --aapt "${ANDROID_HOME}/build-tools/35.0.0/aapt"
           for asset in geoip.db geosite.db; do unzip -l "$APK" | grep -q "$asset"; done
@@ -173,8 +202,8 @@ jobs:
           fi
           mkdir -p out
           cp "$APK" out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk
-          cp runtime-attestation.json out/runtime-attestation.json
-          (cd out && sha256sum NekoBoxYF-core115-validated250-arm64-release-unsigned.apk > NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256)
+          cp "$RUNNER_TEMP/runtime-attestation.json" out/runtime-attestation.json
+          sha256sum out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk > out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256
           python tools/verify_maintenance_ci.py .
       - uses: actions/upload-artifact@v7
         with:
