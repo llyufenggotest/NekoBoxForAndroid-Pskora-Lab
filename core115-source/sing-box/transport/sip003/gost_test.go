@@ -72,7 +72,7 @@ func TestGostOptionsNormalize(t *testing.T) {
 func TestGostOptionsRejectUnsupportedAndUnsafe(t *testing.T) {
 	for _, opts := range []string{
 		"mode=h2", "mode=quic", "mode=grpc", "mode=unknown",
-		"mode=ws;ed=1024", "mode=ws;nocomp=false", "mode=ws;mux=true", "mode=ws;mux=maybe", "mode=ws;mux=65536", "mode=ws;tls=maybe",
+		"mode=ws;ed=1024", "mode=ws;nocomp=false", "mode=ws;mux=-1", "mode=ws;mux=maybe", "mode=ws;mux=65536", "mode=ws;tls=maybe",
 	} {
 		t.Run(opts, func(t *testing.T) {
 			args, err := ParsePluginOptions(opts)

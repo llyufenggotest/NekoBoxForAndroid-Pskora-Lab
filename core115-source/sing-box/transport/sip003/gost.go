@@ -96,12 +96,23 @@ func parseGostOptions(pluginOpts Args) (gostOptions, error) {
 		}
 	}
 	if value, loaded := pluginOpts.Get("mux"); loaded {
-		capacity, parseErr := strconv.ParseUint(value, 10, 16)
-		if parseErr != nil {
-			return options, E.New("gost-plugin: invalid mux value: ", strconv.Quote(value))
+		// YAML booleans are explicit overrides; numeric zero retains GOST's
+		// unlimited-capacity meaning and must not be treated as false.
+		switch strings.ToLower(value) {
+		case "true", "yes", "on":
+			options.muxEnabled = true
+			options.muxCapacity = 1
+		case "false", "no", "off":
+			options.muxEnabled = false
+			options.muxCapacity = 0
+		default:
+			capacity, parseErr := strconv.ParseUint(value, 10, 16)
+			if parseErr != nil {
+				return options, E.New("gost-plugin: invalid mux value: ", strconv.Quote(value))
+			}
+			options.muxEnabled = true
+			options.muxCapacity = int(capacity)
 		}
-		options.muxEnabled = true
-		options.muxCapacity = int(capacity)
 	}
 	if value, loaded := pluginOpts.Get("insecure"); loaded {
 		options.insecure, err = parseGostBool("insecure", value)

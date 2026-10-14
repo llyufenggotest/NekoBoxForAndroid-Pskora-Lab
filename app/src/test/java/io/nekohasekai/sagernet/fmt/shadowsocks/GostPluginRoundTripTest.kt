@@ -84,6 +84,31 @@ class GostPluginRoundTripTest {
         assertEquals("mode=mws;mux=03", number.canonical())
     }
 
+    @Test fun alreadyStoredMuxBooleansSurviveWithoutReimport() {
+        listOf("false", "true", "0", "2").forEach { mux ->
+            val opts = "mode=ws;host=front.invalid;path=/gost;mux=$mux;tls=false"
+            val bean = ShadowsocksBean().apply {
+                initializeDefaultValues()
+                serverAddress = "127.0.0.1"
+                serverPort = 443
+                method = "aes-256-gcm"
+                password = "test-only-password"
+                plugin = "gost-plugin;$opts"
+                sUoT = true
+            }
+            val bytes = ByteBufferOutput(8192).also { bean.serialize(it) }.toBytes()
+            val stored = ShadowsocksBean().apply { deserialize(ByteBufferInput(bytes)) }
+            listOf(stored, stored.clone(), parseShadowsocks(stored.toUri())).forEach { candidate ->
+                assertEquals("gost-plugin;$opts", candidate.plugin)
+                val outbound = buildSingBoxOutboundShadowsocksBean(candidate)
+                assertEquals(opts, Gson().toJsonTree(outbound).asJsonObject["plugin_opts"].asString)
+            }
+            val outbound = buildSingBoxOutboundShadowsocksBean(stored)
+            assertEquals(true, outbound.udp_over_tcp.enabled)
+            assertEquals(2, outbound.udp_over_tcp.version)
+        }
+    }
+
     @Test fun ordinaryPluginsAreNotCanonicalizedAsGost() {
         val plugin = "v2ray-plugin;mode=websocket;host=cdn.invalid;path=/v;mux=8"
         val bean = ShadowsocksBean().apply {

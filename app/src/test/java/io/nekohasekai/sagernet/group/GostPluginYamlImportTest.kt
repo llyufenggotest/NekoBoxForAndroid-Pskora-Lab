@@ -88,6 +88,23 @@ ${pluginOpts.prependIndent("              ")}
         )
     }
 
+    @Test fun typedMuxBooleansAndNumericZeroReachNativeOutboundUnchanged() {
+        listOf("false", "true", "0", "2").forEach { mux ->
+            val bean = parse("""
+                mode: ws
+                host: front.invalid
+                path: /gost
+                mux: $mux
+                tls: false
+            """.trimIndent())
+            val expected = "mode=ws;host=front.invalid;path=/gost;mux=$mux;tls=false"
+            assertEquals("gost-plugin;$expected", bean.plugin)
+            val native = io.nekohasekai.sagernet.fmt.shadowsocks.buildSingBoxOutboundShadowsocksBean(bean)
+            assertEquals("gost-plugin", native.plugin)
+            assertEquals(expected, native.plugin_opts)
+        }
+    }
+
     @Test fun nestedUnknownValuesAreRejectedWithTheirFieldName() {
         val error = assertThrows(IllegalArgumentException::class.java) {
             parse("""
