@@ -1,2 +1,4 @@
 evidence/telegram-call-recovery-final/source-manifest.json -text
 evidence/stable-recovery-ui/native-rebuild.json -text
+buildScript/lib/core/core115-source.manifest.json -text
+buildScript/lib/core/native-baseline.json -text
