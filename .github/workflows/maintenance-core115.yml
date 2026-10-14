@@ -6,6 +6,7 @@ on:
     branches:
       - maintenance/core115-validated250-stable
       - feature/anytls-oix-snell
+      - fix/alpha12-ci-runtime-provenance
     tags:
       - core115-validated250-maintenance-candidate-*
 
@@ -20,6 +21,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           submodules: recursive
+          fetch-depth: 2
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -29,6 +31,7 @@ jobs:
           go-version: '1.26.5'
           cache: false
       - name: Prepare private Oix DNS-Auth build input
+        id: oix-input
         shell: bash
         env:
           OIX_DNS_AUTH_SEED: ${{ secrets.OIX_DNS_AUTH_SEED }}
@@ -38,38 +41,42 @@ jobs:
         run: |
           set -euo pipefail
           test -f core115-source/libcore/go.mod
-          git clone --filter=blob:none https://github.com/MatsuriDayo/gomobile.git core115-source/gomobile
-          git -C core115-source/gomobile checkout --detach 17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f
-          test "$(git -C core115-source/gomobile rev-parse HEAD)" = 17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f
+          git clone --filter=blob:none https://github.com/MatsuriDayo/gomobile.git "$RUNNER_TEMP/gomobile"
+          git -C "$RUNNER_TEMP/gomobile" checkout --detach 17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f
+          test "$(git -C "$RUNNER_TEMP/gomobile" rev-parse HEAD)" = 17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f
+          export GOMOBILE_SOURCE="$RUNNER_TEMP/gomobile"
           chmod +x core115-source/libcore/init.sh core115-source/libcore/build.sh
-          (cd core115-source/libcore && ./init.sh && ./build.sh)
+          (cd core115-source/libcore && GOMOBILE_SOURCE="$GOMOBILE_SOURCE" ./init.sh && ./build.sh)
           test -s app/libs/libcore.aar
-      - name: Verify private Oix input in every native artifact
+          rm -f core115-source/sing-box/component/oixdnsauth/private_seed_generated.go
+          printf 'GOMOBILE_SOURCE=%s
+' "$GOMOBILE_SOURCE" >> "$GITHUB_ENV"
+      - name: Create and verify secret runtime provenance
         shell: bash
         env:
           OIX_DNS_AUTH_SEED: ${{ secrets.OIX_DNS_AUTH_SEED }}
+          OIX_SEED_FINGERPRINT: ${{ steps.oix-input.outputs.fingerprint }}
         run: |
+          set -euo pipefail
+          python scripts/test_prepare_oix_dns_auth.py
           python scripts/test_verify_oix_native.py
-          python scripts/verify_oix_native.py --aar app/libs/libcore.aar
+          python buildScript/lib/core/test_verify_runtime_provenance.py
+          python buildScript/lib/core/verify_runtime_provenance.py \
+            --create \
+            --aar app/libs/libcore.aar \
+            --runtime-attestation runtime-attestation.json \
+            --seed-fingerprint "$OIX_SEED_FINGERPRINT"
+          python buildScript/lib/core/verify_runtime_provenance.py \
+            --aar app/libs/libcore.aar \
+            --runtime-attestation runtime-attestation.json \
+            --expected-seed-fingerprint "$OIX_SEED_FINGERPRINT" \
+            --verify-oix
           (cd core115-source/libcore && go test -tags with_utls ../sing-box/component/oixdnsauth ../sing-box/protocol/snell github.com/sagernet/sing-snell/...)
-      - name: Native provenance Pure and geo gates
+      - name: Native Pure and geo gates
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import hashlib, zipfile
-          from pathlib import Path
-          from buildScript.lib.core.verify_native import canonical_zip_digest
-          aar = Path('app/libs/libcore.aar')
-          data = aar.read_bytes()
-          with zipfile.ZipFile(aar) as archive:
-              print('CI_AAR_SHA256=' + hashlib.sha256(data).hexdigest())
-              print('CI_AAR_CONTENT_SHA256=' + canonical_zip_digest(data))
-              print('CI_CLASSES_JAR_SHA256=' + hashlib.sha256(archive.read('classes.jar')).hexdigest())
-              print('CI_ARM64_SO_SHA256=' + hashlib.sha256(archive.read('jni/arm64-v8a/libgojni.so')).hexdigest())
-          PY
-          python buildScript/lib/core/verify_native.py --aar app/libs/libcore.aar
-          # verify_native.py calls verify_provenance.py for schema-2 local snapshots.
+          python buildScript/lib/core/verify_provenance.py --source-only
           (cd core115-source/libcore && go test -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' ./boxapi ./androidmonitor ./latencyaudit)
           (cd core115-source/libcore && go test -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' . -run 'TestIPQuality|TestBoxInstanceQueryIPQuality|TestNormalizeSpeedTestStreams|TestRaceSpeedBackends|TestRunTransfer|TestUpload' -count=1)
           unzip -l app/libs/libcore.aar | tee aar-files.txt
@@ -77,8 +84,11 @@ jobs:
           ! grep -Eq 'jni/(armeabi-v7a|x86|x86_64)/' aar-files.txt
       - uses: actions/upload-artifact@v7
         with:
-          name: libcore-aar
-          path: app/libs/libcore.aar
+          name: libcore-runtime-provenance
+          path: |
+            app/libs/libcore.aar
+            runtime-attestation.json
+          if-no-files-found: error
           retention-days: 3
 
   android:
@@ -89,14 +99,25 @@ jobs:
       - uses: actions/checkout@v5
         with:
           submodules: recursive
+          fetch-depth: 2
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
       - uses: actions/download-artifact@v5
         with:
-          name: libcore-aar
-          path: app/libs
+          name: libcore-runtime-provenance
+          path: runtime-provenance
+      - name: Install verified runtime AAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/libs
+          cp runtime-provenance/app/libs/libcore.aar app/libs/libcore.aar
+          cp runtime-provenance/runtime-attestation.json runtime-attestation.json
+          python buildScript/lib/core/verify_runtime_provenance.py \
+            --aar app/libs/libcore.aar \
+            --runtime-attestation runtime-attestation.json
       - name: Gradle tests and release build
         shell: bash
         env:
@@ -129,19 +150,18 @@ jobs:
             gradle-release-build.log
           if-no-files-found: ignore
           retention-days: 7
-      - name: Verify target APK
+      - name: Verify target APK against runtime provenance
         shell: bash
         run: |
           set -euo pipefail
           mapfile -t apks < <(find app/build/outputs/apk/oss/release -type f -name '*arm64-v8a*.apk')
           test "${#apks[@]}" -eq 1
           APK="${apks[0]}"
-          unzip -l "$APK" | tee apk-files.txt
-          grep -q 'lib/arm64-v8a/libgojni.so' apk-files.txt
-          ! grep -Eq 'lib/(armeabi-v7a|x86|x86_64)/' apk-files.txt
-          unzip -p "$APK" lib/arm64-v8a/libgojni.so > apk-libgojni.so
-          unzip -p app/libs/libcore.aar jni/arm64-v8a/libgojni.so > aar-libgojni.so
-          cmp apk-libgojni.so aar-libgojni.so
+          python buildScript/lib/core/verify_runtime_provenance.py \
+            --aar app/libs/libcore.aar \
+            --runtime-attestation runtime-attestation.json \
+            --apk "$APK" \
+            --aapt "${ANDROID_HOME}/build-tools/35.0.0/aapt"
           for asset in geoip.db geosite.db; do unzip -l "$APK" | grep -q "$asset"; done
           if "${ANDROID_HOME}/build-tools/35.0.0/apksigner" verify "$APK"; then
             echo 'APK unexpectedly signed' >&2
@@ -149,6 +169,7 @@ jobs:
           fi
           mkdir -p out
           cp "$APK" out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk
+          cp runtime-attestation.json out/runtime-attestation.json
           (cd out && sha256sum NekoBoxYF-core115-validated250-arm64-release-unsigned.apk > NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256)
           python tools/verify_maintenance_ci.py .
       - uses: actions/upload-artifact@v7
@@ -157,5 +178,6 @@ jobs:
           path: |
             out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk
             out/NekoBoxYF-core115-validated250-arm64-release-unsigned.apk.sha256
+            out/runtime-attestation.json
           if-no-files-found: error
           retention-days: 30

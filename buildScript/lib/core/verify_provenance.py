@@ -149,7 +149,7 @@ def verify_snapshot(baseline, root, expected_manifest=None):
     return manifest
 
 
-def verify_provenance(baseline, root, verify_source_content=True, verify_attestation_head=True):
+def verify_source_attestation(baseline, root, verify_attestation_head=True):
     root = Path(root)
     if baseline.get('schema') != 3:
         raise ValueError('Native provenance requires schema 3')
@@ -169,12 +169,35 @@ def verify_provenance(baseline, root, verify_source_content=True, verify_attesta
         raise ValueError('Built source HEAD is not a local commit') from error
     if actual_source_tree != source_tree:
         raise ValueError('Built source tree mismatch')
+    expected_manifest = tracked_source_manifest(root, source_head)
+    manifest = verify_snapshot(baseline, root, expected_manifest)
+    if baseline.get('source_file_count') != len(manifest):
+        raise ValueError('Source file count mismatch')
 
+
+def verify_provenance(baseline, root, verify_source_content=True, verify_attestation_head=True):
+    root = Path(root)
     if verify_source_content:
-        expected_manifest = tracked_source_manifest(root, source_head)
-        manifest = verify_snapshot(baseline, root, expected_manifest)
-        if baseline.get('source_file_count') != len(manifest):
-            raise ValueError('Source file count mismatch')
+        verify_source_attestation(baseline, root, verify_attestation_head)
+    else:
+        if baseline.get('schema') != 3:
+            raise ValueError('Native provenance requires schema 3')
+        source_head = baseline['built_source_head']
+        source_tree = baseline['built_source_tree']
+        require_digest(source_head, 'built source HEAD', 40)
+        require_digest(source_tree, 'built source tree', 40)
+        if verify_attestation_head:
+            attestation_head = git(root, 'rev-parse', 'HEAD')
+            if git(root, 'rev-parse', 'HEAD^') != source_head:
+                raise ValueError('Current attestation HEAD must be the direct child of built source HEAD')
+            if git(root, 'rev-list', '--count', source_head + '..' + attestation_head) != '1':
+                raise ValueError('Current attestation HEAD chain mismatch')
+        try:
+            actual_source_tree = git(root, 'rev-parse', source_head + '^{tree}')
+        except subprocess.CalledProcessError as error:
+            raise ValueError('Built source HEAD is not a local commit') from error
+        if actual_source_tree != source_tree:
+            raise ValueError('Built source tree mismatch')
 
     aar_path = root / baseline['aar_path']
     actual = artifact_identity(aar_path)
@@ -230,6 +253,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[3])
     parser.add_argument('--verify', type=Path)
+    parser.add_argument('--source-only', action='store_true')
     parser.add_argument('--create', action='store_true')
     parser.add_argument('--source-head')
     parser.add_argument('--aar', type=Path)
@@ -242,8 +266,13 @@ def main():
         print(json.dumps(data, indent=2))
     else:
         path = args.verify or args.root / 'buildScript/lib/core/native-baseline.json'
-        verify_provenance(json.loads(path.read_text(encoding='utf-8')), args.root)
-        print('PROVENANCE PASS')
+        baseline = json.loads(path.read_text(encoding='utf-8'))
+        if args.source_only:
+            verify_source_attestation(baseline, args.root)
+            print('SOURCE ATTESTATION PASS')
+        else:
+            verify_provenance(baseline, args.root)
+            print('PROVENANCE PASS')
 
 
 if __name__ == '__main__':

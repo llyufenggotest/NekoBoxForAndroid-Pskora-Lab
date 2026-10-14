@@ -21,6 +21,9 @@ class ProvenanceTest(unittest.TestCase):
         manifest = p.verify_snapshot(self.baseline, ROOT)
         self.assertEqual(len(manifest), self.baseline['source_file_count'])
 
+    def test_source_attestation_can_be_verified_without_committed_aar(self):
+        p.verify_source_attestation(self.baseline, ROOT)
+
     def test_built_source_head_tamper_rejected(self):
         self.baseline['built_source_head'] = '0' * 40
         with self.assertRaisesRegex(ValueError, 'built source HEAD'):
