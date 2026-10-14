@@ -48,6 +48,23 @@ class MaintenanceCIContractTest(unittest.TestCase):
         self.assertNotIn('mkdir -p out', workflow)
         self.assertIn('path: ${{ runner.temp }}/runtime-output', workflow)
 
+    def test_gradle_runtime_verifier_contract(self):
+        workflow = (ROOT / '.github/workflows/maintenance-core115.yml').read_text(encoding='utf-8')
+        gradle = (ROOT / 'app/build.gradle.kts').read_text(encoding='utf-8')
+        self.assertIn('RUNTIME_PROVENANCE: ${{ runner.temp }}/runtime-attestation.json', workflow)
+        self.assertIn('providers.environmentVariable("RUNTIME_PROVENANCE")', gradle)
+        self.assertIn('if (runtimeProvenance.isPresent)', gradle)
+        self.assertIn('else "buildScript/lib/core/verify_native.py"', gradle)
+        self.assertIn('"--gradle-artifact-only", "--aar"', gradle)
+        self.assertIn('nativeVerificationArgs()', gradle)
+        self.assertIn('nativeVerificationArgs(apk)', gradle)
+        line = next(line.strip() for line in workflow.splitlines() if line.strip().startswith("printf 'GOMOBILE_SOURCE="))
+        with tempfile.TemporaryDirectory() as directory:
+            envfile = Path(directory) / 'github-env'
+            env = dict(os.environ, GITHUB_ENV=envfile.as_posix(), GOMOBILE_SOURCE='external/pinned')
+            subprocess.run(['bash', '-euc', line], env=env, check=True)
+            self.assertEqual(b'GOMOBILE_SOURCE=external/pinned\n', envfile.read_bytes())
+
     def test_clean_gate_real_git_status_matrix(self):
         gate = ROOT / "buildScript" / "lib" / "core" / "verify_runtime_clean.py"
         cases = {

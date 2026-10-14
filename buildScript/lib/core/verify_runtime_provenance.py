@@ -61,6 +61,27 @@ def require_clean_source(root, baseline, provenance):
     verify_source_contract(root, baseline, provenance)
 
 
+def require_artifact_source(root, baseline, provenance):
+    """Build-time gate only: retain tracked/source and dependency identity checks.
+
+    Workflow strict-clean gates still run before build and after exact cleanup.
+    This does not grant any directory an exemption in the default verifier.
+    """
+    root = Path(root)
+    if (root / GENERATED_SEED_PATH).exists():
+        raise ValueError('Runtime provenance requires generated private seed cleanup')
+    if provenance.git(root, 'status', '--porcelain', '--untracked-files=no'):
+        raise ValueError('Gradle artifact verification rejects tracked source changes')
+    libs = root / 'app/libs'
+    if libs.exists():
+        for path in libs.rglob('*'):
+            if path.is_file() and path.relative_to(libs).as_posix() != 'libcore.aar':
+                raise ValueError('Unexpected app/libs dependency: ' + path.relative_to(libs).as_posix())
+            if path.is_symlink():
+                raise ValueError('Symlink app/libs dependency is not accepted')
+    verify_source_contract(root, baseline, provenance)
+
+
 def aar_members(aar_path, provenance):
     with zipfile.ZipFile(aar_path) as archive:
         names = archive.namelist()
@@ -228,7 +249,7 @@ def verify_apk(apk_path, aar_path, data, provenance, aapt=None):
             raise ValueError('APK application identity mismatch')
 
 
-def verify_runtime_provenance(root, baseline_path, runtime_path, aar_path, apk_path=None, verify_worktree=True, verify_oix=False, aapt=None, expected_seed_fingerprint=None):
+def verify_runtime_provenance(root, baseline_path, runtime_path, aar_path, apk_path=None, verify_worktree=True, verify_oix=False, aapt=None, expected_seed_fingerprint=None, gradle_artifact_only=False):
     root = Path(root)
     baseline_path = Path(baseline_path)
     runtime_path = Path(runtime_path)
@@ -250,7 +271,9 @@ def verify_runtime_provenance(root, baseline_path, runtime_path, aar_path, apk_p
     require_digest(data.get('source_attestation_tree'), 'source attestation tree', 40)
     require_digest(data.get('built_source_head'), 'built source HEAD', 40)
     require_digest(data.get('built_source_tree'), 'built source tree', 40)
-    if verify_worktree:
+    if gradle_artifact_only:
+        require_artifact_source(root, baseline, provenance)
+    elif verify_worktree:
         require_clean_source(root, baseline, provenance)
     else:
         verify_source_contract(root, baseline, provenance)
@@ -306,6 +329,7 @@ def main():
     parser.add_argument('--aar', type=Path, required=True)
     parser.add_argument('--runtime-attestation', type=Path, required=True)
     parser.add_argument('--create', action='store_true')
+    parser.add_argument('--gradle-artifact-only', action='store_true', help='Gradle build-time verification; workflow must run strict gates before/after build')
     parser.add_argument('--seed-fingerprint')
     parser.add_argument('--expected-seed-fingerprint')
     parser.add_argument('--apk', type=Path)
@@ -314,11 +338,13 @@ def main():
     args = parser.parse_args()
     baseline = args.baseline or args.root / 'buildScript/lib/core/native-baseline.json'
     try:
+        if args.create and args.gradle_artifact_only:
+            raise ValueError('Artifact-only cannot create runtime attestation')
         if args.create:
             data = create_runtime_attestation(args.root, baseline, args.aar, args.runtime_attestation, args.seed_fingerprint)
             print(json.dumps({'status': 'CREATED', 'built_source_head': data['built_source_head'], 'aar_sha256': data['aar_sha256']}, indent=2))
         else:
-            print(json.dumps(verify_runtime_provenance(args.root, baseline, args.runtime_attestation, args.aar, args.apk, verify_oix=args.verify_oix, aapt=args.aapt, expected_seed_fingerprint=args.expected_seed_fingerprint), indent=2))
+            print(json.dumps(verify_runtime_provenance(args.root, baseline, args.runtime_attestation, args.aar, args.apk, verify_oix=args.verify_oix, aapt=args.aapt, expected_seed_fingerprint=args.expected_seed_fingerprint, gradle_artifact_only=args.gradle_artifact_only), indent=2))
     except (ValueError, KeyError, OSError, subprocess.CalledProcessError, zipfile.BadZipFile) as error:
         parser.exit(1, 'RUNTIME PROVENANCE FAILED: ' + str(error) + '\n')
 

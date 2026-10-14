@@ -19,14 +19,27 @@ val verifyBundledGeoAssets by tasks.registering {
         }
     }
 }
-val nativeVerifier = rootProject.file("buildScript/lib/core/verify_native.py")
+val runtimeProvenance = providers.environmentVariable("RUNTIME_PROVENANCE")
+val nativeVerifier = rootProject.file(
+    if (runtimeProvenance.isPresent) "buildScript/lib/core/verify_runtime_provenance.py"
+    else "buildScript/lib/core/verify_native.py"
+)
+fun nativeVerificationArgs(apk: File? = null): List<String> {
+    val args = mutableListOf(nativeVerifier.absolutePath)
+    if (runtimeProvenance.isPresent) {
+        args += listOf("--gradle-artifact-only", "--aar", project.file("libs/libcore.aar").absolutePath,
+            "--runtime-attestation", runtimeProvenance.get())
+    }
+    if (apk != null) args += listOf("--apk", apk.absolutePath)
+    return args
+}
 val nativePython = providers.environmentVariable("NATIVE_VERIFY_PYTHON").orElse(
     if (System.getProperty("os.name").startsWith("Windows")) "python" else "python3"
 )
 val verifyBundledNativeCore by tasks.registering {
     // Always run, including after cache restore; the ignored AAR is not source provenance.
     doLast {
-        exec { commandLine(nativePython.get(), nativeVerifier.absolutePath) }
+        exec { commandLine(listOf(nativePython.get()) + nativeVerificationArgs()) }
     }
 }
 tasks.named("preBuild").configure {
@@ -41,7 +54,7 @@ android.applicationVariants.all {
             val apks = apkDirectory.get().asFile.walkTopDown().filter { it.isFile && it.extension == "apk" }.toList()
             check(apks.isNotEmpty()) { "No APK available for native identity verification: $apkDirectory" }
             apks.forEach { apk ->
-                exec { commandLine(nativePython.get(), nativeVerifier.absolutePath, "--apk", apk.absolutePath) }
+                exec { commandLine(listOf(nativePython.get()) + nativeVerificationArgs(apk)) }
             }
         }
     }

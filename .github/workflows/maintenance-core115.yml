@@ -61,7 +61,7 @@ jobs:
           # Remove exact native build outputs, never exempt source directories.
           rm -rf core115-source/libcore/.build
           rm -f core115-source/libcore/libcore.aar
-          printf 'GOMOBILE_SOURCE=%s' "$GOMOBILE_SOURCE" >> "$GITHUB_ENV"
+          printf 'GOMOBILE_SOURCE=%s\n' "$GOMOBILE_SOURCE" >> "$GITHUB_ENV"
       - name: Verify exact runtime checkout after private build
         shell: bash
         run: |
@@ -146,6 +146,7 @@ jobs:
         env:
           BUILD_PLUGIN: none
           HEV_SRC: ${{ runner.temp }}/hev-socks5-tunnel
+          RUNTIME_PROVENANCE: ${{ runner.temp }}/runtime-attestation.json
         run: |
           set -euo pipefail
           echo "sdk.dir=${ANDROID_HOME}" > local.properties

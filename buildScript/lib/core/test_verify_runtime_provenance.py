@@ -239,6 +239,54 @@ class RuntimeProvenanceTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'only ignored app/libs/libcore.aar'):
                     RUNTIME.require_clean_source(ROOT, {}, mock.Mock())
 
+    def test_gradle_artifact_only_keeps_tracked_source_and_libs_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            (root / '.gitignore').write_text('/app/libs/\n.gradle/\nbuild/\n', encoding='utf-8')
+            (root / 'source.go').write_text('package fixture\n', encoding='utf-8')
+            subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+            subprocess.run(['git', '-C', str(root), '-c', 'user.name=fixture', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'fixture'], check=True)
+            libs = root / 'app/libs'
+            libs.mkdir(parents=True)
+            (libs / 'libcore.aar').write_bytes(b'fixture')
+            cache = root / '.gradle/generated.bin'
+            cache.parent.mkdir()
+            cache.write_bytes(b'Gradle output')
+            with mock.patch.object(RUNTIME, 'verify_source_contract'):
+                RUNTIME.require_artifact_source(root, {}, RUNTIME.load_provenance())
+                with self.assertRaises(ValueError):
+                    CLEAN.verify(root)
+                for extra in ('evil.jar', 'evil.aar', 'nested/evil.jar'):
+                    target = libs / extra
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(b'extra dependency')
+                    with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, 'app/libs'):
+                        RUNTIME.require_artifact_source(root, {}, RUNTIME.load_provenance())
+                    target.unlink()
+                source = root / 'source.go'
+                source.write_text('package tampered\n', encoding='utf-8')
+                with self.assertRaisesRegex(ValueError, 'tracked'):
+                    RUNTIME.require_artifact_source(root, {}, RUNTIME.load_provenance())
+                subprocess.run(['git', '-C', str(root), 'add', 'source.go'], check=True)
+                with self.assertRaisesRegex(ValueError, 'tracked'):
+                    RUNTIME.require_artifact_source(root, {}, RUNTIME.load_provenance())
+
+    def test_gradle_artifact_only_dispatch_retains_full_runtime_checks(self):
+        with mock.patch.object(RUNTIME, 'require_artifact_source') as artifact_gate:
+            result = RUNTIME.verify_runtime_provenance(ROOT, BASELINE, self.attestation, self.aar, gradle_artifact_only=True)
+            self.assertEqual('PASS', result['status'])
+            artifact_gate.assert_called_once()
+            tampered = copy.deepcopy(self.data)
+            tampered['aar_sha256'] = '3' * 64
+            self.attestation.write_text(json.dumps(tampered), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'aar_sha256'):
+                RUNTIME.verify_runtime_provenance(ROOT, BASELINE, self.attestation, self.aar, gradle_artifact_only=True)
+        self.attestation.write_text(json.dumps(self.data), encoding='utf-8')
+        with mock.patch.object(RUNTIME, 'require_clean_source', side_effect=ValueError('strict sentinel')):
+            with self.assertRaisesRegex(ValueError, 'strict sentinel'):
+                RUNTIME.verify_runtime_provenance(ROOT, BASELINE, self.attestation, self.aar)
+
     def test_apk_identity_matches_runtime_aar(self):
         apk = self.root / 'app.apk'
         tampered = self.root / 'tampered.apk'
