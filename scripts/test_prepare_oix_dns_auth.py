@@ -2,6 +2,7 @@ import base64
 import contextlib
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -18,10 +19,14 @@ class PrepareOixDnsAuthTest(unittest.TestCase):
     def test_materialize_returns_domain_separated_nonzero_fingerprint(self):
         seed = base64.b64encode(bytes(range(32))).decode()
         with tempfile.TemporaryDirectory() as directory:
-            fingerprint = MODULE.materialize(seed, Path(directory) / 'private_seed_generated.go')
+            target = Path(directory) / 'private_seed_generated.go'
+            fingerprint = MODULE.materialize(seed, target)
+            generated = target.read_text(encoding='utf-8')
         self.assertRegex(fingerprint, r'^[0-9a-f]{64}$')
         self.assertNotEqual(fingerprint, '0' * 64)
         self.assertNotEqual(fingerprint, MODULE.hashlib.sha256(bytes(range(32))).hexdigest())
+        self.assertIn('BuildSeedFingerprint = ' + json.dumps(MODULE.FINGERPRINT_MARKER + fingerprint), generated)
+        self.assertIn(seed, generated)
 
     def test_cli_writes_only_fingerprint_to_github_output(self):
         seed = base64.b64encode(bytes(range(32))).decode()

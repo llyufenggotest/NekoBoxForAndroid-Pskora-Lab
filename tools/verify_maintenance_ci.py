@@ -7,7 +7,7 @@ from pathlib import Path
 REQUIRED = (
     "maintenance/core115-validated250-stable",
     "feature/anytls-oix-snell",
-    "fix/alpha12-ci-runtime-provenance",
+    "upgrade/sing-box-1.15.0-alpha.12",
     "workflow_dispatch:",
     "id: oix-input",
     "runtime-attestation.json",
@@ -16,6 +16,9 @@ REQUIRED = (
     "--verify-oix",
     "--aapt",
     "runtime-provenance",
+    "17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f",
+    "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api",
+    "Verify clean source worktree after private build",
     "go-version: '1.26.5'",
     "java-version: '21'",
     "core115-source",

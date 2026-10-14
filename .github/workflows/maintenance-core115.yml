@@ -6,7 +6,7 @@ on:
     branches:
       - maintenance/core115-validated250-stable
       - feature/anytls-oix-snell
-      - fix/alpha12-ci-runtime-provenance
+      - upgrade/sing-box-1.15.0-alpha.12
     tags:
       - core115-validated250-maintenance-candidate-*
 
@@ -49,8 +49,12 @@ jobs:
           (cd core115-source/libcore && GOMOBILE_SOURCE="$GOMOBILE_SOURCE" ./init.sh && ./build.sh)
           test -s app/libs/libcore.aar
           rm -f core115-source/sing-box/component/oixdnsauth/private_seed_generated.go
-          printf 'GOMOBILE_SOURCE=%s
-' "$GOMOBILE_SOURCE" >> "$GITHUB_ENV"
+          printf 'GOMOBILE_SOURCE=%s' "$GOMOBILE_SOURCE" >> "$GITHUB_ENV"
+      - name: Verify clean source worktree after private build
+        shell: bash
+        run: |
+          test ! -e core115-source/sing-box/component/oixdnsauth/private_seed_generated.go
+          test -z "$(git status --porcelain --untracked-files=all -- . ':(exclude)app/libs' ':(exclude)out' ':(exclude)artifacts')"
       - name: Create and verify secret runtime provenance
         shell: bash
         env:

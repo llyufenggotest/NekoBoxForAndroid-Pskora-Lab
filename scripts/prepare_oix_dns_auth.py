@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / 'core115-source/sing-box/component/oixdnsauth/private_seed_generated.go'
 FINGERPRINT_DOMAIN = b'nekoboxyf:oix-dns-auth:runtime-provenance:v1\0'
+FINGERPRINT_MARKER = 'NEKOBOX-OIX-SEED-FINGERPRINT-v1:'
 
 
 def decode_seed(value: str) -> tuple[str, bytes]:
@@ -26,14 +27,16 @@ def seed_fingerprint(raw: bytes) -> str:
 
 def materialize(value: str, target: Path = TARGET) -> str:
     value, raw = decode_seed(value)
+    fingerprint = seed_fingerprint(raw)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
         '// Generated private build input. Never commit.\n'
         'package oixdnsauth\n\n'
+        'var BuildSeedFingerprint = ' + json.dumps(FINGERPRINT_MARKER + fingerprint) + '\n\n'
         'func init() { BuildSeed = ' + json.dumps(value) + ' }\n',
         encoding='utf-8',
     )
-    return seed_fingerprint(raw)
+    return fingerprint
 
 
 def main() -> None:

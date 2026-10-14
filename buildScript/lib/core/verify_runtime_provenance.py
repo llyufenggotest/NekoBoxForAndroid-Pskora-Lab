@@ -11,7 +11,17 @@ import zipfile
 
 HERE = Path(__file__).resolve().parent
 GENERATOR_NAME = 'verify_runtime_provenance.py'
-GENERATOR_VERSION = 1
+GENERATOR_VERSION = 2
+EXPECTED_GO_VERSION = '1.26.5'
+EXPECTED_JAVA_MAJOR = '21'
+EXPECTED_GOMOBILE_COMMIT = '17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f'
+EXPECTED_BUILD_TAGS = 'with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api'
+GENERATED_SEED_PATH = Path('core115-source/sing-box/component/oixdnsauth/private_seed_generated.go')
+FINGERPRINT_MARKER = b'NEKOBOX-OIX-SEED-FINGERPRINT-v1:'
+TOOLCHAIN_KEYS = {
+    'go_version', 'go_version_output', 'java_major', 'java_version_output',
+    'gomobile_commit', 'build_tags',
+}
 
 
 def load_module(name, path):
@@ -34,17 +44,18 @@ def require_digest(value, label, size=64):
         raise ValueError(label + ' must be a non-zero lowercase hexadecimal digest')
 
 
-def require_clean_exact(root, baseline, provenance):
-    status = provenance.git(root, 'status', '--porcelain', '--untracked-files=all')
-    allowed_ignored = {baseline['aar_path']}
-    unexpected = []
-    for line in status.splitlines():
-        path = line[3:].replace('\\', '/')
-        if path not in allowed_ignored:
-            unexpected.append(line)
-    if unexpected:
-        raise ValueError('Runtime provenance requires a clean worktree')
+def verify_source_contract(root, baseline, provenance):
     provenance.verify_source_attestation(baseline, root)
+
+
+def require_clean_exact(root, baseline, provenance):
+    root = Path(root)
+    if (root / GENERATED_SEED_PATH).exists():
+        raise ValueError('Runtime provenance requires generated private seed cleanup')
+    status = provenance.git(root, 'status', '--porcelain', '--untracked-files=all')
+    if status:
+        raise ValueError('Runtime provenance requires a clean source worktree')
+    verify_source_contract(root, baseline, provenance)
 
 
 def aar_members(aar_path, provenance):
@@ -68,32 +79,72 @@ def application_identity(root):
     }
 
 
-def default_toolchain(root):
-    def output(command):
-        return subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout.strip()
+def command_output(command):
+    return subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout.strip()
+
+
+def parse_go_version(output):
+    match = re.fullmatch(r'go version go([^\s]+) (?:windows|linux|darwin)/(?:amd64|arm64)', output)
+    if not match:
+        raise ValueError('Unable to parse go version output')
+    return match.group(1)
+
+
+def parse_java_major(output):
+    first_line = output.splitlines()[0] if output else ''
+    match = re.fullmatch(r'(?:java|openjdk) version "([0-9]+)(?:[._][^"]*)?"(?: .*)?', first_line)
+    if not match:
+        raise ValueError('Unable to parse java version output')
+    return match.group(1)
+
+
+def collect_toolchain(root):
     gomobile = Path(os.environ.get('GOMOBILE_SOURCE', Path(root) / 'core115-source/gomobile'))
-    return {
-        'go': output(['go', 'version']),
-        'java': output(['java', '-version']),
-        'gomobile_commit': subprocess.run(
-            ['git', '-C', str(gomobile), 'rev-parse', 'HEAD'],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        ).stdout.strip(),
+    go_output = command_output(['go', 'version'])
+    java_output = command_output(['java', '-version'])
+    toolchain = {
+        'go_version': parse_go_version(go_output),
+        'go_version_output': go_output,
+        'java_major': parse_java_major(java_output),
+        'java_version_output': java_output,
+        'gomobile_commit': command_output(['git', '-C', str(gomobile), 'rev-parse', 'HEAD']),
+        'build_tags': EXPECTED_BUILD_TAGS,
     }
+    validate_toolchain(toolchain)
+    return toolchain
 
 
 def validate_toolchain(toolchain):
-    if not isinstance(toolchain, dict) or not toolchain:
-        raise ValueError('build toolchain must be a non-empty object')
-    for key, value in toolchain.items():
-        if not isinstance(key, str) or not key or not isinstance(value, str) or not value.strip():
-            raise ValueError('build toolchain entries must be non-empty strings')
+    if not isinstance(toolchain, dict) or set(toolchain) != TOOLCHAIN_KEYS:
+        raise ValueError('build toolchain schema mismatch')
+    if any(not isinstance(toolchain[key], str) or not toolchain[key].strip() for key in TOOLCHAIN_KEYS):
+        raise ValueError('build toolchain entries must be non-empty strings')
+    if parse_go_version(toolchain['go_version_output']) != toolchain['go_version']:
+        raise ValueError('Go toolchain output mismatch')
+    if parse_java_major(toolchain['java_version_output']) != toolchain['java_major']:
+        raise ValueError('Java toolchain output mismatch')
+    if toolchain['go_version'] != EXPECTED_GO_VERSION:
+        raise ValueError('Go toolchain must be ' + EXPECTED_GO_VERSION)
+    if toolchain['java_major'] != EXPECTED_JAVA_MAJOR:
+        raise ValueError('Java toolchain major must be ' + EXPECTED_JAVA_MAJOR)
+    require_digest(toolchain['gomobile_commit'], 'gomobile commit', 40)
+    if toolchain['gomobile_commit'] != EXPECTED_GOMOBILE_COMMIT:
+        raise ValueError('gomobile commit mismatch')
+    if toolchain['build_tags'] != EXPECTED_BUILD_TAGS:
+        raise ValueError('build tags mismatch')
 
 
-def create_runtime_attestation(root, baseline_path, aar_path, output_path, seed_fingerprint, require_clean=True, toolchain=None):
+def extract_binary_fingerprint(native):
+    pattern = re.compile(re.escape(FINGERPRINT_MARKER) + rb'([0-9a-f]{64})(?![0-9a-f])')
+    matches = pattern.findall(native)
+    if len(matches) != 1:
+        raise ValueError('Native binary must contain exactly one Oix seed fingerprint marker')
+    fingerprint = matches[0].decode('ascii')
+    require_digest(fingerprint, 'native binary fingerprint')
+    return fingerprint
+
+
+def create_runtime_attestation(root, baseline_path, aar_path, output_path, seed_fingerprint, require_clean=True):
     root = Path(root)
     baseline_path = Path(baseline_path)
     aar_path = Path(aar_path)
@@ -104,12 +155,19 @@ def create_runtime_attestation(root, baseline_path, aar_path, output_path, seed_
     if require_clean:
         require_clean_exact(root, baseline, provenance)
     else:
-        provenance.verify_source_attestation(baseline, root)
+        verify_source_contract(root, baseline, provenance)
     identity = provenance.artifact_identity(aar_path)
-    toolchain = toolchain or {'fixture': 'explicit-test-toolchain'}
-    validate_toolchain(toolchain)
+    binary_fingerprints = {}
+    with zipfile.ZipFile(aar_path) as archive:
+        for abi in identity['native_sha256']:
+            binary_fingerprints[abi] = extract_binary_fingerprint(archive.read('jni/' + abi + '/libgojni.so'))
+    if set(binary_fingerprints.values()) != {seed_fingerprint}:
+        raise ValueError('Native binary fingerprint does not match requested seed fingerprint')
+    toolchain = collect_toolchain(root)
+    if baseline['build_tags'] != EXPECTED_BUILD_TAGS:
+        raise ValueError('Committed build tags do not match runtime contract')
     data = {
-        'schema': 1,
+        'schema': 2,
         'kind': 'oix-secret-runtime-native-provenance',
         'generator': {'name': GENERATOR_NAME, 'version': GENERATOR_VERSION},
         'source_attestation_path': str(baseline_path.relative_to(root)).replace('\\', '/'),
@@ -119,6 +177,7 @@ def create_runtime_attestation(root, baseline_path, aar_path, output_path, seed_
         'built_source_head': baseline['built_source_head'],
         'built_source_tree': baseline['built_source_tree'],
         'seed_fingerprint': seed_fingerprint,
+        'native_seed_fingerprint': dict(sorted(binary_fingerprints.items())),
         'aar_members_sha256': aar_members(aar_path, provenance),
         **identity,
         'core_version': baseline['core_version'],
@@ -164,7 +223,7 @@ def verify_runtime_provenance(root, baseline_path, runtime_path, aar_path, apk_p
     provenance = load_provenance()
     baseline = json.loads(baseline_path.read_text(encoding='utf-8'))
     data = json.loads(runtime_path.read_text(encoding='utf-8'))
-    if data.get('schema') != 1 or data.get('kind') != 'oix-secret-runtime-native-provenance':
+    if data.get('schema') != 2 or data.get('kind') != 'oix-secret-runtime-native-provenance':
         raise ValueError('Unsupported runtime provenance schema')
     if data.get('generator') != {'name': GENERATOR_NAME, 'version': GENERATOR_VERSION}:
         raise ValueError('Runtime provenance generator mismatch')
@@ -181,7 +240,7 @@ def verify_runtime_provenance(root, baseline_path, runtime_path, aar_path, apk_p
     if verify_worktree:
         require_clean_exact(root, baseline, provenance)
     else:
-        provenance.verify_source_attestation(baseline, root)
+        verify_source_contract(root, baseline, provenance)
     if data['source_attestation_path'] != str(baseline_path.relative_to(root)).replace('\\', '/'):
         raise ValueError('Source attestation path mismatch')
     if provenance.sha(baseline_path.read_bytes()) != data['source_attestation_sha256']:
@@ -195,6 +254,8 @@ def verify_runtime_provenance(root, baseline_path, runtime_path, aar_path, apk_p
     for field in ('core_version', 'build_tags', 'build_goos', 'build_goarch'):
         if data.get(field) != baseline[field]:
             raise ValueError('Build metadata mismatch: ' + field)
+    if data['build_tags'] != EXPECTED_BUILD_TAGS:
+        raise ValueError('Runtime build tags mismatch')
     validate_toolchain(data.get('build_toolchain'))
     if data.get('application') != application_identity(root):
         raise ValueError('Application source identity mismatch')
@@ -204,14 +265,22 @@ def verify_runtime_provenance(root, baseline_path, runtime_path, aar_path, apk_p
             raise ValueError('Runtime AAR identity mismatch: ' + field)
     if data.get('aar_members_sha256') != aar_members(aar_path, provenance):
         raise ValueError('Runtime AAR member identity mismatch')
+    binary_fingerprints = {}
     with zipfile.ZipFile(aar_path) as archive:
         for abi in data['native_sha256']:
             native = archive.read('jni/' + abi + '/libgojni.so')
             provenance.verify_build(native, data)
+            if ('go' + EXPECTED_GO_VERSION).encode() not in native:
+                raise ValueError('Missing native Go toolchain evidence: ' + abi)
             if b'EXPORTER-Dler-Snell-Identity-v2' not in native:
                 raise ValueError('Missing Oix identity exporter: ' + abi)
+            binary_fingerprints[abi] = extract_binary_fingerprint(native)
+            if binary_fingerprints[abi] != data['seed_fingerprint']:
+                raise ValueError('Native binary fingerprint mismatch: ' + abi)
             if verify_oix:
                 load_oix_verifier(root).verify(native, os.environ.get('OIX_DNS_AUTH_SEED', ''))
+    if data.get('native_seed_fingerprint') != dict(sorted(binary_fingerprints.items())):
+        raise ValueError('Attested native binary fingerprint mismatch')
     if apk_path:
         verify_apk(Path(apk_path), aar_path, data, provenance, aapt)
     return {'status': 'PASS', 'built_source_head': data['built_source_head'], 'aar_sha256': data['aar_sha256'], 'apk': str(apk_path) if apk_path else None}
@@ -233,7 +302,7 @@ def main():
     baseline = args.baseline or args.root / 'buildScript/lib/core/native-baseline.json'
     try:
         if args.create:
-            data = create_runtime_attestation(args.root, baseline, args.aar, args.runtime_attestation, args.seed_fingerprint, toolchain=default_toolchain(args.root))
+            data = create_runtime_attestation(args.root, baseline, args.aar, args.runtime_attestation, args.seed_fingerprint)
             print(json.dumps({'status': 'CREATED', 'built_source_head': data['built_source_head'], 'aar_sha256': data['aar_sha256']}, indent=2))
         else:
             print(json.dumps(verify_runtime_provenance(args.root, baseline, args.runtime_attestation, args.aar, args.apk, verify_oix=args.verify_oix, aapt=args.aapt, expected_seed_fingerprint=args.expected_seed_fingerprint), indent=2))

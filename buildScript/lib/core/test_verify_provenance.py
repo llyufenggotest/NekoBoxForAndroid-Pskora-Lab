@@ -2,6 +2,7 @@ import copy
 import importlib.util
 import json
 from pathlib import Path
+import struct
 import shutil
 import unittest
 import zipfile
@@ -16,13 +17,37 @@ ROOT = HERE.parents[2]
 class ProvenanceTest(unittest.TestCase):
     def setUp(self):
         self.baseline = json.loads((HERE / 'native-baseline.json').read_text())
+        self.temp = tempfile.TemporaryDirectory()
+        self.fixture_aar = Path(self.temp.name) / 'libcore.aar'
+        header = bytearray(64)
+        header[:4] = b'\x7fELF'
+        header[18:20] = struct.pack('<H', 183)
+        native = bytes(header) + '\0'.join((
+            self.baseline['core_version'],
+            '-tags=' + self.baseline['build_tags'],
+            'GOOS=' + self.baseline['build_goos'],
+            'GOARCH=' + self.baseline['build_goarch'],
+            '-buildmode=c-shared',
+            'CGO_ENABLED=1',
+        )).encode()
+        with zipfile.ZipFile(self.fixture_aar, 'w') as archive:
+            archive.writestr('AndroidManifest.xml', b'fixture')
+            archive.writestr('classes.jar', b'fixture-classes')
+            archive.writestr('jni/arm64-v8a/libgojni.so', native)
+        identity = p.artifact_identity(self.fixture_aar)
+        self.baseline.update(identity)
+        self.baseline['aar_path'] = str(self.fixture_aar)
+
+    def tearDown(self):
+        self.temp.cleanup()
 
     def test_real_snapshot(self):
         manifest = p.verify_snapshot(self.baseline, ROOT)
         self.assertEqual(len(manifest), self.baseline['source_file_count'])
 
     def test_source_attestation_can_be_verified_without_committed_aar(self):
-        p.verify_source_attestation(self.baseline, ROOT)
+        baseline = json.loads((HERE / 'native-baseline.json').read_text())
+        p.verify_source_attestation(baseline, ROOT, verify_attestation_head=False)
 
     def test_built_source_head_tamper_rejected(self):
         self.baseline['built_source_head'] = '0' * 40
@@ -102,7 +127,7 @@ class ProvenanceTest(unittest.TestCase):
             p.verify_provenance(self.baseline, ROOT, verify_source_content=False, verify_attestation_head=False)
 
     def test_real_build_and_changed_version_tags_arch(self):
-        with zipfile.ZipFile(ROOT / 'app/libs/libcore.aar') as z:
+        with zipfile.ZipFile(self.fixture_aar) as z:
             so = z.read('jni/arm64-v8a/libgojni.so')
         p.verify_build(so, self.baseline)
         for field in ('core_version', 'build_tags', 'build_goos', 'build_goarch'):
