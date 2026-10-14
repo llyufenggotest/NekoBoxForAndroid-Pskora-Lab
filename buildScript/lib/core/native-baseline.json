@@ -1,22 +1,22 @@
 {
-  "aar_content_sha256": "6d3f1ae5b1284d670cdeca8da6121ac67bfcec17aaa68dd5939afd769be2a29d",
+  "aar_content_sha256": "5277b91a42b9860c08d8360565f953f14e573db650ac820789e565b8e3e13b20",
   "aar_path": "app/libs/libcore.aar",
-  "aar_sha256": "4bda556d61dde94caead1eecd33bc1c18645acd915574cfe96c141dc9efc02ad",
+  "aar_sha256": "ac3af62bcbe9d3785a3396bdee7fce272c6e6744a367dc17c8bdffabfb769fc0",
   "build_goarch": "arm64",
   "build_goos": "android",
   "build_tags": "with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api",
-  "built_source_head": "c8bdf93a4a8482edf97a4bfed8d3b4c29a5b5416",
-  "built_source_tree": "e1f801784213cad6c9b124da6468c1c46a71528f",
+  "built_source_head": "c4acb3e70acc5cdd8fe84e795d1480754a86df34",
+  "built_source_tree": "37990bbac69b6bbcd92475abc0e661681faddc94",
   "classes_jar_sha256": "82fd24fc75494f6d8940ebf109fab92cb51d13bd025afa721871b752ab2baa69",
   "core_version": "1.15.0-alpha.12-private-lab",
   "native_sha256": {
-    "arm64-v8a": "c481a2217b75386973d055b64aee60a95892d6e5d936522050fcb420b670f790"
+    "arm64-v8a": "f47301b2735d47dba91d061eff81a7d46d798f53e14a5646c39db07c3fb5ec48"
   },
   "schema": 3,
-  "source_file_count": 2282,
+  "source_file_count": 2285,
   "source_kind": "clean-git-source-commit",
   "source_manifest_path": "buildScript/lib/core/core115-source.manifest.json",
-  "source_manifest_sha256": "ac65ad9007de623bc8e7dc4b59c8505348d0175f3f4ad33b4d6f4c9f2d83d3f3",
+  "source_manifest_sha256": "d53528caacbb50f6d88dda3c16d3b5b4d6af66e1c8ec6a7688cead1e97695a97",
   "source_snapshot_path": "buildScript/lib/core/core115-source.snapshot.tar",
-  "source_snapshot_sha256": "355e26dc4f611f4013e4ca49a24f3d576872b51faf51fa48f095b2d8bc24cba9"
+  "source_snapshot_sha256": "7b27876587d4a8d1156c4df9f89ccec9b68ff640f8a9464e22859bdbda4c431d"
 }
