@@ -97,7 +97,11 @@ class GostPluginRoundTripTest {
                 sUoT = true
             }
             val bytes = ByteBufferOutput(8192).also { bean.serialize(it) }.toBytes()
-            val stored = ShadowsocksBean().apply { deserialize(ByteBufferInput(bytes)) }
+            val stored = ShadowsocksBean().apply {
+                deserialize(ByteBufferInput(bytes))
+                // Display name is entity metadata, not part of the bean payload.
+                name = "gost fixture"
+            }
             listOf(stored, stored.clone(), parseShadowsocks(stored.toUri())).forEach { candidate ->
                 assertEquals("gost-plugin;$opts", candidate.plugin)
                 val outbound = buildSingBoxOutboundShadowsocksBean(candidate)
