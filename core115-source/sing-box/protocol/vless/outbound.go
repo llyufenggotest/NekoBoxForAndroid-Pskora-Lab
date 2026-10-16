@@ -58,6 +58,14 @@ type Outbound struct {
 }
 
 func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.VLESSOutboundOptions) (adapter.Outbound, error) {
+	if _, selected, err := vless.BlackstoneIdentity(options.UUID); selected {
+		if err != nil {
+			return nil, err
+		}
+		if options.TunNet != nil {
+			return nil, E.New("Blackstone: TunNet cannot be combined")
+		}
+	}
 	pure, pureErr := configurePure(&options)
 	if pureErr != nil {
 		return nil, pureErr
@@ -142,7 +150,7 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 	if muxOpts.Enabled {
 		options.Flow = ""
 	}
-	outbound.client, err = vless.NewClient(options.UUID, options.Flow, logger)
+	outbound.client, err = vless.NewClientWithBlackstoneOptions(options.UUID, options.Flow, logger, options.E, options.H)
 	if err != nil {
 		return nil, err
 	}

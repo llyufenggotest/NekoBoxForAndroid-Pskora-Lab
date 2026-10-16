@@ -20,12 +20,13 @@ import (
 )
 
 type Client struct {
-	key    [16]byte
-	flow   string
-	logger logger.Logger
-	isX365 bool // X365 private framing (#x365)
-	isJuzi bool // Juzi SDK tag framing (#juzi, case-insensitive)
-	isPure bool // Pure A1 framing, TCP only; never standard UDP/XUDP.
+	key        [16]byte
+	flow       string
+	logger     logger.Logger
+	isX365     bool // X365 private framing (#x365)
+	isJuzi     bool // Juzi SDK tag framing (#juzi, case-insensitive)
+	isPure     bool // Pure A1 framing, TCP only; never standard UDP/XUDP.
+	blackstone *blackstoneState
 }
 
 func splitPrivateSuffix(userID string) (cleanID string, isX365 bool, isJuzi bool) {
@@ -41,6 +42,12 @@ func splitPrivateSuffix(userID string) (cleanID string, isX365 bool, isJuzi bool
 }
 
 func NewClient(userId string, flow string, logger logger.Logger) (*Client, error) {
+	if _, selected, err := BlackstoneIdentity(userId); selected {
+		if err != nil {
+			return nil, err
+		}
+		return nil, E.New("Blackstone: explicit E/H configuration required")
+	}
 	key, pure, pureErr := PureIdentity(userId)
 	if pureErr != nil {
 		return nil, pureErr
@@ -86,7 +93,7 @@ func (c *Client) DialConn(conn net.Conn, destination M.Socksaddr) (net.Conn, err
 	if c.isPure {
 		return c.dialPure(conn, destination)
 	}
-	remoteConn := NewConn(conn, c.key, vmess.CommandTCP, destination, c.flow, c.isX365, c.isJuzi)
+	remoteConn := c.newConn(conn, vmess.CommandTCP, destination)
 	protocolConn, err := c.prepareConn(remoteConn, conn)
 	if err != nil {
 		return nil, err
@@ -98,7 +105,7 @@ func (c *Client) DialEarlyConn(conn net.Conn, destination M.Socksaddr) (net.Conn
 	if c.isPure {
 		return c.dialPure(conn, destination)
 	}
-	return c.prepareConn(NewConn(conn, c.key, vmess.CommandTCP, destination, c.flow, c.isX365, c.isJuzi), conn)
+	return c.prepareConn(c.newConn(conn, vmess.CommandTCP, destination), conn)
 }
 
 func (c *Client) DialEarlyConnWithBase(conn net.Conn, baseConn net.Conn, destination M.Socksaddr) (net.Conn, error) {
@@ -109,14 +116,14 @@ func (c *Client) DialEarlyConnWithOptions(conn net.Conn, baseConn net.Conn, dest
 	if c.isPure {
 		return c.dialPure(conn, destination)
 	}
-	return c.prepareConnWithOptions(NewConn(conn, c.key, vmess.CommandTCP, destination, c.flow, c.isX365, c.isJuzi), baseConn, canSplice)
+	return c.prepareConnWithOptions(c.newConn(conn, vmess.CommandTCP, destination), baseConn, canSplice)
 }
 
 func (c *Client) DialPacketConn(conn net.Conn, destination M.Socksaddr) (*PacketConn, error) {
 	if c.isPure {
 		return nil, E.New("Pure: UDP/XUDP unsupported")
 	}
-	serverConn := &PacketConn{Conn: conn, key: c.key, destination: destination, flow: c.flow, isX365: c.isX365, isJuzi: c.isJuzi}
+	serverConn := &PacketConn{Conn: conn, key: c.key, destination: destination, flow: c.flow, isX365: c.isX365, isJuzi: c.isJuzi, blackstone: c.blackstone}
 	return serverConn, common.Error(serverConn.Write(nil))
 }
 
@@ -124,14 +131,14 @@ func (c *Client) DialEarlyPacketConn(conn net.Conn, destination M.Socksaddr) (*P
 	if c.isPure {
 		return nil, E.New("Pure: UDP/XUDP unsupported")
 	}
-	return &PacketConn{Conn: conn, key: c.key, destination: destination, flow: c.flow, isX365: c.isX365, isJuzi: c.isJuzi}, nil
+	return &PacketConn{Conn: conn, key: c.key, destination: destination, flow: c.flow, isX365: c.isX365, isJuzi: c.isJuzi, blackstone: c.blackstone}, nil
 }
 
 func (c *Client) DialXUDPPacketConn(conn net.Conn, destination M.Socksaddr) (vmess.PacketConn, error) {
 	if c.isPure {
 		return nil, E.New("Pure: UDP/XUDP unsupported")
 	}
-	remoteConn := NewConn(conn, c.key, vmess.CommandTCP, destination, c.flow, c.isX365, c.isJuzi)
+	remoteConn := c.newConn(conn, vmess.CommandTCP, destination)
 	protocolConn, err := c.prepareConn(remoteConn, conn)
 	if err != nil {
 		return nil, err
@@ -143,7 +150,7 @@ func (c *Client) DialEarlyXUDPPacketConn(conn net.Conn, destination M.Socksaddr)
 	if c.isPure {
 		return nil, E.New("Pure: UDP/XUDP unsupported")
 	}
-	remoteConn := NewConn(conn, c.key, vmess.CommandMux, destination, c.flow, c.isX365, c.isJuzi)
+	remoteConn := c.newConn(conn, vmess.CommandMux, destination)
 	protocolConn, err := c.prepareConn(remoteConn, conn)
 	if err != nil {
 		return nil, err
@@ -158,6 +165,7 @@ type Conn struct {
 	request        Request
 	requestWritten bool
 	responseRead   bool
+	blackstone     *blackstoneState
 }
 
 func NewConn(conn net.Conn, uuid [16]byte, command byte, destination M.Socksaddr, flow string, isX365 bool, isJuzi bool) *Conn {
@@ -176,7 +184,7 @@ func NewConn(conn net.Conn, uuid [16]byte, command byte, destination M.Socksaddr
 
 func (c *Conn) Read(b []byte) (n int, err error) {
 	if !c.responseRead {
-		err = ReadResponse(c.ExtendedConn, c.request.IsX365)
+		err = readClientResponse(c.ExtendedConn, c.request.IsX365, c.blackstone)
 		if err != nil {
 			return
 		}
@@ -187,7 +195,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 
 func (c *Conn) ReadBuffer(buffer *buf.Buffer) error {
 	if !c.responseRead {
-		err := ReadResponse(c.ExtendedConn, c.request.IsX365)
+		err := readClientResponse(c.ExtendedConn, c.request.IsX365, c.blackstone)
 		if err != nil {
 			return err
 		}
@@ -198,7 +206,11 @@ func (c *Conn) ReadBuffer(buffer *buf.Buffer) error {
 
 func (c *Conn) Write(b []byte) (n int, err error) {
 	if !c.requestWritten {
-		err = WriteRequest(c.ExtendedConn, c.request, b)
+		if c.blackstone != nil {
+			err = c.blackstone.writeRequest(c.ExtendedConn, c.request, b)
+		} else {
+			err = WriteRequest(c.ExtendedConn, c.request, b)
+		}
 		if err == nil {
 			n = len(b)
 		}
@@ -209,6 +221,11 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 }
 
 func (c *Conn) WriteBuffer(buffer *buf.Buffer) error {
+	if c.blackstone != nil && !c.requestWritten {
+		defer buffer.Release()
+		_, err := c.Write(buffer.Bytes())
+		return err
+	}
 	if !c.requestWritten {
 		err := EncodeRequest(c.request, buf.With(buffer.ExtendHeader(RequestLen(c.request))))
 		if err != nil {
@@ -262,11 +279,12 @@ type PacketConn struct {
 	isJuzi         bool
 	requestWritten bool
 	responseRead   bool
+	blackstone     *blackstoneState
 }
 
 func (c *PacketConn) Read(b []byte) (n int, err error) {
 	if !c.responseRead {
-		err = ReadResponse(c.Conn, c.isX365)
+		err = readClientResponse(c.Conn, c.isX365, c.blackstone)
 		if err != nil {
 			return
 		}
@@ -284,6 +302,9 @@ func (c *PacketConn) Read(b []byte) (n int, err error) {
 }
 
 func (c *PacketConn) Write(b []byte) (n int, err error) {
+	if c.blackstone != nil {
+		return c.writeBlackstonePacket(b)
+	}
 	if !c.requestWritten {
 		c.access.Lock()
 		if c.requestWritten {
@@ -306,6 +327,10 @@ func (c *PacketConn) Write(b []byte) (n int, err error) {
 
 func (c *PacketConn) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
 	defer buffer.Release()
+	if c.blackstone != nil {
+		_, err := c.writeBlackstonePacket(buffer.Bytes())
+		return err
+	}
 	dataLen := buffer.Len()
 	binary.BigEndian.PutUint16(buffer.ExtendHeader(2), uint16(dataLen))
 	if !c.requestWritten {
