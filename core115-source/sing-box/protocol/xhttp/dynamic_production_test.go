@@ -62,7 +62,8 @@ func dynamicControlFixture(t *testing.T, document *atomic.Value) (context.Contex
 	server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
 	server.StartTLS()
 	t.Cleanup(server.Close)
-	ctx := service.ContextWith[adapter.CertificateStore](context.Background(), &dynamicCertificateStore{pool: pool})
+	resolverCtx, _, _, _ := resolverFixtureContext(t)
+	ctx := service.ContextWith[adapter.CertificateStore](resolverCtx, &dynamicCertificateStore{pool: pool})
 	d := &dynamicSystemDialer{dial: func(ctx context.Context, network string, a M.Socksaddr) (net.Conn, error) {
 		if a.Fqdn == controlCDNHost {
 			return (&net.Dialer{}).DialContext(ctx, "tcp", server.Listener.Addr().String())

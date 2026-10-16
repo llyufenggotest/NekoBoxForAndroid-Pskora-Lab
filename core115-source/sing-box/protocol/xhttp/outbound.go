@@ -55,7 +55,11 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 	return newOutbound(ctx, router, logger, tag, "xhttp", options)
 }
 func newOutbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag, outboundType string, options option.XHttpOutboundOptions) (adapter.Outbound, error) {
-	data, err := dialer.New(ctx, options.DialerOptions, options.ServerIsDomain())
+	// Canonical control always dials a hostname, regardless of the subscription's
+	// placeholder server. Selected data endpoints may also be domains. Keep both
+	// on the framework resolver/detour path; legacy fixed-IP xhttp is unchanged.
+	remoteIsDomain := options.ServerIsDomain() || outboundType == "Blackstone" || deviceContext(options.DeviceID, options.DeviceName)
+	data, err := dialer.New(ctx, options.DialerOptions, remoteIsDomain)
 	if err != nil {
 		return nil, err
 	}
