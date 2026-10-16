@@ -4273,6 +4273,10 @@ public class SingBoxOptions {
 
         public String packet_encoding;
 
+        // Typed private VLESS options; null values are omitted by Gson.
+        public Boolean e;
+        public String h;
+
         public TunNetOptions tunnet;
 
         public static class TunNetOptions {

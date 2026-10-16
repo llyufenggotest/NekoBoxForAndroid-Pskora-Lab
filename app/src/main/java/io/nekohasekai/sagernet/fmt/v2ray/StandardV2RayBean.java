@@ -13,6 +13,10 @@ public abstract class StandardV2RayBean extends AbstractBean {
     public String encryption; // or VLESS flow
     public String vlessEncryption; // VLESS ncryption
 
+    // Nullable: absent private options must not change ordinary VLESS JSON.
+    public Boolean blackstoneE;
+    public String blackstoneH;
+
     //////// End of VMess & VLESS ////////
 
     // "V2Ray Transport" tcp/http/ws/quic/grpc/httpupgrade
@@ -148,7 +152,7 @@ public abstract class StandardV2RayBean extends AbstractBean {
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(10); // 保持 Mod-12 的版本号
+        output.writeInt(11); // v11 appends typed Blackstone VLESS options
         super.serialize(output);
         output.writeString(uuid);
         output.writeString(encryption);
@@ -229,6 +233,11 @@ public abstract class StandardV2RayBean extends AbstractBean {
         output.writeBoolean(muxBrutal);
         output.writeInt(muxBrutalUpMbps);
         output.writeInt(muxBrutalDownMbps);
+
+        // Append only: keep all v0-v10 field positions and AbstractBean extras intact.
+        output.writeBoolean(blackstoneE != null);
+        if (blackstoneE != null) output.writeBoolean(blackstoneE);
+        output.writeString(blackstoneH);
     }
 
     @Override
@@ -366,6 +375,13 @@ public abstract class StandardV2RayBean extends AbstractBean {
             muxBrutal = input.readBoolean();
             muxBrutalUpMbps = input.readInt();
             muxBrutalDownMbps = input.readInt();
+        }
+
+        blackstoneE = null;
+        blackstoneH = null;
+        if (version >= 11) {
+            if (input.readBoolean()) blackstoneE = input.readBoolean();
+            blackstoneH = input.readString();
         }
 
         // Note: xhttp fields are read in the switch case above when version >= 4

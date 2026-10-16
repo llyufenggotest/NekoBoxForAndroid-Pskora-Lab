@@ -80,10 +80,17 @@ abstract class StandardV2RaySettingsActivity : ProfileSettingsActivity<StandardV
 
         tmpBean = this // copy bean
         pbm.writeToCacheAll(this)
+        // Subscription-owned private fields have no editor controls. Preserve them
+        // in the session cache because save creates a fresh bean (also after rotation).
+        val privateE: Boolean? = blackstoneE
+        DataStore.profileCacheStore.putBoolean("blackstoneE", privateE)
+        DataStore.profileCacheStore.putString("blackstoneH", blackstoneH)
     }
 
     override fun StandardV2RayBean.serialize() {
         pbm.fromCacheAll(this)
+        blackstoneE = DataStore.profileCacheStore.getBoolean("blackstoneE")
+        blackstoneH = DataStore.profileCacheStore.getString("blackstoneH")
     }
 
     private lateinit var securityCategory: PreferenceCategory

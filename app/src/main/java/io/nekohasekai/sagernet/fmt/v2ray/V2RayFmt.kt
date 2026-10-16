@@ -347,6 +347,14 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
         }
     }
 
+    if (isVLESS) {
+        url.queryParameter("e")?.let {
+            require(it == "true" || it == "false") { "VLESS e must be true or false" }
+            blackstoneE = it == "true"
+        }
+        url.queryParameter("h")?.let { blackstoneH = it }
+    }
+
     url.queryParameter("fp")?.let {
         utlsFingerprint = it
     }
@@ -575,6 +583,8 @@ fun StandardV2RayBean.toUriVMessVLESSTrojan(isTrojan: Boolean): String {
             builder.addQueryParameter("encryption", "none")
         }
 
+        blackstoneE?.let { builder.addQueryParameter("e", it.toString()) }
+        blackstoneH?.let { builder.addQueryParameter("h", it) }
         if (encryption != "auto") builder.addQueryParameter("flow", encryption)
     }
 
@@ -931,6 +941,8 @@ fun buildSingBoxOutboundStandardV2RayBean(
                 server = bean.serverAddress
                 server_port = bean.serverPort
                 uuid = bean.tunNetRuntimeUuid()
+                e = bean.blackstoneE
+                h = bean.blackstoneH
                 if (bean.isTunNet()) {
                     tunnet = Outbound_VLESSOptions.TunNetOptions().apply {
                         snapshot = tunNetSnapshotPathProvider()

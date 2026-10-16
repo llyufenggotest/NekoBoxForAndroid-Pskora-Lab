@@ -837,6 +837,16 @@ object RawUpdater : GroupUpdater() {
                                         bean.vlessEncryption = opt.value?.toString() ?: ""
                                     }
 
+                                    "e" -> if (bean is VMessBean && bean.isVLESS) {
+                                        require(opt.value is Boolean) { "VLESS e must be a Boolean" }
+                                        bean.blackstoneE = opt.value as Boolean
+                                    }
+
+                                    "h" -> if (bean is VMessBean && bean.isVLESS) {
+                                        require(opt.value is String) { "VLESS h must be a String" }
+                                        bean.blackstoneH = opt.value as String
+                                    }
+
                                     "packet-encoding" -> if (bean is VMessBean) {
                                         bean.packetEncoding = when ((opt.value as? String)) {
                                             "packetaddr" -> 1
