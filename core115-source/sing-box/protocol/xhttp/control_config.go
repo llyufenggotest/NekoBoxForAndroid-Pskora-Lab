@@ -1,6 +1,7 @@
 package xhttp
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
@@ -186,6 +187,13 @@ func parseSelectedConfig(p map[string]any, terminal bool) (RealConfig, error) {
 func parseSelectedVLESS(p map[string]any, server, port string) (RealConfig, error) {
 	fail := func() (RealConfig, error) { return RealConfig{}, errors.New("invalid selected vless fields") }
 	id, ok := p["uuid"].(string)
+	for _, field := range []string{"network", "flow"} {
+		if value, present := p[field]; present {
+			if _, valid := value.(string); !valid {
+				return fail()
+			}
+		}
+	}
 	if !ok {
 		return fail()
 	}
@@ -220,9 +228,15 @@ func parseSelectedVLESS(p map[string]any, server, port string) (RealConfig, erro
 	}
 	n, _ := strconv.Atoi(port)
 	copyP["port"] = n
+	delete(copyP, "type") // discriminator is owned by selection, not VLESS options
 	raw, err := json.Marshal(copyP)
 	var v BlackstoneVLESSOptions
-	if err != nil || json.Unmarshal(raw, &v) != nil {
+	if err != nil {
+		return fail()
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&v) != nil {
 		return fail()
 	}
 	switch v.Network {

@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sagernet/sing-box/adapter"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 )
@@ -49,9 +50,15 @@ func controlSafe(stage string, err error) error {
 func deviceContext(id, name string) bool { return id != "" && name != "" }
 
 func newControlClient(dialer N.Dialer) *http.Client {
+	return newControlClientContext(context.Background(), dialer)
+}
+
+// Use the normal sing certificate store; this keeps configured trust roots and
+// exclusive-anchor policy instead of installing a test-only TLS bypass.
+func newControlClientContext(ctx context.Context, dialer N.Dialer) *http.Client {
 	return &http.Client{Transport: &http.Transport{
 		ForceAttemptHTTP2: true,
-		TLSClientConfig:   &tls.Config{ServerName: controlLegacyHost},
+		TLSClientConfig:   &tls.Config{ServerName: controlLegacyHost, RootCAs: adapter.RootPoolFromContext(ctx)},
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return dialer.DialContext(ctx, "tcp", M.ParseSocksaddr(addr))
 		},

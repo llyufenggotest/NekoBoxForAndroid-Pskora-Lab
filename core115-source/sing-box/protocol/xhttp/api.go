@@ -112,7 +112,8 @@ func decodeMaybeGzip(data []byte, limit int, label string) ([]byte, error) {
 }
 
 func FetchDynamicConfig(ctx context.Context, dialer N.Dialer, nodeName string, nodeID string, token string, deviceID string, deviceName string) ([]RealConfig, error) {
-	client := newControlClient(dialer)
+	client := newControlClientContext(ctx, dialer)
+	defer client.CloseIdleConnections()
 	return fetchDynamicConfig(ctx, client, nodeName, nodeID, token, deviceID, deviceName)
 }
 
