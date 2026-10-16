@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
@@ -15,13 +14,11 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"net"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
-	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"golang.org/x/crypto/chacha20poly1305"
 	"gopkg.in/yaml.v3"
@@ -38,16 +35,26 @@ const (
 )
 
 type RealConfig struct {
-	Type     string
-	Server   string
-	Port     string
-	Password string
-	Cipher   string
-	TcpFake  string
+	Type              string
+	Server            string
+	Port              string
+	Password          string
+	Cipher            string
+	TcpFake           string
+	Name              string
+	UdpFake           string
+	UDP               bool
+	UDPOverTCP        bool
+	UDPOverTCPVersion int
+	PaddingLen        string
+	VLESS             *BlackstoneVLESSOptions
 }
 
 func applyControlHeaders(req *http.Request, token string, deviceID string, deviceName string) {
-	req.Host = "g.just4test.xyz"
+	req.Host = controlLegacyHost
+	if deviceContext(deviceID, deviceName) {
+		req.Host = req.URL.Host
+	}
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("x-version", "520")
 	req.Header.Set("x-platform", "android")
@@ -68,6 +75,7 @@ func newControlRequest(ctx context.Context, url string, payload []byte, token st
 	if err != nil {
 		return nil, err
 	}
+	req.GetBody = nil
 	applyControlHeaders(req, token, deviceID, deviceName)
 	return req, nil
 }
@@ -79,7 +87,7 @@ func readBounded(reader io.Reader, limit int, label string) ([]byte, error) {
 		return nil, fmt.Errorf("read %s: %w", label, err)
 	}
 	if len(data) > limit {
-		return nil, fmt.Errorf("%s too large", label)
+		return nil, fmt.Errorf("%s: %w", label, errControlTooLarge)
 	}
 	return data, nil
 }
@@ -87,7 +95,7 @@ func readBounded(reader io.Reader, limit int, label string) ([]byte, error) {
 func decodeMaybeGzip(data []byte, limit int, label string) ([]byte, error) {
 	if !bytes.HasPrefix(data, []byte("\x1f\x8b")) {
 		if len(data) > limit {
-			return nil, fmt.Errorf("%s too large", label)
+			return nil, fmt.Errorf("%s: %w", label, errControlTooLarge)
 		}
 		return data, nil
 	}
@@ -104,24 +112,27 @@ func decodeMaybeGzip(data []byte, limit int, label string) ([]byte, error) {
 }
 
 func FetchDynamicConfig(ctx context.Context, dialer N.Dialer, nodeName string, nodeID string, token string, deviceID string, deviceName string) ([]RealConfig, error) {
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(c context.Context, network, addr string) (net.Conn, error) {
-				return dialer.DialContext(c, "tcp", M.ParseSocksaddr(addr))
-			},
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				ServerName:         "g.just4test.xyz",
-			},
-			ForceAttemptHTTP2: true,
-		},
-	}
+	client := newControlClient(dialer)
 	return fetchDynamicConfig(ctx, client, nodeName, nodeID, token, deviceID, deviceName)
 }
 
-func fetchDynamicConfig(ctx context.Context, client *http.Client, nodeName string, nodeID string, token string, deviceID string, deviceName string) ([]RealConfig, error) {
-	cfNodeIP := "104.21.41.69"
-	url := fmt.Sprintf("https://%s/api/v3/proxy/config", cfNodeIP)
+func fetchDynamicConfig(ctx context.Context, client *http.Client, nodeName string, nodeID string, token string, deviceID string, deviceName string) (configs []RealConfig, resultErr error) {
+	ctx, cancel := context.WithTimeout(ctx, controlTotalTimeout)
+	defer cancel()
+	defer func() {
+		if resultErr == nil {
+			resultErr = ctx.Err()
+		}
+		if resultErr != nil {
+			configs = nil
+			resultErr = controlSafe("fetch", resultErr)
+		}
+	}()
+	exact := deviceContext(deviceID, deviceName)
+	url := "https://" + controlLegacyIP + "/api/v3/proxy/config"
+	if exact {
+		url = "https://" + controlCDNHost + "/api/v3/proxy/config"
+	}
 
 	reqMap := map[string]interface{}{
 		"fastest_ping":    map[string]interface{}{},
@@ -147,7 +158,7 @@ func fetchDynamicConfig(ctx context.Context, client *http.Client, nodeName strin
 		return nil, errors.New("missing control HTTP client")
 	}
 
-	resp, err := client.Do(req)
+	resp, err := doControl(ctx, client, req, payloadJson, exact)
 	if err != nil {
 		return nil, fmt.Errorf("api request failed: %w", err)
 	}
@@ -225,6 +236,12 @@ func fetchDynamicConfig(ctx context.Context, client *http.Client, nodeName strin
 		return nil, err
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if exact {
+		return parseSelectedConfigs(ctx, smartPlain)
+	}
 	var smartData struct {
 		Proxies []map[string]interface{} `yaml:"proxies"`
 	}
@@ -305,7 +322,7 @@ func fetchDynamicConfig(ctx context.Context, client *http.Client, nodeName strin
 	}
 
 	if len(realConfigs) == 0 {
-		return nil, fmt.Errorf("no target node matched for name: %s", nodeName)
+		return nil, errors.New("no legacy target node matched")
 	}
 
 	return realConfigs, nil
@@ -400,6 +417,9 @@ func vmessKDF(secret []byte, paths ...string) []byte {
 }
 
 func decryptBlackstonePayload(rawData []byte) ([]byte, error) {
+	if len(rawData) > maxDecodedControlBytes {
+		return nil, errors.New("encrypted payload too large")
+	}
 	if len(rawData) < 1 {
 		return nil, errors.New("data too short")
 	}
