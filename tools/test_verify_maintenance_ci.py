@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 import re
 import subprocess
@@ -14,6 +15,72 @@ SPEC.loader.exec_module(MODULE)
 
 
 class MaintenanceCIContractTest(unittest.TestCase):
+    def workflow_fixture(self, text):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        path = Path(temp.name) / 'workflow.yml'
+        path.write_text(text, encoding='utf-8')
+        return path
+
+    def test_exact_blackstone_push_branch_allowlist(self):
+        text = (ROOT / '.github/workflows/maintenance-core115.yml').read_text(encoding='utf-8')
+        block = re.search(r'    branches:\n(.*?)(?=    tags:)', text, re.S).group(1)
+        self.assertEqual([
+            'maintenance/core115-validated250-stable',
+            'feature/anytls-oix-snell',
+            'upgrade/sing-box-1.15.0-alpha.12',
+            'feature/blackstone-parity-integration-20261016',
+        ], re.findall(r'^      - (.+)$', block, re.M))
+
+    def test_verifier_rejects_wildcard_or_extra_branch(self):
+        text = (ROOT / '.github/workflows/maintenance-core115.yml').read_text(encoding='utf-8')
+        for branch in ('feature/*', 'main', 'refs/pull/*'):
+            with self.subTest(branch=branch):
+                changed = text.replace('    tags:', '      - ' + branch + '\n    tags:', 1)
+                self.assertTrue(MODULE.verify(ROOT, self.workflow_fixture(changed)))
+
+    def test_blackstone_race_gate_runs_before_private_input(self):
+        text = (ROOT / '.github/workflows/maintenance-core115.yml').read_text(encoding='utf-8')
+        match = re.search(r'      - name: Blackstone protocol race gates\n(?P<body>.*?)(?=      - )', text, re.S)
+        self.assertIsNotNone(match, 'missing real Blackstone race gate')
+        block = match['body']
+        self.assertIn('CGO_ENABLED: "1"', block)
+        self.assertIn('CC: gcc', block)
+        self.assertIn('PYTHONDONTWRITEBYTECODE: "1"', block)
+        self.assertIn('command -v gcc', block)
+        self.assertIn('set -euo pipefail', block)
+        self.assertIn('for mode in normal lowmem; do', block)
+        self.assertIn('tags=with_utls', block)
+        self.assertIn('tags="$tags,with_low_memory"', block)
+        self.assertIn('go test -race -json -count=1 -timeout=10m -tags="$tags"', block)
+        for package in ('github.com/sagernet/sing-box/protocol/xhttp',
+                        'github.com/sagernet/sing-box/protocol/vless',
+                        'github.com/sagernet/sing-vmess/vless'):
+            self.assertIn(package, block)
+        self.assertIn('python tools/verify_maintenance_ci.py --race-log', block)
+        self.assertNotIn('|| true', block)
+        self.assertNotIn('continue-on-error', block)
+        self.assertLess(match.start(), text.index('      - name: Prepare private Oix'))
+
+    def test_race_log_requires_real_named_tests_and_package_passes(self):
+        required = {
+            'github.com/sagernet/sing-box/protocol/xhttp': 'TestWireTCPAndUOTRealLoopback',
+            'github.com/sagernet/sing-box/protocol/vless': 'TestBlackstoneProductionLoopbackTCPUDP',
+            'github.com/sagernet/sing-vmess/vless': 'TestBlackstoneCurrentHAtFirstWriteAndGenerationIsolation',
+        }
+        events = [dict(Action='pass', Package=p, Test=t) for p, t in required.items()]
+        events += [dict(Action='pass', Package=p) for p in required]
+        def check(items):
+            path = self.workflow_fixture('\n'.join(json.dumps(e) for e in items))
+            return subprocess.run([sys.executable, str(ROOT / 'tools/verify_maintenance_ci.py'),
+                                   '--race-log', str(path)], capture_output=True, text=True)
+        accepted = check(events)
+        self.assertEqual(0, accepted.returncode, accepted.stderr)
+        for items in ([], events[1:], events[:-1], events + [dict(Action='fail', Package=next(iter(required)))],
+                      [dict(e, Action='skip') if e.get('Test') else e for e in events]):
+            with self.subTest(items=items):
+                self.assertNotEqual(0, check(items).returncode)
+
     def test_workflow_contract(self):
         workflow = ROOT / ".github" / "workflows" / "maintenance-core115.yml"
         self.assertEqual([], MODULE.verify(ROOT, workflow))

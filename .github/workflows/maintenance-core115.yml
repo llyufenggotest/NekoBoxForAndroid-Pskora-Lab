@@ -7,6 +7,7 @@ on:
       - maintenance/core115-validated250-stable
       - feature/anytls-oix-snell
       - upgrade/sing-box-1.15.0-alpha.12
+      - feature/blackstone-parity-integration-20261016
     tags:
       - core115-validated250-maintenance-candidate-*
 
@@ -40,6 +41,34 @@ jobs:
           set -euo pipefail
           test ! -e core115-source/sing-box/component/oixdnsauth/private_seed_generated.go
           python buildScript/lib/core/verify_runtime_clean.py
+      - name: Blackstone protocol race gates
+        shell: bash
+        env:
+          CGO_ENABLED: "1"
+          CC: gcc
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          command -v gcc
+          gcc --version
+          python tools/test_verify_maintenance_ci.py
+          for mode in normal lowmem; do
+            tags=with_utls
+            if test "$mode" = lowmem; then tags="$tags,with_low_memory"; fi
+            (cd core115-source/libcore && go test -race -json -count=1 -timeout=10m -tags="$tags" \
+              github.com/sagernet/sing-box/protocol/xhttp \
+              github.com/sagernet/sing-box/protocol/vless \
+              github.com/sagernet/sing-vmess/vless) | tee "$RUNNER_TEMP/blackstone-race-$mode.jsonl"
+            python tools/verify_maintenance_ci.py --race-log "$RUNNER_TEMP/blackstone-race-$mode.jsonl"
+          done
+      - name: Upload Blackstone race diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: blackstone-race-diagnostics
+          path: ${{ runner.temp }}/blackstone-race-*.jsonl
+          if-no-files-found: warn
+          retention-days: 7
       - name: Prepare private Oix DNS-Auth build input
         id: oix-input
         shell: bash

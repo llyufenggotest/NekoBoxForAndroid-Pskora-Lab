@@ -1,8 +1,17 @@
 from __future__ import annotations
 
+import argparse
+import json
 import re
 import sys
 from pathlib import Path
+
+PUSH_BRANCHES = (
+    'maintenance/core115-validated250-stable',
+    'feature/anytls-oix-snell',
+    'upgrade/sing-box-1.15.0-alpha.12',
+    'feature/blackstone-parity-integration-20261016',
+)
 
 REQUIRED = (
     "maintenance/core115-validated250-stable",
@@ -39,6 +48,9 @@ def verify(root: Path, workflow: Path) -> list[str]:
     if not workflow.is_file():
         return [f"missing workflow: {workflow}"]
     text = workflow.read_text(encoding="utf-8")
+    branches = re.search(r'^  push:\n    branches:\n(?P<branches>(?:      - [^\n]+\n)+)    tags:', text, re.M)
+    if branches is None or tuple(re.findall(r'^      - (.+)$', branches['branches'], re.M)) != PUSH_BRANCHES:
+        errors.append('push branches must match the exact maintenance/Blackstone allowlist')
     for token in REQUIRED:
         if token not in text:
             errors.append(f"missing workflow contract token: {token}")
@@ -54,10 +66,37 @@ def verify(root: Path, workflow: Path) -> list[str]:
     return errors
 
 
+RACE_TESTS = {
+    'github.com/sagernet/sing-box/protocol/xhttp': 'TestWireTCPAndUOTRealLoopback',
+    'github.com/sagernet/sing-box/protocol/vless': 'TestBlackstoneProductionLoopbackTCPUDP',
+    'github.com/sagernet/sing-vmess/vless': 'TestBlackstoneCurrentHAtFirstWriteAndGenerationIsolation',
+}
+
+
+def verify_race_log(path: Path) -> list[str]:
+    # Supplement go test's exit code: package success with zero selected tests
+    # is not protocol coverage. Logs are emitted by the real -race invocation.
+    events = [json.loads(line) for line in path.read_text(encoding='utf-8').splitlines() if line.strip()]
+    errors = []
+    if any(event.get('Action') == 'fail' for event in events):
+        errors.append('race log contains a failed test/package')
+    for package, test in RACE_TESTS.items():
+        if not any(e.get('Package') == package and e.get('Action') == 'pass' and 'Test' not in e for e in events):
+            errors.append('missing race package pass: ' + package)
+        if not any(e.get('Package') == package and e.get('Action') == 'pass' and e.get('Test') == test for e in events):
+            errors.append('missing race protocol test pass: ' + test)
+    return errors
+
+
 if __name__ == "__main__":
-    base = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
-    failures = verify(base, base / ".github" / "workflows" / "maintenance-core115.yml")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('root', nargs='?', type=Path, default=Path.cwd())
+    parser.add_argument('--race-log', type=Path)
+    args = parser.parse_args()
+    base = args.root.resolve()
+    failures = (verify_race_log(args.race_log) if args.race_log
+                else verify(base, base / '.github/workflows/maintenance-core115.yml'))
     if failures:
         print("\n".join(failures), file=sys.stderr)
         raise SystemExit(1)
-    print("maintenance CI contract: PASS")
+    print('Blackstone race coverage: PASS' if args.race_log else 'maintenance CI contract: PASS')

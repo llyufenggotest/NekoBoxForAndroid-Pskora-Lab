@@ -204,5 +204,91 @@ class ProvenanceTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'arm64 ELF'):
             p.verify_build(so[:18] + b'\x03\x00' + so[20:], self.baseline)
 
+class DirectChildIntegrityTest(unittest.TestCase):
+    setUp = ProvenanceTest.setUp
+    tearDown = ProvenanceTest.tearDown
+
+    # Use actual Git commits and snapshot verification, not mocked git output.
+    def fixture(self, extra=None, reuse_snapshot=False):
+        root = Path(self.temp.name) / 'source'
+        root.mkdir()
+        def git(*args):
+            return p.git(root, *args)
+        git('init', '-q')
+        git('config', 'user.name', 'Provenance fixture')
+        git('config', 'user.email', 'fixture@example.invalid')
+        git('config', 'core.autocrlf', 'false')
+        for name in ('core115-source/example.go', 'app/example.kt',
+                     '.github/workflows/example.yml', 'extra.txt'):
+            target = root / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b'original\n')
+        git('add', '.')
+        git('commit', '-qm', 'synthetic initial source')
+        core = root / 'buildScript/lib/core'
+        snapshot = core / 'core115-source.snapshot.tar'
+        manifest = core / 'core115-source.manifest.json'
+        baseline_path = core / 'native-baseline.json'
+        if reuse_snapshot:
+            p.write_snapshot(root, git('rev-parse', 'HEAD'), snapshot, manifest)
+            baseline_path.write_text('{}\n', encoding='utf-8')
+            git('add', '.')
+            git('commit', '-qm', 'synthetic source with unchanged snapshot')
+        source = git('rev-parse', 'HEAD')
+        files = p.write_snapshot(root, source, snapshot, manifest)
+        baseline = dict(self.baseline, built_source_head=source,
+                        built_source_tree=git('rev-parse', source + '^{tree}'),
+                        source_manifest_path=manifest.relative_to(root).as_posix(),
+                        source_snapshot_path=snapshot.relative_to(root).as_posix(),
+                        source_manifest_sha256=p.sha(manifest.read_bytes()),
+                        source_snapshot_sha256=p.sha(snapshot.read_bytes()),
+                        source_file_count=len(files))
+        baseline_path.write_text(json.dumps(baseline), encoding='utf-8')
+        if extra:
+            (root / extra).write_bytes(b'changed in attestation child\n')
+        git('add', '.')
+        git('commit', '-qm', 'synthetic direct-child attestation')
+        self.assertEqual(source, git('rev-parse', 'HEAD^'))
+        return root, baseline
+
+    def reject_extra(self, path):
+        root, baseline = self.fixture(path)
+        # Both entry paths must enforce the child boundary, including the mode
+        # that skips expensive snapshot content verification.
+        for source_content in (True, False):
+            with self.subTest(path=path, source_content=source_content):
+                with self.assertRaisesRegex(ValueError, 'attestation paths|core subtree'):
+                    p.verify_provenance(baseline, root, verify_source_content=source_content)
+
+    def test_child_core_change_rejected(self):
+        self.reject_extra('core115-source/example.go')
+
+    def test_child_app_change_rejected(self):
+        self.reject_extra('app/example.kt')
+
+    def test_child_workflow_change_rejected(self):
+        self.reject_extra('.github/workflows/example.yml')
+
+    def test_child_extra_file_change_rejected(self):
+        self.reject_extra('extra.txt')
+
+    def test_child_three_attestation_paths_pass(self):
+        root, baseline = self.fixture()
+        self.assertEqual({
+            'buildScript/lib/core/native-baseline.json',
+            'buildScript/lib/core/core115-source.snapshot.tar',
+            'buildScript/lib/core/core115-source.manifest.json',
+        }, set(p.git(root, 'diff', '--name-only', 'HEAD^', 'HEAD').splitlines()))
+        p.verify_source_attestation(baseline, root)
+        p.verify_provenance(baseline, root, verify_source_content=False)
+
+    def test_child_baseline_only_with_identical_snapshot_passes(self):
+        root, baseline = self.fixture(reuse_snapshot=True)
+        self.assertEqual(['buildScript/lib/core/native-baseline.json'],
+                         p.git(root, 'diff', '--name-only', 'HEAD^', 'HEAD').splitlines())
+        p.verify_source_attestation(baseline, root)
+        p.verify_provenance(baseline, root, verify_source_content=False)
+
+
 if __name__ == '__main__':
     unittest.main()

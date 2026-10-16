@@ -149,6 +149,32 @@ def verify_snapshot(baseline, root, expected_manifest=None):
     return manifest
 
 
+ATTESTATION_PATHS = frozenset({
+    'buildScript/lib/core/native-baseline.json',
+    'buildScript/lib/core/core115-source.snapshot.tar',
+    'buildScript/lib/core/core115-source.manifest.json',
+})
+
+
+def verify_attestation_child(root, source_head):
+    attestation_head = git(root, 'rev-parse', 'HEAD')
+    if git(root, 'rev-parse', 'HEAD^') != source_head:
+        raise ValueError('Current attestation HEAD must be the direct child of built source HEAD')
+    if git(root, 'rev-list', '--count', source_head + '..' + attestation_head) != '1':
+        raise ValueError('Current attestation HEAD chain mismatch')
+    # Compare tree objects as well as paths: the child must never change native
+    # source, modes or gitlinks, even when snapshot hashes still describe parent.
+    if git(root, 'rev-parse', attestation_head + ':core115-source') != git(root, 'rev-parse', source_head + ':core115-source'):
+        raise ValueError('Current attestation HEAD core subtree differs from built source HEAD')
+    # Fixed paths, not paths supplied by an untrusted baseline. NUL delimiters
+    # and disabled rename detection keep unusual names and rename sources visible.
+    changed = set(filter(None, git(root, 'diff', '--no-renames', '--name-only', '-z', source_head, attestation_head, '--').split('\0')))
+    # Identical core snapshots need not be rewritten (historical baseline-only
+    # attestations are valid); every changed path must still belong to this set.
+    if not changed or changed - ATTESTATION_PATHS:
+        raise ValueError('Current attestation HEAD changes unexpected attestation paths')
+
+
 def verify_source_attestation(baseline, root, verify_attestation_head=True):
     root = Path(root)
     if baseline.get('schema') != 3:
@@ -158,11 +184,8 @@ def verify_source_attestation(baseline, root, verify_attestation_head=True):
     require_digest(source_head, 'built source HEAD', 40)
     require_digest(source_tree, 'built source tree', 40)
     if verify_attestation_head:
-        attestation_head = git(root, 'rev-parse', 'HEAD')
-        if git(root, 'rev-parse', 'HEAD^') != source_head:
-            raise ValueError('Current attestation HEAD must be the direct child of built source HEAD')
-        if git(root, 'rev-list', '--count', source_head + '..' + attestation_head) != '1':
-            raise ValueError('Current attestation HEAD chain mismatch')
+        verify_attestation_child(root, source_head)
+
     try:
         actual_source_tree = git(root, 'rev-parse', source_head + '^{tree}')
     except subprocess.CalledProcessError as error:
@@ -187,11 +210,7 @@ def verify_provenance(baseline, root, verify_source_content=True, verify_attesta
         require_digest(source_head, 'built source HEAD', 40)
         require_digest(source_tree, 'built source tree', 40)
         if verify_attestation_head:
-            attestation_head = git(root, 'rev-parse', 'HEAD')
-            if git(root, 'rev-parse', 'HEAD^') != source_head:
-                raise ValueError('Current attestation HEAD must be the direct child of built source HEAD')
-            if git(root, 'rev-list', '--count', source_head + '..' + attestation_head) != '1':
-                raise ValueError('Current attestation HEAD chain mismatch')
+            verify_attestation_child(root, source_head)
         try:
             actual_source_tree = git(root, 'rev-parse', source_head + '^{tree}')
         except subprocess.CalledProcessError as error:
