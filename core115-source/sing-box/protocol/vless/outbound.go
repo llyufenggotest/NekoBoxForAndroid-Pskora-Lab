@@ -65,6 +65,9 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		if options.TunNet != nil {
 			return nil, E.New("Blackstone: TunNet cannot be combined")
 		}
+		if strings.HasPrefix(options.Flow, "xtls-rprx-vision") && options.TLS == nil && (options.Encryption == "" || options.Encryption == "none") {
+			return nil, E.New("Blackstone: Vision requires TLS/Reality or encryption")
+		}
 	}
 	pure, pureErr := configurePure(&options)
 	if pureErr != nil {

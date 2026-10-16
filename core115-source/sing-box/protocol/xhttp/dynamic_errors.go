@@ -54,7 +54,7 @@ func (c *dynamicConn) NeedHandshake() bool         { return N.NeedHandshakeForWr
 func (c *dynamicConn) NeedHandshakeForRead() bool  { return N.NeedHandshakeForRead(c.ExtendedConn) }
 func (c *dynamicConn) NeedHandshakeForWrite() bool { return N.NeedHandshakeForWrite(c.ExtendedConn) }
 
-type dynamicPacketConn struct{ N.NetPacketConn }
+type dynamicPacketConn struct{ net.PacketConn }
 
 func wrapDynamicPacket(c net.PacketConn) net.PacketConn {
 	if c == nil {
@@ -63,42 +63,48 @@ func wrapDynamicPacket(c net.PacketConn) net.PacketConn {
 	if _, ok := c.(*dynamicPacketConn); ok {
 		return c
 	}
-	return &dynamicPacketConn{bufio.NewPacketConn(c)}
+	return &dynamicPacketConn{c}
 }
 func (c *dynamicPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
-	n, a, err := c.NetPacketConn.ReadFrom(p)
+	n, a, err := c.PacketConn.ReadFrom(p)
 	return n, a, dynamicSafe("packet-read", err)
 }
 func (c *dynamicPacketConn) WriteTo(p []byte, a net.Addr) (int, error) {
-	n, err := c.NetPacketConn.WriteTo(p, a)
+	n, err := c.PacketConn.WriteTo(p, a)
 	return n, dynamicSafe("packet-write", err)
 }
 func (c *dynamicPacketConn) ReadPacket(b *buf.Buffer) (M.Socksaddr, error) {
-	a, err := c.NetPacketConn.ReadPacket(b)
-	return a, dynamicSafe("packet-read", err)
+	n, a, err := c.PacketConn.ReadFrom(b.FreeBytes())
+	if err != nil {
+		return M.Socksaddr{}, dynamicSafe("packet-read", err)
+	}
+	b.Truncate(n)
+	return M.SocksaddrFromNet(a).Unwrap(), nil
 }
 func (c *dynamicPacketConn) WritePacket(b *buf.Buffer, a M.Socksaddr) error {
-	return dynamicSafe("packet-write", c.NetPacketConn.WritePacket(b, a))
+	defer b.Release()
+	_, err := c.PacketConn.WriteTo(b.Bytes(), a)
+	return dynamicSafe("packet-write", err)
 }
 func (c *dynamicPacketConn) Close() error {
-	return dynamicSafe("packet-close", c.NetPacketConn.Close())
+	return dynamicSafe("packet-close", c.PacketConn.Close())
 }
 func (c *dynamicPacketConn) SetDeadline(t time.Time) error {
-	return dynamicSafe("deadline", c.NetPacketConn.SetDeadline(t))
+	return dynamicSafe("deadline", c.PacketConn.SetDeadline(t))
 }
 func (c *dynamicPacketConn) SetReadDeadline(t time.Time) error {
-	return dynamicSafe("deadline", c.NetPacketConn.SetReadDeadline(t))
+	return dynamicSafe("deadline", c.PacketConn.SetReadDeadline(t))
 }
 func (c *dynamicPacketConn) SetWriteDeadline(t time.Time) error {
-	return dynamicSafe("deadline", c.NetPacketConn.SetWriteDeadline(t))
+	return dynamicSafe("deadline", c.PacketConn.SetWriteDeadline(t))
 }
-func (c *dynamicPacketConn) Upstream() any           { return c.NetPacketConn }
+func (c *dynamicPacketConn) Upstream() any           { return c.PacketConn }
 func (c *dynamicPacketConn) ReaderReplaceable() bool { return false }
 func (c *dynamicPacketConn) WriterReplaceable() bool { return false }
-func (c *dynamicPacketConn) NeedHandshake() bool     { return N.NeedHandshakeForWriteAny(c.NetPacketConn) }
+func (c *dynamicPacketConn) NeedHandshake() bool     { return N.NeedHandshakeForWriteAny(c.PacketConn) }
 func (c *dynamicPacketConn) NeedHandshakeForRead() bool {
-	return N.NeedHandshakeForReadAny(c.NetPacketConn)
+	return N.NeedHandshakeForReadAny(c.PacketConn)
 }
 func (c *dynamicPacketConn) NeedHandshakeForWrite() bool {
-	return N.NeedHandshakeForWriteAny(c.NetPacketConn)
+	return N.NeedHandshakeForWriteAny(c.PacketConn)
 }

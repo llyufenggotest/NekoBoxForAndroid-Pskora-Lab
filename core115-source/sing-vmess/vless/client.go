@@ -166,6 +166,8 @@ type Conn struct {
 	requestWritten bool
 	responseRead   bool
 	blackstone     *blackstoneState
+	blackstoneMu   sync.Mutex
+	blackstoneErr  error
 }
 
 func NewConn(conn net.Conn, uuid [16]byte, command byte, destination M.Socksaddr, flow string, isX365 bool, isJuzi bool) *Conn {
@@ -205,12 +207,35 @@ func (c *Conn) ReadBuffer(buffer *buf.Buffer) error {
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {
-	if !c.requestWritten {
-		if c.blackstone != nil {
-			err = c.blackstone.writeRequest(c.ExtendedConn, c.request, b)
-		} else {
-			err = WriteRequest(c.ExtendedConn, c.request, b)
+	if c.blackstone != nil {
+		c.blackstoneMu.Lock()
+		defer c.blackstoneMu.Unlock()
+		if c.blackstoneErr != nil {
+			return 0, c.blackstoneErr
 		}
+		if !c.requestWritten {
+			c.requestWritten = true
+			err = c.blackstone.writeRequest(c.ExtendedConn, c.request, b)
+			if err != nil {
+				c.blackstoneErr = err
+				_ = c.ExtendedConn.Close()
+				return 0, err
+			}
+			return len(b), nil
+		}
+		n, err = c.ExtendedConn.Write(b)
+		if err == nil && n != len(b) {
+			err = io.ErrShortWrite
+		}
+		if err != nil {
+			c.blackstoneErr = err
+			_ = c.ExtendedConn.Close()
+			return 0, err
+		}
+		return n, nil
+	}
+	if !c.requestWritten {
+		err = WriteRequest(c.ExtendedConn, c.request, b)
 		if err == nil {
 			n = len(b)
 		}
@@ -280,6 +305,7 @@ type PacketConn struct {
 	requestWritten bool
 	responseRead   bool
 	blackstone     *blackstoneState
+	blackstoneErr  error
 }
 
 func (c *PacketConn) Read(b []byte) (n int, err error) {
@@ -296,6 +322,11 @@ func (c *PacketConn) Read(b []byte) (n int, err error) {
 		return
 	}
 	if len(b) < int(length) {
+		if c.blackstone != nil {
+			if _, drainErr := io.CopyN(io.Discard, c.Conn, int64(length)); drainErr != nil {
+				return 0, drainErr
+			}
+		}
 		return 0, io.ErrShortBuffer
 	}
 	return io.ReadFull(c.Conn, b[:length])

@@ -119,6 +119,14 @@ func (s *blackstoneState) writeRequest(w io.Writer, request Request, payload []b
 func (c *PacketConn) writeBlackstonePacket(payload []byte) (int, error) {
 	c.access.Lock()
 	defer c.access.Unlock()
+	if c.blackstoneErr != nil {
+		return 0, c.blackstoneErr
+	}
+	fail := func(err error) (int, error) {
+		c.blackstoneErr = err
+		_ = c.Conn.Close()
+		return 0, err
+	}
 	if len(payload) > 65535 {
 		return 0, fmt.Errorf("Blackstone: packet exceeds wire limit")
 	}
@@ -130,7 +138,7 @@ func (c *PacketConn) writeBlackstonePacket(payload []byte) (int, error) {
 		c.requestWritten = true // never replay a possibly partially emitted private header
 		err := c.blackstone.writeRequest(c.Conn, Request{UUID: c.key, Command: 2, Destination: c.destination, Flow: c.flow}, frame)
 		if err != nil {
-			return 0, err
+			return fail(err)
 		}
 		return len(payload), nil
 	}
@@ -139,7 +147,7 @@ func (c *PacketConn) writeBlackstonePacket(payload []byte) (int, error) {
 		err = io.ErrShortWrite
 	}
 	if err != nil {
-		return 0, err
+		return fail(err)
 	}
 	return len(payload), nil
 }

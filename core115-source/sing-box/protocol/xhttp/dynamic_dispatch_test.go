@@ -68,6 +68,17 @@ func TestDynamicProductionAES256Stream(t *testing.T) {
 	require.True(t, bytes.Equal(expected, <-done), "production dispatch ignored selected AES-256 cipher")
 }
 
+func TestDynamicPacketWrapperPreservesDomainOnWritePacket(t *testing.T) {
+	client, err := NewWireClient(WireConfig{Password: "synthetic:0102"})
+	require.NoError(t, err)
+	raw := &memoryPacket{}
+	packetConn := wrapDynamicPacket(client.PacketConn(raw, M.ParseSocksaddr("127.0.0.1:443")))
+	buffer := buf.NewSize(32)
+	buffer.Write([]byte("P"))
+	require.NoError(t, packetConn.(N.PacketConn).WritePacket(buffer, M.ParseSocksaddr("route.example:53")))
+	require.Len(t, raw.writes, 1)
+}
+
 func TestDynamicBufferedPathsPreserveContractsAndRedaction(t *testing.T) {
 	raw := &dynamicErrorConn{}
 	cfg := dynamicVLESSFixture()

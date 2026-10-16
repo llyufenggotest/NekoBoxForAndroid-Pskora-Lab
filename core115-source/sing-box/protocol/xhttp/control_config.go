@@ -186,6 +186,11 @@ func parseSelectedConfig(p map[string]any, terminal bool) (RealConfig, error) {
 
 func parseSelectedVLESS(p map[string]any, server, port string) (RealConfig, error) {
 	fail := func() (RealConfig, error) { return RealConfig{}, errors.New("invalid selected vless fields") }
+	for _, field := range []string{"tls", "flow", "reality-opts", "servername", "skip-cert-verify", "xhttp-opts"} {
+		if value, present := p[field]; present && value == nil {
+			return fail()
+		}
+	}
 	id, ok := p["uuid"].(string)
 	for _, field := range []string{"network", "flow"} {
 		if value, present := p[field]; present {
