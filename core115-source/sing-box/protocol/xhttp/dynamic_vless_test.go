@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strings"
 	"testing"
 	"time"
 
@@ -54,7 +53,7 @@ func TestDynamicTypedVLESSMapping(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, dynamicUUID+"#blackstone", o.UUID)
 	require.NotNil(t, o.PacketEncoding)
-	require.Empty(t, *o.PacketEncoding)
+	require.Equal(t, "xudp", *o.PacketEncoding)
 	require.True(t, o.E)
 	require.Equal(t, "03aabbcc", o.H)
 	for _, network := range []string{"", "tcp", "http", "h2", "ws", "grpc", "xhttp"} {
@@ -101,7 +100,7 @@ func TestDynamicTypedVLESSMapping(t *testing.T) {
 
 func TestDynamicUnsupportedFieldsFailClosed(t *testing.T) {
 	for name, change := range map[string]func(*BlackstoneVLESSOptions){
-		"flow": func(v *BlackstoneVLESSOptions) { v.Flow = "xtls-rprx-vision-extra" }, "network": func(v *BlackstoneVLESSOptions) { v.Network = "unknown" }, "selector": func(v *BlackstoneVLESSOptions) { v.UUID += "#blackstone" }, "packet": func(v *BlackstoneVLESSOptions) { v.XUDP = true }, "fingerprint": func(v *BlackstoneVLESSOptions) { v.Fingerprint = "sha256" }, "inactive-ws": func(v *BlackstoneVLESSOptions) { v.WSOpts.Path = "/lost" }, "grpc-user-agent": func(v *BlackstoneVLESSOptions) { v.Network = "grpc"; v.GrpcOpts.GrpcUserAgent = "lost" }, "encryption": func(v *BlackstoneVLESSOptions) { v.Encryption = "1rtt" }, "restls": func(v *BlackstoneVLESSOptions) { v.RestlsOpts.Password = "secret" }, "tls-disabled": func(v *BlackstoneVLESSOptions) { v.ServerName = "lost" },
+		"flow": func(v *BlackstoneVLESSOptions) { v.Flow = "xtls-rprx-vision-extra" }, "network": func(v *BlackstoneVLESSOptions) { v.Network = "unknown" }, "selector": func(v *BlackstoneVLESSOptions) { v.UUID += "#blackstone" }, "packet": func(v *BlackstoneVLESSOptions) { v.PacketAddr = true; v.XUDP = true }, "fingerprint": func(v *BlackstoneVLESSOptions) { v.Fingerprint = "sha256" }, "inactive-ws": func(v *BlackstoneVLESSOptions) { v.WSOpts.Path = "/lost" }, "grpc-user-agent": func(v *BlackstoneVLESSOptions) { v.Network = "grpc"; v.GrpcOpts.GrpcUserAgent = "lost" }, "encryption": func(v *BlackstoneVLESSOptions) { v.Encryption = "1rtt" }, "restls": func(v *BlackstoneVLESSOptions) { v.RestlsOpts.Password = "secret" }, "tls-disabled": func(v *BlackstoneVLESSOptions) { v.ServerName = "lost" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			cfg := dynamicVLESSFixture()
@@ -123,9 +122,8 @@ func TestDynamicProductionVLESSLoopback(t *testing.T) {
 			expected := "0000112233445566778899aabbccddeeff000101bb020b6578616d706c652e636f6d6e8311168ee16d6aa1aa48c64145003c03aabbcc50"
 			response := []byte{0, 0, 2, 0xaa, 0xbb, 'R'}
 			if udp {
-				expected = strings.Replace(expected, "000101bb", "000201bb", 1)
-				expected = strings.TrimSuffix(expected, "50") + "000150"
-				response = []byte{0, 0, 2, 0xaa, 0xbb, 0, 1, 'R'}
+				expected = "0000112233445566778899aabbccddeeff00036e8311168ee16d6aa1aa48c64145003c03aabbcc0014000001010201bb020b6578616d706c652e636f6d000150"
+				response = []byte{0, 0, 2, 0xaa, 0xbb, 0, 4, 0, 0, 2, 1, 0, 1, 'R'}
 			}
 			want, _ := hex.DecodeString(expected)
 			done := make(chan []byte, 1)
@@ -162,11 +160,11 @@ func TestDynamicProductionVLESSLoopback(t *testing.T) {
 				pc.SetDeadline(time.Now().Add(2 * time.Second))
 				_, e = pc.WriteTo([]byte("P"), dst)
 				require.NoError(t, e)
-				p := make([]byte, 1)
+				p := make([]byte, 128)
 				n, _, e := pc.ReadFrom(p)
 				require.NoError(t, e)
 				require.Equal(t, 1, n)
-				require.Equal(t, "R", string(p))
+				require.Equal(t, "R", string(p[:n]))
 			} else {
 				conn, e := h.DialContext(context.Background(), "tcp", dst)
 				require.NoError(t, e)

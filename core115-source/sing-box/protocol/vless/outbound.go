@@ -343,12 +343,25 @@ func (h *vlessDialer) DialContext(ctx context.Context, network string, destinati
 	case N.NetworkUDP:
 		h.logger.InfoContext(ctx, "outbound packet connection to ", destination)
 		if h.xudp {
+			if h.client.BlackstoneVisionNativeUDP() {
+				return h.client.DialEarlyXUDPPacketConnWithOptions(conn, visionBaseConn, destination, visionCanSplice)
+			}
 			return h.client.DialEarlyXUDPPacketConn(conn, destination)
 		} else if h.packetAddr {
 			if destination.IsDomain() {
 				return nil, E.New("packetaddr: domain destination is not supported")
 			}
-			packetConn, err := h.client.DialEarlyPacketConn(conn, M.Socksaddr{Fqdn: packetaddr.SeqPacketMagicAddress})
+			var packetConn *vless.PacketConn
+			var err error
+			if h.client.BlackstoneVisionNativeUDP() {
+				packetConn, err = h.client.DialEarlyBlackstoneVisionPacketConnWithOptions(conn, visionBaseConn, M.Socksaddr{Fqdn: packetaddr.SeqPacketMagicAddress, Port: 443}, visionCanSplice)
+			} else {
+				packetDestination := M.Socksaddr{Fqdn: packetaddr.SeqPacketMagicAddress}
+				if h.client.IsBlackstone() {
+					packetDestination.Port = 443
+				}
+				packetConn, err = h.client.DialEarlyPacketConn(conn, packetDestination)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -372,7 +385,7 @@ func (h *vlessDialer) ListenPacket(ctx context.Context, destination M.Socksaddr)
 	if h.pure {
 		return nil, E.New("Pure: UDP/XUDP unsupported")
 	}
-	if !h.xudp && !h.packetAddr && h.client.BlackstoneVisionNativeUDP() {
+	if h.client.BlackstoneVisionNativeUDP() {
 		// Reuse the stream's real TLS/Reality/encryption base discovery. Do not
 		// wrap an already-framed PacketConn or run the private handshake twice.
 		conn, err := h.DialContext(ctx, N.NetworkUDP, destination)
@@ -412,7 +425,11 @@ func (h *vlessDialer) ListenPacket(ctx context.Context, destination M.Socksaddr)
 		if destination.IsDomain() {
 			return nil, E.New("packetaddr: domain destination is not supported")
 		}
-		conn, err := h.client.DialEarlyPacketConn(conn, M.Socksaddr{Fqdn: packetaddr.SeqPacketMagicAddress})
+		packetDestination := M.Socksaddr{Fqdn: packetaddr.SeqPacketMagicAddress}
+		if h.client.IsBlackstone() {
+			packetDestination.Port = 443
+		}
+		conn, err := h.client.DialEarlyPacketConn(conn, packetDestination)
 		if err != nil {
 			return nil, err
 		}

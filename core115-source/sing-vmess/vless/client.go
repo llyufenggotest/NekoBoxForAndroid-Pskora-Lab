@@ -150,6 +150,9 @@ func (c *Client) DialEarlyXUDPPacketConn(conn net.Conn, destination M.Socksaddr)
 	if c.isPure {
 		return nil, E.New("Pure: UDP/XUDP unsupported")
 	}
+	if c.blackstone != nil {
+		return c.DialEarlyXUDPPacketConnWithOptions(conn, conn, destination, true)
+	}
 	remoteConn := c.newConn(conn, vmess.CommandMux, destination)
 	protocolConn, err := c.prepareConn(remoteConn, conn)
 	if err != nil {
@@ -246,7 +249,7 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 }
 
 func (c *Conn) WriteBuffer(buffer *buf.Buffer) error {
-	if c.blackstone != nil && !c.requestWritten {
+	if c.blackstone != nil {
 		defer buffer.Release()
 		_, err := c.Write(buffer.Bytes())
 		return err

@@ -28,7 +28,25 @@ func dynamicVLESSOptions(cfg RealConfig) (option.VLESSOutboundOptions, error) {
 	if v.Server != cfg.Server || v.Port <= 0 || cfg.Port != fmtPort(v.Port) {
 		return fail()
 	}
-	if v.PacketAddr || v.XUDP || (v.PacketEncoding != "" && v.PacketEncoding != "none") {
+	// Match FlClash NewVless: empty/none default to XUDP, even when the
+	// legacy xudp boolean is false. Explicit packetaddr/packet selects UDP
+	// address framing. Reject contradictory flags rather than lose intent.
+	encoding := "xudp"
+	switch v.PacketEncoding {
+	case "", "none":
+		if v.PacketAddr {
+			encoding = "packetaddr"
+		}
+	case "xudp":
+		if v.PacketAddr {
+			return fail()
+		}
+	case "packetaddr", "packet":
+		encoding = "packetaddr"
+	default:
+		return fail()
+	}
+	if v.XUDP && encoding == "packetaddr" {
 		return fail()
 	}
 	if v.Encryption != "" && v.Encryption != "none" {
@@ -40,12 +58,11 @@ func dynamicVLESSOptions(cfg RealConfig) (option.VLESSOutboundOptions, error) {
 	if !v.TLS && (v.Flow != "" || len(v.ALPN) > 0 || v.SkipCertVerify || v.ServerName != "" || v.Certificate != "" || v.PrivateKey != "" || v.ClientFingerprint != "" || !reflect.ValueOf(v.ECHOpts).IsZero() || !reflect.ValueOf(v.RealityOpts).IsZero()) {
 		return fail()
 	}
-	empty := ""
 	out.UUID = v.UUID + "#blackstone"
 	out.E = v.E
 	out.H = v.H
 	out.Flow = v.Flow
-	out.PacketEncoding = &empty
+	out.PacketEncoding = &encoding
 	if v.TLS {
 		tls := &option.OutboundTLSOptions{Enabled: true, ServerName: v.ServerName, Insecure: v.SkipCertVerify, ALPN: v.ALPN}
 		if v.PrivateKey != "" {
@@ -90,6 +107,8 @@ func dynamicVLESSOptions(cfg RealConfig) (option.VLESSOutboundOptions, error) {
 	active.ALPN = nil
 	active.UDP = false
 	active.PacketEncoding = ""
+	active.PacketAddr = false
+	active.XUDP = false
 	active.Encryption = ""
 	active.Network = ""
 	active.ECHOpts = BlackstoneECHOptions{}

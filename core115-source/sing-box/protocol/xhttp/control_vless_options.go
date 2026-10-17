@@ -1,5 +1,28 @@
 package xhttp
 
+import (
+	"encoding/json"
+	"errors"
+)
+
+// BlackstonePacketEncoding rejects null/coercion and retains the donor selector.
+// The empty value is donor-default XUDP, not sing's explicit native encoding.
+type BlackstonePacketEncoding string
+
+func (p *BlackstonePacketEncoding) UnmarshalJSON(raw []byte) error {
+	var value string
+	if string(raw) == "null" || json.Unmarshal(raw, &value) != nil {
+		return errors.New("invalid packet encoding")
+	}
+	switch value {
+	case "", "none", "xudp", "packet", "packetaddr":
+		*p = BlackstonePacketEncoding(value)
+		return nil
+	default:
+		return errors.New("unsupported packet encoding")
+	}
+}
+
 // Typed donor schema. No adapter import: parent maps this losslessly to its private constructor.
 type BlackstoneVLESSOptions struct {
 	Name   string `json:"name"`
@@ -15,7 +38,7 @@ type BlackstoneVLESSOptions struct {
 	UDP               bool                       `json:"udp,omitempty"`
 	PacketAddr        bool                       `json:"packet-addr,omitempty"`
 	XUDP              bool                       `json:"xudp,omitempty"`
-	PacketEncoding    string                     `json:"packet-encoding,omitempty"`
+	PacketEncoding    BlackstonePacketEncoding   `json:"packet-encoding,omitempty"`
 	Encryption        string                     `json:"encryption,omitempty"`
 	Network           string                     `json:"network,omitempty"`
 	ECHOpts           BlackstoneECHOptions       `json:"ech-opts,omitempty"`
