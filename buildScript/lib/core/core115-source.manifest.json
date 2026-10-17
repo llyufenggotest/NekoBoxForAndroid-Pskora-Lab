@@ -1555,7 +1555,7 @@
   "core115-source/sing-box/protocol/xhttp/control_config_test.go": "686cb51662e0a53813d70b1d07114d89f8866c15651cd2582034cfa04954a018",
   "core115-source/sing-box/protocol/xhttp/control_failure_test.go": "e304d9271999dbc0f858baa57c7c297204d294f2d52285576346f07067aa39f7",
   "core115-source/sing-box/protocol/xhttp/control_policy_test.go": "46eb0af438538bdeaffcc21ff8057870a6f5677591ee172ca72c1f818749cf07",
-  "core115-source/sing-box/protocol/xhttp/control_resolver_test.go": "4ad9c972d102c2e0db84fc451ac6d95f6feeaed6491918920fb72a8b4e2b9c39",
+  "core115-source/sing-box/protocol/xhttp/control_resolver_test.go": "261b872d8ced543e9b6fc2a3fdf6ce935679a6613907d21eb9677318375da8e6",
   "core115-source/sing-box/protocol/xhttp/control_selection.go": "1429258a082b7e32e0664cd7d73e653b4477d13a6e78a39f55c1eb62a7799183",
   "core115-source/sing-box/protocol/xhttp/control_transport.go": "bca2e2a972fe5c883af576861fb48f3b0d0afdb36713a761ea60e61d1676c636",
   "core115-source/sing-box/protocol/xhttp/control_transport_test.go": "c1cf7c1d1c43310b400f76c4748dff180279d9051e40f48940ebe00dccd0f0ff",
