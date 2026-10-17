@@ -1550,7 +1550,7 @@
   "core115-source/sing-box/protocol/xhttp/api.go": "cf04704cde2015aefe015644af2a783f6f32fe5957c96df7f0ce42c70611f368",
   "core115-source/sing-box/protocol/xhttp/blackstone_contract_test.go": "965d70e78c9810337a080cf144da33327cabb3b1e4aad85b005ae62ff293b6ed",
   "core115-source/sing-box/protocol/xhttp/conn.go": "a8aec4b55ca7548407feb69b65db4989380888a441fefd8eb7b09b224e221f76",
-  "core115-source/sing-box/protocol/xhttp/control_budget_test.go": "8d180b4a10f598037f146aaeb6134118626a8e8db198ab31190ecb268a7bad01",
+  "core115-source/sing-box/protocol/xhttp/control_budget_test.go": "fc5feade89872149b2139816cf4657bc48156525214fb9b3da7f7e8951ce5402",
   "core115-source/sing-box/protocol/xhttp/control_config.go": "51e54aa253e0dd200a64aded0ddff38c6f76eb9339f64d84c1555ad7d3c59d08",
   "core115-source/sing-box/protocol/xhttp/control_config_test.go": "686cb51662e0a53813d70b1d07114d89f8866c15651cd2582034cfa04954a018",
   "core115-source/sing-box/protocol/xhttp/control_failure_test.go": "e304d9271999dbc0f858baa57c7c297204d294f2d52285576346f07067aa39f7",
