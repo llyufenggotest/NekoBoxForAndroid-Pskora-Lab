@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -229,6 +230,9 @@ func TestBlackstoneIPPlaceholderResolverPolicies(t *testing.T) {
 // resolver/router/client -> protected sockets -> verified TLS/H2 control ->
 // selected-member constructor preflight -> domain xhttp TCP/native UDP/UOT.
 func TestBlackstoneIPPlaceholderVertical(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("offline canonical fixture requires permission to bind loopback port 443")
+	}
 	for _, detour := range []bool{false, true} {
 		for _, mode := range []string{"tcp", "udp", "uot0", "uot1", "uot2"} {
 			t.Run(fmt.Sprintf("detour=%t/%s", detour, mode), func(t *testing.T) {

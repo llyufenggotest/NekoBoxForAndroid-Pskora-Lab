@@ -49,10 +49,10 @@ class MaintenanceCIContractTest(unittest.TestCase):
         self.assertIn('PYTHONDONTWRITEBYTECODE: "1"', block)
         self.assertIn('command -v gcc', block)
         self.assertIn('set -euo pipefail', block)
-        self.assertIn('for mode in normal lowmem; do', block)
-        self.assertIn('tags=with_utls', block)
-        self.assertIn('tags="$tags,with_low_memory"', block)
-        self.assertIn('go test -race -json -count=1 -timeout=10m -tags="$tags"', block)
+        self.assertIn('sudo --preserve-env=CGO_ENABLED,CC,PYTHONDONTWRITEBYTECODE,PATH', block)
+        self.assertIn('-u root env HOME="$RUNNER_TEMP/blackstone-race-home"', block)
+        self.assertIn('go test -race -json -count=1 -timeout=10m -tags=with_utls', block)
+        self.assertIn("go test -race -json -count=1 -timeout=10m -tags='with_utls,with_low_memory'", block)
         for package in ('github.com/sagernet/sing-box/protocol/xhttp',
                         'github.com/sagernet/sing-box/protocol/vless',
                         'github.com/sagernet/sing-vmess/vless'):

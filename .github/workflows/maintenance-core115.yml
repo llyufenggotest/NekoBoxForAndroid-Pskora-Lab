@@ -52,15 +52,18 @@ jobs:
           command -v gcc
           gcc --version
           python tools/test_verify_maintenance_ci.py
-          for mode in normal lowmem; do
-            tags=with_utls
-            if test "$mode" = lowmem; then tags="$tags,with_low_memory"; fi
-            (cd core115-source/libcore && go test -race -json -count=1 -timeout=10m -tags="$tags" \
+          sudo --preserve-env=CGO_ENABLED,CC,PYTHONDONTWRITEBYTECODE,PATH \
+            -u root env HOME="$RUNNER_TEMP/blackstone-race-home" \
+            bash -c 'cd core115-source/libcore && go test -race -json -count=1 -timeout=10m -tags=with_utls \
               github.com/sagernet/sing-box/protocol/xhttp \
               github.com/sagernet/sing-box/protocol/vless \
-              github.com/sagernet/sing-vmess/vless) | tee "$RUNNER_TEMP/blackstone-race-$mode.jsonl"
-            python tools/verify_maintenance_ci.py --race-log "$RUNNER_TEMP/blackstone-race-$mode.jsonl"
-          done
+              github.com/sagernet/sing-vmess/vless' | tee "$RUNNER_TEMP/blackstone-race-normal.jsonl"
+          python tools/verify_maintenance_ci.py --race-log "$RUNNER_TEMP/blackstone-race-normal.jsonl"
+          (cd core115-source/libcore && go test -race -json -count=1 -timeout=10m -tags='with_utls,with_low_memory' \
+            github.com/sagernet/sing-box/protocol/xhttp \
+            github.com/sagernet/sing-box/protocol/vless \
+            github.com/sagernet/sing-vmess/vless) | tee "$RUNNER_TEMP/blackstone-race-lowmem.jsonl"
+          python tools/verify_maintenance_ci.py --race-log "$RUNNER_TEMP/blackstone-race-lowmem.jsonl"
       - name: Upload Blackstone race diagnostics
         if: always()
         uses: actions/upload-artifact@v7
