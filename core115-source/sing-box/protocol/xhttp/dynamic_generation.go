@@ -83,7 +83,10 @@ func (h *Outbound) constructGeneration(ctx context.Context, cfg RealConfig) (*dy
 	if cfg.UDPOverTCP && (!cfg.UDP || cfg.UDPOverTCPVersion < 0 || cfg.UDPOverTCPVersion > 2) {
 		return fail(errors.New("uot"))
 	}
-	if cfg.PaddingLen != "" {
+	// The donor xhttp client retains padding-len as config-only metadata; it
+	// does not interpret it or add wire padding. Preserve the raw value without
+	// rejecting otherwise supported xhttp members. Other transports stay strict.
+	if cfg.Type != "xhttp" && cfg.PaddingLen != "" {
 		return fail(errors.New("padding unsupported"))
 	}
 	if cfg.Type != "xhttp" && (cfg.TcpFake != "" || cfg.UdpFake != "") {
