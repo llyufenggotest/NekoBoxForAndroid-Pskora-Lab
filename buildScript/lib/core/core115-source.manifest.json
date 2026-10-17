@@ -2330,7 +2330,7 @@
   "core115-source/sing-vmess/vless/pure_test.go": "f1a7575b4ccb33506852fd1655af14e02815bdaf4dc1a8cb5d1fe82c5e3d9c15",
   "core115-source/sing-vmess/vless/pure_wire_test.go": "919e547e44540835b043befaeb320c1d00c171bf10714c822c705c2a59898846",
   "core115-source/sing-vmess/vless/service.go": "1bc6e41c2588d42a8a98e51bf8c7c3b50300c27b3aa37d8528ae447cb3c5d51d",
-  "core115-source/sing-vmess/vless/vision.go": "f1a43c52fbf7b244bb9faa2e660c14a9f4cce598837e481618f3eb035170d130",
-  "core115-source/sing-vmess/vless/vision_utls.go": "23747cbe4fb6887a20d32f23bd7d4768a12d8d6a2bc4165a50885e3351d35545",
+  "core115-source/sing-vmess/vless/vision.go": "d54fc13f657aff2e6cffbc37970efa325748703ff4fc6dcf63090caf96f5d7e9",
+  "core115-source/sing-vmess/vless/vision_utls.go": "50174799618132d35154bb450b7b04a6b3c4277abe9875fe55461c152a05d0b5",
   "core115-source/sing-vmess/xudp.go": "b8b1c7d657f8a81898943ceb3a1b0261cb6c393f92fdf279ea69eff542672a03"
 }
