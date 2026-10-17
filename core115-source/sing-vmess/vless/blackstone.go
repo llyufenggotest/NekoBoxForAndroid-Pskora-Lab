@@ -91,6 +91,73 @@ func (c *Client) newConn(conn net.Conn, command byte, destination M.Socksaddr) *
 	return result
 }
 
+// BlackstoneVisionNativeUDP selects only the private native packet stack.
+// Standard/Pure/Juzi/X365 and XUDP keep their existing initialization paths.
+func (c *Client) BlackstoneVisionNativeUDP() bool {
+	return c.blackstone != nil && c.flow == FlowVision
+}
+
+// DialEarlyBlackstoneVisionPacketConnWithOptions follows the donor stack:
+// raw transport -> private CommandUDP stream -> Vision -> packet framing.
+// The inner stream alone owns request/response authentication and H updates;
+// the outer PacketConn only owns datagram lengths (both handshakes are done
+// there). Keeping the private state also preserves atomic writes, short-write
+// failure and short-buffer draining without emitting another private header.
+func (c *Client) DialEarlyBlackstoneVisionPacketConnWithOptions(conn, baseConn net.Conn, destination M.Socksaddr, canSplice bool) (*PacketConn, error) {
+	if !c.BlackstoneVisionNativeUDP() {
+		return nil, fmt.Errorf("Blackstone: native Vision UDP initializer requires private Vision")
+	}
+	stream, err := c.prepareConnWithOptions(c.newConn(&blackstoneUDPCloseConn{Conn: conn}, 2, destination), baseConn, canSplice)
+	if err != nil {
+		return nil, err
+	}
+	return &PacketConn{Conn: &blackstoneUDPVisionPacketStream{Conn: stream}, destination: destination, requestWritten: true, responseRead: true, blackstone: c.blackstone}, nil
+}
+
+// PacketConn's private writer supplies one complete length+payload frame.
+// The exact donor submits those as two Vision writes; preserve that boundary
+// without touching flow-empty framing or duplicating the packet length.
+type blackstoneUDPVisionPacketStream struct{ net.Conn }
+
+func (c *blackstoneUDPVisionPacketStream) Write(frame []byte) (int, error) {
+	if len(frame) < 2 || int(frame[0])<<8|int(frame[1]) != len(frame)-2 {
+		return 0, fmt.Errorf("Blackstone: invalid native UDP frame")
+	}
+	n, err := c.Conn.Write(frame[:2])
+	if err == nil && n != 2 {
+		err = io.ErrShortWrite
+	}
+	if err != nil {
+		return 0, err
+	}
+	n, err = c.Conn.Write(frame[2:])
+	if err == nil && n != len(frame)-2 {
+		err = io.ErrShortWrite
+	}
+	if err != nil {
+		return 0, err
+	}
+	return len(frame), nil
+}
+
+func (c *blackstoneUDPVisionPacketStream) Upstream() any { return c.Conn }
+
+// Only the new private UDP stack needs to coalesce inner handshake failures,
+// outer packet failures and simultaneous owner closes onto one raw Close.
+// Preserve upstream discovery for TLS/encryption Vision introspection.
+type blackstoneUDPCloseConn struct {
+	net.Conn
+	once sync.Once
+	err  error
+}
+
+func (c *blackstoneUDPCloseConn) Close() error {
+	c.once.Do(func() { c.err = c.Conn.Close() })
+	return c.err
+}
+
+func (c *blackstoneUDPCloseConn) Upstream() any { return c.Conn }
+
 // Capture current H at first write, not when a lazy connection is allocated.
 func (s *blackstoneState) writeRequest(w io.Writer, request Request, payload []byte) error {
 	h := s.snapshot()

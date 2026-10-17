@@ -354,6 +354,13 @@ func (h *vlessDialer) DialContext(ctx context.Context, network string, destinati
 			}
 			return bufio.NewBindPacketConn(packetaddr.NewConn(packetConn, destination), destination), nil
 		} else {
+			if h.client.BlackstoneVisionNativeUDP() {
+				packetConn, err := h.client.DialEarlyBlackstoneVisionPacketConnWithOptions(conn, visionBaseConn, destination, visionCanSplice)
+				if err != nil {
+					common.Close(conn)
+				}
+				return packetConn, err
+			}
 			return h.client.DialEarlyPacketConn(conn, destination)
 		}
 	default:
@@ -364,6 +371,15 @@ func (h *vlessDialer) DialContext(ctx context.Context, network string, destinati
 func (h *vlessDialer) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.PacketConn, error) {
 	if h.pure {
 		return nil, E.New("Pure: UDP/XUDP unsupported")
+	}
+	if !h.xudp && !h.packetAddr && h.client.BlackstoneVisionNativeUDP() {
+		// Reuse the stream's real TLS/Reality/encryption base discovery. Do not
+		// wrap an already-framed PacketConn or run the private handshake twice.
+		conn, err := h.DialContext(ctx, N.NetworkUDP, destination)
+		if err != nil {
+			return nil, err
+		}
+		return conn.(net.PacketConn), nil
 	}
 	h.logger.InfoContext(ctx, "outbound packet connection to ", destination)
 	ctx, metadata := adapter.ExtendContext(ctx)
