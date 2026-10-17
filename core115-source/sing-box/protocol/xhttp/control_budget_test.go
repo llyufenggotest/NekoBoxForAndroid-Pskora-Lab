@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -15,30 +17,40 @@ import (
 func TestControlOwnedConnectAndAggregateBudgets(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		start := time.Now()
+		var timesMu sync.Mutex
 		var times []time.Duration
 		dialer := controlFixtureDialer{dial: func(ctx context.Context, _ string) (net.Conn, error) {
 			deadline, ok := ctx.Deadline()
 			require.True(t, ok)
+			timesMu.Lock()
 			times = append(times, deadline.Sub(start))
+			timesMu.Unlock()
 			<-ctx.Done()
 			return nil, ctx.Err()
 		}}
 		_, err := FetchDynamicConfig(context.Background(), dialer, "ignored", "id", "token", "device", "tablet")
 		require.ErrorIs(t, err, context.DeadlineExceeded)
-		require.Equal(t, []time.Duration{4 * time.Second, 15 * time.Second}, times)
+		timesMu.Lock()
+		gotTimes := append([]time.Duration(nil), times...)
+		timesMu.Unlock()
+		require.Equal(t, []time.Duration{4 * time.Second, 15 * time.Second}, gotTimes)
 		require.Equal(t, 15*time.Second, time.Since(start))
 	})
 }
 
 func TestControlCallerBudgetDoesNotAuthorizeFallback(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		calls := 0
-		dialer := controlFixtureDialer{dial: func(ctx context.Context, _ string) (net.Conn, error) { calls++; <-ctx.Done(); return nil, ctx.Err() }}
+		var calls atomic.Int32
+		dialer := controlFixtureDialer{dial: func(ctx context.Context, _ string) (net.Conn, error) {
+			calls.Add(1)
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		_, err := FetchDynamicConfig(ctx, dialer, "ignored", "id", "token", "device", "tablet")
 		require.ErrorIs(t, err, context.DeadlineExceeded)
-		require.Equal(t, 1, calls)
+		require.Equal(t, int32(1), calls.Load())
 	})
 }
 
