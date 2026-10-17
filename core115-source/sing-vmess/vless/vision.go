@@ -19,15 +19,15 @@ import (
 	N "github.com/sagernet/sing/common/network"
 )
 
-var tlsRegistry []func(conn net.Conn) (loaded bool, netConn net.Conn, reflectType reflect.Type, reflectPointer uintptr)
+var tlsRegistry []func(conn net.Conn) (loaded bool, netConn net.Conn, reflectType reflect.Type, reflectPointer unsafe.Pointer)
 
 func init() {
-	tlsRegistry = append(tlsRegistry, func(conn net.Conn) (loaded bool, netConn net.Conn, reflectType reflect.Type, reflectPointer uintptr) {
+	tlsRegistry = append(tlsRegistry, func(conn net.Conn) (loaded bool, netConn net.Conn, reflectType reflect.Type, reflectPointer unsafe.Pointer) {
 		tlsConn, loaded := N.CastReader[*tls.Conn](conn)
 		if !loaded {
 			return
 		}
-		return true, tlsConn.NetConn(), reflect.TypeOf(tlsConn).Elem(), uintptr(unsafe.Pointer(tlsConn))
+		return true, tlsConn.NetConn(), reflect.TypeOf(tlsConn).Elem(), unsafe.Pointer(tlsConn)
 	})
 }
 
@@ -193,8 +193,8 @@ func extractTLSInfo(tlsConn net.Conn) (*visionConnInfo, error) {
 
 			inputField, _ := reflectType.FieldByName("input")
 			rawInputField, _ := reflectType.FieldByName("rawInput")
-			info.input = (*bytes.Reader)(unsafe.Pointer(reflectPointer + inputField.Offset))
-			info.rawInput = (*bytes.Buffer)(unsafe.Pointer(reflectPointer + rawInputField.Offset))
+			info.input = (*bytes.Reader)(unsafe.Add(reflectPointer, inputField.Offset))
+			info.rawInput = (*bytes.Buffer)(unsafe.Add(reflectPointer, rawInputField.Offset))
 			return info, nil
 		}
 	}
@@ -204,7 +204,7 @@ func extractTLSInfo(tlsConn net.Conn) (*visionConnInfo, error) {
 
 func extractInputFields(encConn net.Conn, info *visionConnInfo) error {
 	reflectType := reflect.TypeOf(encConn).Elem()
-	reflectPointer := uintptr(unsafe.Pointer(reflect.ValueOf(encConn).Pointer()))
+	reflectPointer := unsafe.Pointer(reflect.ValueOf(encConn).Pointer())
 
 	inputField, inputOk := reflectType.FieldByName("input")
 	rawInputField, rawInputOk := reflectType.FieldByName("rawInput")
@@ -213,8 +213,8 @@ func extractInputFields(encConn net.Conn, info *visionConnInfo) error {
 		return E.New("vision: encryption layer missing input/rawInput fields")
 	}
 
-	info.input = (*bytes.Reader)(unsafe.Pointer(reflectPointer + inputField.Offset))
-	info.rawInput = (*bytes.Buffer)(unsafe.Pointer(reflectPointer + rawInputField.Offset))
+	info.input = (*bytes.Reader)(unsafe.Add(reflectPointer, inputField.Offset))
+	info.rawInput = (*bytes.Buffer)(unsafe.Add(reflectPointer, rawInputField.Offset))
 	return nil
 }
 
@@ -224,8 +224,8 @@ func extractInputFieldsFromTLS(tlsConn net.Conn, info *visionConnInfo) error {
 		if loaded {
 			inputField, _ := reflectType.FieldByName("input")
 			rawInputField, _ := reflectType.FieldByName("rawInput")
-			info.input = (*bytes.Reader)(unsafe.Pointer(reflectPointer + inputField.Offset))
-			info.rawInput = (*bytes.Buffer)(unsafe.Pointer(reflectPointer + rawInputField.Offset))
+			info.input = (*bytes.Reader)(unsafe.Add(reflectPointer, inputField.Offset))
+			info.rawInput = (*bytes.Buffer)(unsafe.Add(reflectPointer, rawInputField.Offset))
 			return nil
 		}
 	}
