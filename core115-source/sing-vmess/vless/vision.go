@@ -62,6 +62,9 @@ type VisionConn struct {
 	currentCommand         byte
 	directRead             bool
 	remainingBuffers       []*buf.Buffer
+
+	// Exact private stream opt-in; legacy Vision keeps its chunk parser.
+	blackstoneReader *blackstoneVisionReader
 }
 
 type EncryptionConn interface {
@@ -87,7 +90,7 @@ func NewVisionConn(conn net.Conn, tlsConn net.Conn, userUUID [16]byte, logger lo
 		return nil, err
 	}
 
-	return &VisionConn{
+	result := &VisionConn{
 		Conn:       conn,
 		reader:     bufio.NewChunkReader(conn, xrayChunkSize),
 		writer:     bufio.NewVectorisedWriter(conn),
@@ -107,7 +110,13 @@ func NewVisionConn(conn net.Conn, tlsConn net.Conn, userUUID [16]byte, logger lo
 		withinPaddingBuffers:   true,
 		remainingContent:       -1,
 		remainingPadding:       -1,
-	}, nil
+	}
+	// Only an exact private VLESS stream opts in. Both CommandUDP native and
+	// CommandMux XUDP reach this seam; unrelated clients and flow-empty do not.
+	if stream, ok := conn.(*Conn); ok && stream.blackstone != nil && stream.request.Flow == FlowVision {
+		result.blackstoneReader = &blackstoneVisionReader{first: true}
+	}
+	return result, nil
 }
 
 func extractVisionConnInfo(conn net.Conn, baseConn net.Conn) (*visionConnInfo, error) {
@@ -397,6 +406,9 @@ func isTLSConn(conn net.Conn) bool {
 }
 
 func (c *VisionConn) Read(p []byte) (n int, err error) {
+	if c.blackstoneReader != nil {
+		return c.readBlackstoneVision(p)
+	}
 	for len(c.remainingBuffers) > 0 {
 		newN, _ := c.remainingBuffers[0].Read(p[n:])
 		if c.remainingBuffers[0].IsEmpty() {
