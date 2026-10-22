@@ -242,21 +242,37 @@ func TestGoKernelZeroWindowHalfClose(t *testing.T) {
 			if err != nil {
 				test.Fatal(err)
 			}
-			traffic.await(test, server, "effective clamped receive window", func(flow kernelTCPFlow) bool {
-				return slices.ContainsFunc(flow.events, func(event kernelTCPEvent) bool {
-					return !event.outgoing && event.flags == header.TCPFlagAck && event.ack == 1
-				})
-			})
 			permit := server.sendPermit.Load() &^ goPermitWindowBit
 			if permit <= 1 || permit > uint64(effectiveClamp+1) {
 				test.Fatalf("effective clamped receive window was not published: permit=%d clamp=%d", permit, effectiveClamp)
 			}
-			payload := kernelPayload(int(permit-1), 139)
+			// A data ACK may publish a smaller effective window than the SYN ACK,
+			// especially for IPv6. Send one byte first, wait for the TCP state to
+			// consume its ACK, then fill the actually published remaining window.
+			payload := kernelPayload(1, 139)
 			_, err = server.Write(payload)
 			if err != nil {
 				test.Fatal(err)
 			}
 			deadline := time.Now().Add(time.Second)
+			for server.sendUnacked.Load() != 2 && time.Now().Before(deadline) {
+				time.Sleep(time.Millisecond)
+			}
+			if server.sendUnacked.Load() != 2 {
+				test.Fatal("initial byte was not acknowledged")
+			}
+			permit = server.sendPermit.Load() &^ goPermitWindowBit
+			unacked := server.sendUnacked.Load()
+			if permit <= unacked {
+				test.Fatalf("receive window closed before the fixture could fill it: unacked=%d permit=%d", unacked, permit)
+			}
+			tail := kernelPayload(int(permit-unacked), 140)
+			payload = append(payload, tail...)
+			_, err = server.Write(tail)
+			if err != nil {
+				test.Fatal(err)
+			}
+			deadline = time.Now().Add(time.Second)
 			for time.Now().Before(deadline) {
 				if server.sendUnacked.Load() == uint64(len(payload)+1) && server.sendPermit.Load()&^goPermitWindowBit == server.sendUnacked.Load() {
 					break

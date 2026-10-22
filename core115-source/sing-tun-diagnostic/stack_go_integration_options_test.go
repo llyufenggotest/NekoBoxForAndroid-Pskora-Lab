@@ -174,14 +174,14 @@ func TestGoConnKeepalive(t *testing.T) {
 			deadline := time.Now().Add(2 * time.Second)
 			probes := 0
 			answered := 0
-			awaiting := make(map[uint32]int)
+			awaiting := make(map[uint32]bool)
 			started := false
 			for time.Now().Before(deadline) {
 				for _, segment := range recorder.take() {
 					switch {
 					case segment.probe():
 						probes++
-						awaiting[segment.sequence+1]++
+						awaiting[segment.sequence+1] = true
 						if !started {
 							// Keep the two-second observation budget for probe/ACK traffic;
 							// scheduler delay before the first probe must not consume it.
@@ -189,18 +189,18 @@ func TestGoConnKeepalive(t *testing.T) {
 							started = true
 						}
 					case !segment.outbound && segment.payload == 0:
-						if count := awaiting[segment.ack]; count != 0 {
-							answered += count
+						if awaiting[segment.ack] {
+							answered++
 							delete(awaiting, segment.ack)
 						}
 					}
 				}
-				if probes >= 2 && answered == probes && len(awaiting) == 0 {
+				if probes >= 2 && answered > 0 && len(awaiting) == 0 {
 					break
 				}
 				time.Sleep(10 * time.Millisecond)
 			}
-			if probes < 2 || answered != probes || len(awaiting) != 0 {
+			if probes < 2 || answered == 0 || len(awaiting) != 0 {
 				test.Fatalf("kernel answered %d of %d probes during the two-second observation window", answered, probes)
 			}
 			err = kernelTransfer(conn, kernel, kernelPayload(1<<20, 5), false)
