@@ -223,11 +223,21 @@ func getProxyDelay(server *Server) func(w http.ResponseWriter, r *http.Request) 
 		}
 
 		proxy := r.Context().Value(CtxKeyProxy).(adapter.Outbound)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
+		ownerCtx, release := requestContext(r.Context(), server.ctx)
+		defer release()
+		ctx, cancel := context.WithTimeout(ownerCtx, time.Millisecond*time.Duration(timeout))
 		defer cancel()
 
 		delay, err := urltest.URLTest(ctx, url, proxy)
+		if ctx.Err() != nil {
+			err = ctx.Err()
+		}
 		defer func() {
+			// Cancellation is not a failed measurement; an old request/server
+			// must not delete a successor's successful history.
+			if r.Context().Err() != nil || server.ctx.Err() != nil {
+				return
+			}
 			realTag := group.RealTag(server.outbound, proxy)
 			if err != nil {
 				server.urlTestHistory.DeleteURLTestHistory(realTag)
@@ -249,6 +259,9 @@ func getProxyDelay(server *Server) func(w http.ResponseWriter, r *http.Request) 
 			}
 		}()
 
+		if r.Context().Err() != nil || server.ctx.Err() != nil {
+			return
+		}
 		if ctx.Err() != nil {
 			render.Status(r, http.StatusGatewayTimeout)
 			render.JSON(w, r, ErrRequestTimeout)

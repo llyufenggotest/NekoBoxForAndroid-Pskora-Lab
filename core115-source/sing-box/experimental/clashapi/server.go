@@ -40,6 +40,7 @@ var _ adapter.LifecycleService = (*Server)(nil)
 
 type Server struct {
 	ctx            context.Context
+	cancel         context.CancelFunc
 	network        adapter.NetworkManager
 	router         adapter.Router
 	dnsRouter      adapter.DNSRouter
@@ -71,9 +72,11 @@ func NewServer(ctx context.Context, logFactory log.ObservableFactory, options op
 	if clashMode == nil {
 		return nil, E.New("missing clash mode manager")
 	}
+	ctx, cancel := context.WithCancel(ctx)
 	chiRouter := chi.NewRouter()
 	s := &Server{
 		ctx:       ctx,
+		cancel:    cancel,
 		network:   service.FromContext[adapter.NetworkManager](ctx),
 		router:    service.FromContext[adapter.Router](ctx),
 		dnsRouter: service.FromContext[adapter.DNSRouter](ctx),
@@ -95,6 +98,7 @@ func NewServer(ctx context.Context, logFactory log.ObservableFactory, options op
 	//goland:noinspection GoDeprecation
 	//nolint:staticcheck
 	if options.StoreMode || options.StoreSelected || options.StoreFakeIP || options.CacheFile != "" || options.CacheID != "" {
+		cancel()
 		return nil, E.New("cache_file and related fields in Clash API is deprecated in sing-box 1.8.0, use experimental.cache_file instead.")
 	}
 	allowedOrigins := options.AccessControlAllowOrigin
@@ -132,6 +136,7 @@ func NewServer(ctx context.Context, logFactory log.ObservableFactory, options op
 		s.externalUI = filemanager.BasePath(ctx, os.ExpandEnv(options.ExternalUI))
 		_, err := filemanager.ReadDir(ctx, s.externalUI)
 		if err != nil && !os.IsNotExist(err) {
+			cancel()
 			return nil, E.Cause(err, "read external UI directory")
 		}
 		chiRouter.Group(func(r chi.Router) {
@@ -147,6 +152,12 @@ func (s *Server) Name() string {
 }
 
 func (s *Server) Start(stage adapter.StartStage, scope *adapter.Scope) error {
+	if stage == adapter.StartStateInitialize {
+		scope.Add(func() error {
+			s.cancel()
+			return nil
+		})
+	}
 	if stage != adapter.StartStateStarted {
 		return nil
 	}

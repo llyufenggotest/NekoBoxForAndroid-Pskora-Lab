@@ -44,8 +44,10 @@ func inuseMemory() uint64 {
 	return memStats.StackInuse + memStats.HeapInuse + memStats.HeapIdle - memStats.HeapReleased
 }
 
-func memory(ctx context.Context) func(w http.ResponseWriter, r *http.Request) {
+func memory(owner context.Context) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, release := requestContext(r.Context(), owner)
+		defer release()
 		var conn net.Conn
 		if r.Header.Get("Upgrade") == "websocket" {
 			var err error
@@ -61,6 +63,23 @@ func memory(ctx context.Context) func(w http.ResponseWriter, r *http.Request) {
 			render.Status(r, http.StatusOK)
 		}
 
+		// Cancellation must also wake an in-progress socket/HTTP write. Join
+		// the callback before returning so it cannot touch a reused writer.
+		controller := http.NewResponseController(w)
+		writeRetired := make(chan struct{})
+		stopWrite := context.AfterFunc(ctx, func() {
+			defer close(writeRetired)
+			if conn != nil {
+				conn.Close()
+			} else {
+				_ = controller.SetWriteDeadline(time.Now())
+			}
+		})
+		defer func() {
+			if !stopWrite() {
+				<-writeRetired
+			}
+		}()
 		tick := time.NewTicker(time.Second)
 		defer tick.Stop()
 		buf := &bytes.Buffer{}
@@ -71,6 +90,9 @@ func memory(ctx context.Context) func(w http.ResponseWriter, r *http.Request) {
 			case <-ctx.Done():
 				return
 			case <-tick.C:
+			}
+			if ctx.Err() != nil {
+				return
 			}
 			buf.Reset()
 
@@ -88,9 +110,14 @@ func memory(ctx context.Context) func(w http.ResponseWriter, r *http.Request) {
 			}); err != nil {
 				break
 			}
+			if ctx.Err() != nil {
+				return
+			}
 			if conn == nil {
 				_, err = w.Write(buf.Bytes())
-				w.(http.Flusher).Flush()
+				if err == nil {
+					err = controller.Flush()
+				}
 			} else {
 				err = wsutil.WriteServerText(conn, buf.Bytes())
 			}
