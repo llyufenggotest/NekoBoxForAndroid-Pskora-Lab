@@ -78,12 +78,17 @@ jobs:
         env:
           CGO_ENABLED: "1"
           CC: gcc
+          PYTHONDONTWRITEBYTECODE: "1"
         run: |
           set -euo pipefail
-          (cd core115-source/libcore && go test -race -json -count=1 -timeout=120s -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' \
-            github.com/sagernet/sing-tun github.com/sagernet/sing-box/experimental/clashapi github.com/sagernet/sing-box/common/urltest) | tee "$RUNNER_TEMP/positive-lifecycle-race-normal.jsonl"
-          (cd core115-source/libcore && go test -race -json -count=1 -timeout=120s -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_low_memory' \
-            github.com/sagernet/sing-tun github.com/sagernet/sing-box/experimental/clashapi github.com/sagernet/sing-box/common/urltest) | tee "$RUNNER_TEMP/positive-lifecycle-race-lowmem.jsonl"
+          sudo --preserve-env=CGO_ENABLED,CC,PYTHONDONTWRITEBYTECODE,PATH \
+            -u root env HOME="$RUNNER_TEMP/positive-lifecycle-race-home" \
+            bash -c 'cd core115-source/libcore && go test -race -json -count=1 -timeout=120s -tags='"'"'with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api'"'"' \
+              github.com/sagernet/sing-tun github.com/sagernet/sing-box/experimental/clashapi github.com/sagernet/sing-box/common/urltest' | tee "$RUNNER_TEMP/positive-lifecycle-race-normal.jsonl"
+          sudo --preserve-env=CGO_ENABLED,CC,PYTHONDONTWRITEBYTECODE,PATH \
+            -u root env HOME="$RUNNER_TEMP/positive-lifecycle-race-home" \
+            bash -c 'cd core115-source/libcore && go test -race -json -count=1 -timeout=120s -tags='"'"'with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_low_memory'"'"' \
+              github.com/sagernet/sing-tun github.com/sagernet/sing-box/experimental/clashapi github.com/sagernet/sing-box/common/urltest' | tee "$RUNNER_TEMP/positive-lifecycle-race-lowmem.jsonl"
       - name: Preserve positive lifecycle diagnostics
         if: always()
         uses: actions/upload-artifact@v7
