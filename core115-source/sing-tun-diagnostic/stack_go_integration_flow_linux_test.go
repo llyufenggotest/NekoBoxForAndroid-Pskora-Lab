@@ -165,11 +165,19 @@ func TestGoKernelSACKReneging(t *testing.T) {
 			if err != nil {
 				test.Fatal(err)
 			}
-			retained := goSackBlock{start: uint64(mss + 1), end: uint64(len(payload) + 1)}
+			var retained goSackBlock
 			traffic.await(test, server, "kernel SACK of queued out-of-order data", func(flow kernelTCPFlow) bool {
-				return slices.ContainsFunc(flow.events, func(event kernelTCPEvent) bool {
-					return !event.outgoing && slices.Contains(event.sacks, retained)
-				})
+				for _, event := range flow.events {
+					if event.outgoing {
+						continue
+					}
+					for _, block := range event.sacks {
+						if block.start == uint64(mss+1) && block.end > retained.end {
+							retained = block
+						}
+					}
+				}
+				return retained.end > retained.start
 			})
 			err = client.SetReadBuffer(512)
 			if err != nil {
@@ -234,10 +242,11 @@ func TestGoKernelZeroWindowHalfClose(t *testing.T) {
 			if err != nil {
 				test.Fatal(err)
 			}
-			deadline := time.Now().Add(time.Second)
-			for server.sendPermit.Load()&^goPermitWindowBit > uint64(effectiveClamp+1) && time.Now().Before(deadline) {
-				time.Sleep(time.Millisecond)
-			}
+			traffic.await(test, server, "effective clamped receive window", func(flow kernelTCPFlow) bool {
+				return slices.ContainsFunc(flow.events, func(event kernelTCPEvent) bool {
+					return !event.outgoing && event.flags == header.TCPFlagAck && event.ack == 1
+				})
+			})
 			permit := server.sendPermit.Load() &^ goPermitWindowBit
 			if permit <= 1 || permit > uint64(effectiveClamp+1) {
 				test.Fatalf("effective clamped receive window was not published: permit=%d clamp=%d", permit, effectiveClamp)
@@ -247,7 +256,7 @@ func TestGoKernelZeroWindowHalfClose(t *testing.T) {
 			if err != nil {
 				test.Fatal(err)
 			}
-			deadline = time.Now().Add(time.Second)
+			deadline := time.Now().Add(time.Second)
 			for time.Now().Before(deadline) {
 				if server.sendUnacked.Load() == uint64(len(payload)+1) && server.sendPermit.Load()&^goPermitWindowBit == server.sendUnacked.Load() {
 					break
