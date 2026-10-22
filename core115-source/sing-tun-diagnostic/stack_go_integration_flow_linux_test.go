@@ -243,7 +243,7 @@ func TestGoKernelZeroWindowHalfClose(t *testing.T) {
 				test.Fatalf("effective clamped receive window was not published: permit=%d clamp=%d", permit, effectiveClamp)
 			}
 			payload := kernelPayload(int(permit-1), 139)
-			_, err := server.Write(payload)
+			_, err = server.Write(payload)
 			if err != nil {
 				test.Fatal(err)
 			}
