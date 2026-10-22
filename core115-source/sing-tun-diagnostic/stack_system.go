@@ -157,8 +157,28 @@ func (s *System) Start() error {
 	return nil
 }
 
+// systemStartFactories isolates host side effects without replacing startup or cleanup.
+// A nil factory set always uses the production implementations.
+type systemStartFactories struct {
+	fixFirewall func() error
+	listen      func(context.Context, string, net.ListenConfig, string, string) (net.Listener, error)
+	newUDPNat   func(UDPNatOptions) *UDPNat
+}
+
 func (s *System) start() error {
-	_ = fixWindowsFirewall()
+	return s.startWithFactories(nil)
+}
+
+func (s *System) startWithFactories(factories *systemStartFactories) error {
+	fixFirewall := fixWindowsFirewall
+	listen := listenNetworkNamespace
+	newUDPNat := NewUDPNat
+	if factories != nil {
+		fixFirewall = factories.fixFirewall
+		listen = factories.listen
+		newUDPNat = factories.newUDPNat
+	}
+	_ = fixFirewall()
 	var listener net.ListenConfig
 	if s.bindInterface {
 		listener.Control = control.Append(listener.Control, func(network, address string, conn syscall.RawConn) error {
@@ -173,7 +193,7 @@ func (s *System) start() error {
 	var err error
 	if s.inet4NextAddress.IsValid() {
 		for range 3 {
-			tcpListener, err = listenNetworkNamespace(s.ctx, s.netNs, listener, "tcp4", net.JoinHostPort(s.inet4Address.String(), "0"))
+			tcpListener, err = listen(s.ctx, s.netNs, listener, "tcp4", net.JoinHostPort(s.inet4Address.String(), "0"))
 			if !retryableListenError(err) {
 				break
 			}
@@ -189,7 +209,7 @@ func (s *System) start() error {
 	}
 	if s.inet6NextAddress.IsValid() {
 		for range 3 {
-			tcpListener, err = listenNetworkNamespace(s.ctx, s.netNs, listener, "tcp6", net.JoinHostPort(s.inet6Address.String(), "0"))
+			tcpListener, err = listen(s.ctx, s.netNs, listener, "tcp6", net.JoinHostPort(s.inet6Address.String(), "0"))
 			if !retryableListenError(err) {
 				break
 			}
@@ -206,7 +226,7 @@ func (s *System) start() error {
 	udpNATOptions := s.udpNATOptions
 	udpNATOptions.Handler = s.handler
 	udpNATOptions.Prepare = s.preparePacketConnection
-	s.udpNat = NewUDPNat(udpNATOptions)
+	s.udpNat = newUDPNat(udpNATOptions)
 	err = s.udpNat.Start()
 	if err != nil {
 		return err

@@ -4,6 +4,7 @@ package tun
 
 import (
 	"errors"
+	"sync"
 	"syscall"
 
 	"github.com/sagernet/gvisor/pkg/buffer"
@@ -23,6 +24,16 @@ type Mixed struct {
 	stack        *stack.Stack
 	endpoint     *channel.Endpoint
 	udpForwarder *UDPForwarder
+	factories    *mixedStartFactories
+	closeOnce    sync.Once
+	closeErr     error
+}
+
+// mixedStartFactories keeps fault injection local to one stack. Cleanup is never replaced.
+type mixedStartFactories struct {
+	system            *systemStartFactories
+	newStack          func(stack.LinkEndpoint) (*stack.Stack, error)
+	startUDPForwarder func(*UDPForwarder) error
 }
 
 func NewMixed(
@@ -38,25 +49,40 @@ func NewMixed(
 	}, nil
 }
 
-func (m *Mixed) Start() error {
-	err := m.System.start()
+func (m *Mixed) Start() (startErr error) {
+	// Roll back through the same real cleanup path used by the caller.
+	defer func() {
+		if startErr != nil {
+			startErr = errors.Join(startErr, m.Close())
+		}
+	}()
+	var systemFactories *systemStartFactories
+	newStack := NewGVisorStack
+	startUDPForwarder := (*UDPForwarder).Start
+	if m.factories != nil {
+		systemFactories = m.factories.system
+		newStack = m.factories.newStack
+		startUDPForwarder = m.factories.startUDPForwarder
+	}
+	err := m.System.startWithFactories(systemFactories)
 	if err != nil {
 		return err
 	}
 	endpoint := channel.New(1024, uint32(m.mtu), "")
-	ipStack, err := NewGVisorStack(endpoint)
+	m.endpoint = endpoint
+	ipStack, err := newStack(endpoint)
+	// Own any returned stack before inspecting the error or starting children.
+	m.stack = ipStack
 	if err != nil {
 		return err
 	}
 	udpForwarder := NewUDPForwarder(m.ctx, ipStack, m.handler, m.udpNATOptions)
-	err = udpForwarder.Start()
+	m.udpForwarder = udpForwarder
+	err = startUDPForwarder(udpForwarder)
 	if err != nil {
 		return err
 	}
 	ipStack.SetTransportProtocolHandler(udp.ProtocolNumber, udpForwarder.HandlePacket)
-	m.udpForwarder = udpForwarder
-	m.stack = ipStack
-	m.endpoint = endpoint
 	go m.tunLoop()
 	go m.packetLoop()
 	return nil
@@ -70,18 +96,23 @@ func (m *Mixed) ResetNetwork() {
 }
 
 func (m *Mixed) Close() error {
-	if m.stack == nil {
-		return nil
-	}
-	if m.udpForwarder != nil {
-		m.udpForwarder.Close()
-	}
-	m.endpoint.Attach(nil)
-	m.stack.Close()
-	for _, endpoint := range m.stack.CleanupEndpoints() {
-		endpoint.Abort()
-	}
-	return m.System.Close()
+	m.closeOnce.Do(func() {
+		if m.udpForwarder != nil {
+			m.udpForwarder.Close()
+		}
+		if m.endpoint != nil {
+			m.endpoint.Attach(nil)
+			m.endpoint.Close()
+		}
+		if m.stack != nil {
+			m.stack.Close()
+			for _, endpoint := range m.stack.CleanupEndpoints() {
+				endpoint.Abort()
+			}
+		}
+		m.closeErr = m.System.Close()
+	})
+	return m.closeErr
 }
 
 func (m *Mixed) tunLoop() {
