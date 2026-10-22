@@ -27,6 +27,19 @@ mapfile -t sing_tun_tests < <(
     sed -n '/^Test/p'
 )
 
+sequence_wrap_present=false
+for test_name in "${sing_tun_tests[@]}"; do
+  if [[ "$test_name" == TestGoKernelSequenceWrap ]]; then
+    sequence_wrap_present=true
+    break
+  fi
+done
+if [[ "$sequence_wrap_present" != true ]]; then
+  printf 'required TestGoKernelSequenceWrap is absent\n' >&2
+  exit 1
+fi
+sing_tun_tests=("${sing_tun_tests[@]/TestGoKernelSequenceWrap}")
+
 first_offload=-1
 for index in "${!sing_tun_tests[@]}"; do
   if [[ "${sing_tun_tests[$index]}" == TestGoKernelPacketOffload ]]; then
@@ -64,6 +77,29 @@ run_sing_tun_group() {
 # package budget instead of increasing or weakening the timeout.
 run_sing_tun_group before-offload "${before[@]}"
 run_sing_tun_group offload-and-after "${after[@]}"
+
+run_sequence_wrap_case() {
+  local case_name="$1"
+  (
+    cd core115-source/libcore
+    go test -race -json -count=1 -timeout=120s -tags="$tags" \
+      -run "^TestGoKernelSequenceWrap/${case_name}$" github.com/sagernet/sing-tun
+  )
+}
+
+# This fixture transfers more than 4 GiB per direction to cross the TCP
+# sequence boundary. Run its six existing subtests separately so the original
+# 120s per-process timeout remains strict without parallel flows competing for
+# one shared package budget.
+for sequence_wrap_case in \
+  ipv6=false/mode=write \
+  ipv6=false/mode=buffer \
+  ipv6=false/mode=splice \
+  ipv6=true/mode=write \
+  ipv6=true/mode=buffer \
+  ipv6=true/mode=splice; do
+  run_sequence_wrap_case "$sequence_wrap_case"
+done
 
 (
   cd core115-source/libcore
