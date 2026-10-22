@@ -2215,7 +2215,7 @@
   "core115-source/sing-tun-diagnostic/stack_go_integration_memory_darwin_test.go": "1db4d5256e46e2fbea9a7e688bc4ab4a71d437b337e1b49821ddcaea044200cc",
   "core115-source/sing-tun-diagnostic/stack_go_integration_memory_linux_test.go": "f92d5d0359c247508971227f1121eddd5e6549971af9b1f5276af5876f53ac2e",
   "core115-source/sing-tun-diagnostic/stack_go_integration_memory_test.go": "348ac2551a4efdf5041bf44ac26b55b8a3ec61ed39e1ededa5ca078c09528768",
-  "core115-source/sing-tun-diagnostic/stack_go_integration_options_test.go": "6906da8e317dc778b6ddfafcd6ae6d440379dcedbcf1bd16a3bef71722f8ec51",
+  "core115-source/sing-tun-diagnostic/stack_go_integration_options_test.go": "e38dac75d282179014088e4f3a2cfdcfc01f449f9786c96a4dd1a4a8dc91a426",
   "core115-source/sing-tun-diagnostic/stack_go_integration_packet_flow_test.go": "211165bc415ee68da52d1f7f5636941b0124c5d618ae2023b76c8b0644607d4a",
   "core115-source/sing-tun-diagnostic/stack_go_integration_packet_offload_linux_test.go": "d3195087234c5d01a4b8241d29bddd54e4a45ed9b8188801ee8fbb2aa2f8ad54",
   "core115-source/sing-tun-diagnostic/stack_go_integration_packet_test.go": "b03c5de8d79c4cbff72f5acc25f27a0796df9a9e6af52a8ff1d5b3ef8504f7a3",
