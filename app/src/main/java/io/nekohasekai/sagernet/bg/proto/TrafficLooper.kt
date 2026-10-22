@@ -226,13 +226,6 @@ class TrafficLooper
                 }
 
                 val trafficUpdates = arrayListOf<TrafficData>()
-                if (profileTrafficStatistics) {
-                    idMap.forEach { (id, item) ->
-                        if (id > 0L && item.hasTrafficDelta) {
-                            trafficUpdates.add(TrafficData(id = id, rx = item.rx, tx = item.tx))
-                        }
-                    }
-                }
                 val snapshot = LoopSnapshot(
                     speed = SpeedDisplayData(
                         mainTxRate,
@@ -249,6 +242,13 @@ class TrafficLooper
                         SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND
                     )
                 ) {
+                    if (profileTrafficStatistics) {
+                        idMap.forEach { (id, item) ->
+                            if (id > 0L && item.hasTrafficDelta) {
+                                trafficUpdates.add(TrafficData(id = id, rx = item.rx, tx = item.tx))
+                            }
+                        }
+                    }
                     data.binder.broadcast { callback ->
                         if (data.binder.callbackIdMap[callback] ==
                             SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND

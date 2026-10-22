@@ -1,0 +1,44 @@
+[
+  {
+    "artifact": "kotlin-compiler-embeddable",
+    "version": "1.9.24",
+    "sha256": "e71ff19e6b141ab85a9328fd010941531a302543026bd4244c95adc208d501f6",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-compiler-embeddable/1.9.24/kotlin-compiler-embeddable-1.9.24.jar"
+  },
+  {
+    "artifact": "kotlin-stdlib",
+    "version": "1.9.24",
+    "sha256": "858b902696da9cf585ab9d98ffc1c2712269828354dfe9107e3711b084a36468",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/1.9.24/kotlin-stdlib-1.9.24.jar"
+  },
+  {
+    "artifact": "kotlin-script-runtime",
+    "version": "1.9.24",
+    "sha256": "314c7d308fe750654365bac6144780613c9169cf3d9e1dafbab91cf80bdc357c",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-script-runtime/1.9.24/kotlin-script-runtime-1.9.24.jar"
+  },
+  {
+    "artifact": "kotlin-reflect",
+    "version": "1.9.24",
+    "sha256": "a65166445bb85ef816cde127279fe0017d2b7cc439b3b972390e1b736d64e94c",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-reflect/1.9.24/kotlin-reflect-1.9.24.jar"
+  },
+  {
+    "artifact": "trove4j",
+    "version": "1.0.20200330",
+    "sha256": "c5fd725bffab51846bf3c77db1383c60aaaebfe1b7fe2f00d23fe1b7df0a439d",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/intellij/deps/trove4j/1.0.20200330/trove4j-1.0.20200330.jar"
+  },
+  {
+    "artifact": "annotations",
+    "version": "13.0",
+    "sha256": "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/13.0/annotations-13.0.jar"
+  },
+  {
+    "artifact": "kotlinx-coroutines-core-jvm",
+    "version": "1.6.4",
+    "sha256": "c24c8bb27bb320c4a93871501a7e5e0c61607638907b197aef675513d4c820be",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.6.4/kotlinx-coroutines-core-jvm-1.6.4.jar"
+  }
+]
