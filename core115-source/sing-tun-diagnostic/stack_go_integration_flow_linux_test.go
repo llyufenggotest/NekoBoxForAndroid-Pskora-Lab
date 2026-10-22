@@ -220,18 +220,27 @@ func TestGoKernelZeroWindowHalfClose(t *testing.T) {
 			}}
 			fixture, traffic := newKernelTCPFixture(test, config, kernelTCPConfig{})
 			client, server := fixture.pair(test, ipv6)
-			// The loopback peer can advertise the pre-clamp window in the handshake
-			// and publish the effective TCP_WINDOW_CLAMP in the following ACK. Wait
-			// for that ACK before sizing the payload; otherwise a fast runner may
-			// write against the stale larger window and can never reach the intended
-			// state where every payload byte is acknowledged at a zero window.
+			// Linux may raise TCP_WINDOW_CLAMP to its minimum effective value, so
+			// read back the real socket setting instead of assuming the requested
+			// 1024-byte value. The peer permit includes the SYN sequence byte.
+			var effectiveClamp int
+			rawConn, err := client.SyscallConn()
+			if err != nil {
+				test.Fatal(err)
+			}
+			err = rawConn.Control(func(descriptor uintptr) {
+				effectiveClamp, err = unix.GetsockoptInt(int(descriptor), unix.IPPROTO_TCP, unix.TCP_WINDOW_CLAMP)
+			})
+			if err != nil {
+				test.Fatal(err)
+			}
 			deadline := time.Now().Add(time.Second)
-			for server.sendPermit.Load()&^goPermitWindowBit > 1024 && time.Now().Before(deadline) {
+			for server.sendPermit.Load()&^goPermitWindowBit > uint64(effectiveClamp+1) && time.Now().Before(deadline) {
 				time.Sleep(time.Millisecond)
 			}
 			permit := server.sendPermit.Load() &^ goPermitWindowBit
-			if permit <= 1 || permit > 1024 {
-				test.Fatalf("effective clamped receive window was not published: permit=%d", permit)
+			if permit <= 1 || permit > uint64(effectiveClamp+1) {
+				test.Fatalf("effective clamped receive window was not published: permit=%d clamp=%d", permit, effectiveClamp)
 			}
 			payload := kernelPayload(int(permit-1), 139)
 			_, err := server.Write(payload)
