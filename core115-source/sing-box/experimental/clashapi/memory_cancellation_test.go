@@ -20,14 +20,63 @@ import (
 // net/http writer/controller/connection. A non-reading peer must block TCP Write.
 type saturatedMemoryWriter struct {
 	http.ResponseWriter
+	payload []byte
 	entered chan struct{}
 	once    sync.Once
+}
+
+// Observe the actual connection write, including writes made by net/http's
+// Flush after saturatedMemoryWriter.Write has returned. The per-connection
+// channel identifies its writer goroutine, never an unrelated test's socket.
+type saturatedMemoryConn struct {
+	*net.TCPConn
+	writer chan string
+	once   sync.Once
+}
+
+func (c *saturatedMemoryConn) Write(p []byte) (int, error) {
+	c.once.Do(func() {
+		var header [64]byte
+		n := runtime.Stack(header[:], false)
+		fields := strings.Fields(string(header[:n]))
+		c.writer <- "goroutine " + fields[1] + " "
+	})
+	return c.TCPConn.Write(p)
+}
+
+type saturatedMemoryListener struct {
+	net.Listener
+	writer chan string
+}
+
+func (l *saturatedMemoryListener) Accept() (net.Conn, error) {
+	c, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return &saturatedMemoryConn{TCPConn: c.(*net.TCPConn), writer: l.writer}, nil
+}
+
+func saturatedMemoryWriteBlocked(stack, writer string) (string, bool) {
+	if writer == "" {
+		return "", false
+	}
+	for _, g := range strings.Split(stack, "\n\n") {
+		if strings.HasPrefix(g, writer) &&
+			(strings.Contains(strings.SplitN(g, "\n", 2)[0], "[IO wait]") ||
+				strings.Contains(strings.SplitN(g, "\n", 2)[0], "[syscall]")) &&
+			strings.Contains(g, "saturatedMemoryConn).Write") &&
+			strings.Contains(g, "internal/poll.(*FD).Write") {
+			return g, true
+		}
+	}
+	return "", false
 }
 
 func (w *saturatedMemoryWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 func (w *saturatedMemoryWriter) Write(p []byte) (int, error) {
 	w.once.Do(func() { close(w.entered) })
-	_, err := w.ResponseWriter.Write(bytes.Repeat([]byte("x"), 8<<20))
+	_, err := w.ResponseWriter.Write(w.payload)
 	if err != nil {
 		return 0, err
 	}
@@ -42,12 +91,16 @@ func TestMemoryRealSocketSaturatedCancellation(t *testing.T) {
 			req, stopRequest := context.WithCancel(context.Background())
 			defer stopRequest()
 			done, entered := make(chan struct{}), make(chan struct{})
+			// Fixture allocation is not socket readiness and must precede it.
+			payload := bytes.Repeat([]byte("x"), 8<<20)
+			writer := make(chan string, 1)
 			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				defer close(done)
-				memory(core)(&saturatedMemoryWriter{ResponseWriter: w, entered: entered}, r.WithContext(req))
+				memory(core)(&saturatedMemoryWriter{ResponseWriter: w, payload: payload, entered: entered}, r.WithContext(req))
 			}))
+			server.Listener = &saturatedMemoryListener{Listener: server.Listener, writer: writer}
 			server.Config.ConnContext = func(ctx context.Context, c net.Conn) context.Context {
-				if err := c.(*net.TCPConn).SetWriteBuffer(1024); err != nil {
+				if err := c.(*saturatedMemoryConn).SetWriteBuffer(1024); err != nil {
 					t.Error(err)
 				}
 				return ctx
@@ -66,26 +119,41 @@ func TestMemoryRealSocketSaturatedCancellation(t *testing.T) {
 				t.Fatal(err)
 			}
 			<-entered
-			// Verify real net FD Write stack, not merely a mock deadline callback.
+			// Verify this connection's real, OS-blocked FD Write, whether the
+			// handler is in Write or in the following ResponseController.Flush.
 			until := time.Now().Add(time.Second)
 			blocked := false
+			writerID := ""
+			buf := make([]byte, 64<<10)
+			var observed, previous string
 			for time.Now().Before(until) {
-				buf := make([]byte, 1<<20)
-				n := runtime.Stack(buf, true)
-				for _, g := range strings.Split(string(buf[:n]), "\n\n") {
-					if strings.Contains(g, "saturatedMemoryWriter).Write") && strings.Contains(g, "internal/poll.(*FD).Write") {
-						blocked = true
+				if writerID == "" {
+					select {
+					case writerID = <-writer:
+					default:
 					}
 				}
-				if blocked {
+				n := runtime.Stack(buf, true)
+				if n == len(buf) {
+					// Never interpret a truncated all-goroutine snapshot.
+					buf = make([]byte, len(buf)*2)
+					continue
+				}
+				observed, blocked = saturatedMemoryWriteBlocked(string(buf[:n]), writerID)
+				// A Windows WSASend syscall frame alone can be transient. Require
+				// the same owned FD write stack across separated observations.
+				if blocked && observed == previous {
 					break
 				}
+				previous = observed
+				blocked = false
 				time.Sleep(time.Millisecond)
 			}
 			if !blocked {
 				conn.Close()
 				t.Fatal("TCP send did not saturate")
 			}
+			t.Logf("owned real FD write before %s cancel:\n%s", owner, observed)
 			if owner == "request" {
 				stopRequest()
 			} else {
