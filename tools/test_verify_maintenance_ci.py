@@ -30,6 +30,7 @@ class MaintenanceCIContractTest(unittest.TestCase):
             'feature/anytls-oix-snell',
             'upgrade/sing-box-1.15.0-alpha.12',
             'feature/blackstone-parity-integration-20261016',
+            'repair/positive-power-integration-20261022',
         ], re.findall(r'^      - (.+)$', block, re.M))
 
     def test_verifier_rejects_wildcard_or_extra_branch(self):

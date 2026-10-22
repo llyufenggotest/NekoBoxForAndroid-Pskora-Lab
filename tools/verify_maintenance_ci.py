@@ -11,6 +11,7 @@ PUSH_BRANCHES = (
     'feature/anytls-oix-snell',
     'upgrade/sing-box-1.15.0-alpha.12',
     'feature/blackstone-parity-integration-20261016',
+    'repair/positive-power-integration-20261022',
 )
 
 REQUIRED = (
@@ -39,6 +40,10 @@ REQUIRED = (
     "assembleOssRelease",
     "arm64-v8a",
     "apksigner",
+    "Positive optimization lifecycle race gates",
+    "github.com/sagernet/sing-tun github.com/sagernet/sing-box/experimental/clashapi github.com/sagernet/sing-box/common/urltest",
+    "positive-lifecycle-race-normal.jsonl",
+    "positive-lifecycle-race-lowmem.jsonl",
     "sha256sum",
 )
 

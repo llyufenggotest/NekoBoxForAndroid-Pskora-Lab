@@ -8,6 +8,7 @@ on:
       - feature/anytls-oix-snell
       - upgrade/sing-box-1.15.0-alpha.12
       - feature/blackstone-parity-integration-20261016
+      - repair/positive-power-integration-20261022
     tags:
       - core115-validated250-maintenance-candidate-*
 
@@ -70,6 +71,25 @@ jobs:
         with:
           name: blackstone-race-diagnostics
           path: ${{ runner.temp }}/blackstone-race-*.jsonl
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Positive optimization lifecycle race gates
+        shell: bash
+        env:
+          CGO_ENABLED: "1"
+          CC: gcc
+        run: |
+          set -euo pipefail
+          (cd core115-source/libcore && go test -race -json -count=1 -timeout=120s -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' \
+            github.com/sagernet/sing-tun github.com/sagernet/sing-box/experimental/clashapi github.com/sagernet/sing-box/common/urltest) | tee "$RUNNER_TEMP/positive-lifecycle-race-normal.jsonl"
+          (cd core115-source/libcore && go test -race -json -count=1 -timeout=120s -tags='with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_low_memory' \
+            github.com/sagernet/sing-tun github.com/sagernet/sing-box/experimental/clashapi github.com/sagernet/sing-box/common/urltest) | tee "$RUNNER_TEMP/positive-lifecycle-race-lowmem.jsonl"
+      - name: Preserve positive lifecycle diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: positive-lifecycle-race-diagnostics
+          path: ${{ runner.temp }}/positive-lifecycle-race-*.jsonl
           if-no-files-found: warn
           retention-days: 7
       - name: Prepare private Oix DNS-Auth build input
