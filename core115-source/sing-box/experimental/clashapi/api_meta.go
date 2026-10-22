@@ -1,8 +1,10 @@
 package clashapi
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"runtime"
@@ -48,14 +50,34 @@ func memory(owner context.Context) func(w http.ResponseWriter, r *http.Request) 
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, release := requestContext(r.Context(), owner)
 		defer release()
+		ctx, peerCancel := context.WithCancel(ctx)
+		defer peerCancel()
 		var conn net.Conn
 		if r.Header.Get("Upgrade") == "websocket" {
 			var err error
-			conn, _, _, err = ws.UpgradeHTTP(r, w)
+			var buffered *bufio.ReadWriter
+			conn, buffered, _, err = ws.UpgradeHTTP(r, w)
 			if err != nil {
 				return
 			}
-			defer conn.Close()
+			// Hijacking detaches net/http's disconnect detection. A read-only
+			// pump observes EOF/close without racing the single frame writer.
+			// Close unblocks it on every handler return, and always join it.
+			peerDone := make(chan struct{})
+			go func() {
+				defer close(peerDone)
+				defer peerCancel()
+				for {
+					header, readErr := ws.ReadHeader(buffered.Reader)
+					if readErr != nil || header.OpCode == ws.OpClose {
+						return
+					}
+					if _, readErr = io.CopyN(io.Discard, buffered.Reader, header.Length); readErr != nil {
+						return
+					}
+				}
+			}()
+			defer func() { conn.Close(); <-peerDone }()
 		}
 
 		if conn == nil {

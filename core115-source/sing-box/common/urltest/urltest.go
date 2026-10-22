@@ -54,18 +54,41 @@ func (s *HistoryStorage) LoadURLTestHistory(tag string) *adapter.URLTestHistory 
 	return s.delayHistory[tag]
 }
 
+// DeleteURLTestHistory preserves the unconditional contract for existing callers.
 func (s *HistoryStorage) DeleteURLTestHistory(tag string) {
+	s.DeleteURLTestHistoryIf(tag, nil)
+}
+
+// DeleteURLTestHistoryIf admits a publication only after acquiring the commit
+// lock. valid must be non-blocking and must not call back into HistoryStorage.
+// A false guard is a no-op, including notifications. The last successful guard
+// check is the linearization point: cancellation before it rejects publication;
+// cancellation after it may lose to the already admitted commit.
+func (s *HistoryStorage) DeleteURLTestHistoryIf(tag string, valid func() bool) bool {
 	s.access.Lock()
+	defer s.access.Unlock()
+	if valid != nil && !valid() {
+		return false
+	}
 	delete(s.delayHistory, tag)
 	s.notifyUpdated()
-	s.access.Unlock()
+	return true
 }
 
 func (s *HistoryStorage) StoreURLTestHistory(tag string, history *adapter.URLTestHistory) {
+	s.StoreURLTestHistoryIf(tag, history, nil)
+}
+
+// StoreURLTestHistoryIf has the same admission boundary as DeleteURLTestHistoryIf.
+func (s *HistoryStorage) StoreURLTestHistoryIf(tag string, history *adapter.URLTestHistory, valid func() bool) bool {
 	s.access.Lock()
+	defer s.access.Unlock()
+	if valid != nil && !valid() {
+		return false
+	}
 	s.delayHistory[tag] = history
 	s.notifyUpdated()
-	s.access.Unlock()
+	return true
 }
 
 func (s *HistoryStorage) notifyUpdated() {

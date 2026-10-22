@@ -235,17 +235,22 @@ func getProxyDelay(server *Server) func(w http.ResponseWriter, r *http.Request) 
 		defer func() {
 			// Cancellation is not a failed measurement; an old request/server
 			// must not delete a successor's successful history.
-			if r.Context().Err() != nil || server.ctx.Err() != nil {
+			valid := func() bool { return r.Context().Err() == nil && server.ctx.Err() == nil }
+			if !valid() {
 				return
 			}
 			realTag := group.RealTag(server.outbound, proxy)
+			var committed bool
 			if err != nil {
-				server.urlTestHistory.DeleteURLTestHistory(realTag)
+				committed = server.urlTestHistory.DeleteURLTestHistoryIf(realTag, valid)
 			} else {
-				server.urlTestHistory.StoreURLTestHistory(realTag, &adapter.URLTestHistory{
+				committed = server.urlTestHistory.StoreURLTestHistoryIf(realTag, &adapter.URLTestHistory{
 					Time:  time.Now(),
 					Delay: delay,
-				})
+				}, valid)
+			}
+			if !committed {
+				return
 			}
 			for _, detour := range server.outbound.Outbounds() {
 				urlTestGroup, isURLTestGroup := detour.(adapter.URLTestGroup)
