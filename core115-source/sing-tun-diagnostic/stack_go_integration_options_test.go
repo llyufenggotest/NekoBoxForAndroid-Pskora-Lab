@@ -171,21 +171,27 @@ func TestGoConnKeepalive(t *testing.T) {
 				test.Fatal(err)
 			}
 			recorder := recordWire(test, fixture, port)
-			time.Sleep(2 * time.Second)
+			deadline := time.Now().Add(2 * time.Second)
 			probes := 0
 			answered := 0
 			var awaiting []uint32
-			for _, segment := range recorder.take() {
-				switch {
-				case segment.probe():
-					probes++
-					awaiting = append(awaiting, segment.sequence+1)
-				case !segment.outbound && segment.payload == 0 && len(awaiting) > 0 && segment.ack == awaiting[0]:
-					answered++
-					awaiting = awaiting[1:]
+			for time.Now().Before(deadline) {
+				for _, segment := range recorder.take() {
+					switch {
+					case segment.probe():
+						probes++
+						awaiting = append(awaiting, segment.sequence+1)
+					case !segment.outbound && segment.payload == 0 && len(awaiting) > 0 && segment.ack == awaiting[0]:
+						answered++
+						awaiting = awaiting[1:]
+					}
 				}
+				if probes >= 2 && answered == probes && len(awaiting) == 0 {
+					break
+				}
+				time.Sleep(10 * time.Millisecond)
 			}
-			if probes < 2 || answered != probes {
+			if probes < 2 || answered != probes || len(awaiting) != 0 {
 				test.Fatalf("kernel answered %d of %d probes sent while idle for 2s", answered, probes)
 			}
 			err = kernelTransfer(conn, kernel, kernelPayload(1<<20, 5), false)

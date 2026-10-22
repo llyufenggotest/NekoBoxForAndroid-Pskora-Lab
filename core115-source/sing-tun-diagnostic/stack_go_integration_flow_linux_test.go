@@ -220,12 +220,25 @@ func TestGoKernelZeroWindowHalfClose(t *testing.T) {
 			}}
 			fixture, traffic := newKernelTCPFixture(test, config, kernelTCPConfig{})
 			client, server := fixture.pair(test, ipv6)
-			payload := kernelPayload(int(server.sendPermit.Load()&^goPermitWindowBit-1), 139)
+			// The loopback peer can advertise the pre-clamp window in the handshake
+			// and publish the effective TCP_WINDOW_CLAMP in the following ACK. Wait
+			// for that ACK before sizing the payload; otherwise a fast runner may
+			// write against the stale larger window and can never reach the intended
+			// state where every payload byte is acknowledged at a zero window.
+			deadline := time.Now().Add(time.Second)
+			for server.sendPermit.Load()&^goPermitWindowBit > 1024 && time.Now().Before(deadline) {
+				time.Sleep(time.Millisecond)
+			}
+			permit := server.sendPermit.Load() &^ goPermitWindowBit
+			if permit <= 1 || permit > 1024 {
+				test.Fatalf("effective clamped receive window was not published: permit=%d", permit)
+			}
+			payload := kernelPayload(int(permit-1), 139)
 			_, err := server.Write(payload)
 			if err != nil {
 				test.Fatal(err)
 			}
-			deadline := time.Now().Add(time.Second)
+			deadline = time.Now().Add(time.Second)
 			for time.Now().Before(deadline) {
 				if server.sendUnacked.Load() == uint64(len(payload)+1) && server.sendPermit.Load()&^goPermitWindowBit == server.sendUnacked.Load() {
 					break
