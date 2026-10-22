@@ -175,13 +175,17 @@ func TestGoConnKeepalive(t *testing.T) {
 			probes := 0
 			answered := 0
 			awaiting := make(map[uint32]bool)
+			acknowledged := make(map[uint32]bool)
 			started := false
 			for time.Now().Before(deadline) {
 				for _, segment := range recorder.take() {
 					switch {
 					case segment.probe():
 						probes++
-						awaiting[segment.sequence+1] = true
+						probeACK := segment.sequence + 1
+						if !acknowledged[probeACK] {
+							awaiting[probeACK] = true
+						}
 						if !started {
 							// Keep the two-second observation budget for probe/ACK traffic;
 							// scheduler delay before the first probe must not consume it.
@@ -191,6 +195,7 @@ func TestGoConnKeepalive(t *testing.T) {
 					case !segment.outbound && segment.payload == 0:
 						if awaiting[segment.ack] {
 							answered++
+							acknowledged[segment.ack] = true
 							delete(awaiting, segment.ack)
 						}
 					}
